@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowRight, ArrowLeft, Sparkles, Loader2 } from "lucide-react"
+import { ArrowRight, ArrowLeft, Sparkles, Loader2, Globe } from "lucide-react"
 
 const TONES = [
   { value: "FRIENDLY", label: "Friendly", desc: "Warm and approachable" },
@@ -24,6 +24,8 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     website: "",
@@ -50,6 +52,45 @@ export default function OnboardingPage() {
   const set = (name: string, value: string) =>
     setForm((prev) => ({ ...prev, [name]: value }))
 
+  const importFromWebsite = async () => {
+    if (!form.website.trim()) {
+      toast.error("Enter your website address first")
+      return
+    }
+    setImporting(true)
+    try {
+      const res = await fetch("/api/organization/import-from-website", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: form.website.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Import failed")
+
+      setForm((prev) => ({
+        ...prev,
+        website: data.website || prev.website,
+        email: data.contactEmail || prev.email,
+        phone: data.contactPhone || prev.phone,
+        mainServices: data.services?.length ? data.services.join(", ") : prev.mainServices,
+        areasCovered: data.areasCovered?.length ? data.areasCovered.join(", ") : prev.areasCovered,
+        yearEstablished: data.yearEstablished ? String(data.yearEstablished) : prev.yearEstablished,
+        mainUSP: data.mainUSP || prev.mainUSP,
+        reviewCount: data.reviewCount ? String(data.reviewCount) : prev.reviewCount,
+        whyChooseUs: data.whyChooseUs || prev.whyChooseUs,
+        brandColor: data.brandColor || prev.brandColor,
+        proposalTone: data.suggestedTone || prev.proposalTone,
+      }))
+      if (data.logoUrl) setLogoUrl(data.logoUrl)
+
+      toast.success("Details imported — please check everything before continuing")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Import failed")
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const saveDetails = async () => {
     setSaving(true)
     try {
@@ -58,6 +99,7 @@ export default function OnboardingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           website: form.website || "",
+          ...(logoUrl && { logoUrl }),
           brandColor: form.brandColor,
           secondaryColor: form.secondaryColor,
           email: form.email || "",
@@ -157,9 +199,35 @@ export default function OnboardingPage() {
             <div className="space-y-4">
               <div>
                 <label className={labelCls}>Website</label>
-                <input type="url" placeholder="https://yourcompany.co.uk" className={inputCls}
-                  value={form.website} onChange={(e) => set("website", e.target.value)} />
+                <div className="flex gap-2">
+                  <input type="url" placeholder="https://yourcompany.co.uk" className={inputCls}
+                    value={form.website} onChange={(e) => set("website", e.target.value)} />
+                  <button type="button" onClick={importFromWebsite} disabled={importing}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 bg-brand-navy text-white rounded-lg text-sm font-semibold hover:bg-slate-800 transition disabled:opacity-50">
+                    {importing ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Globe className="w-4 h-4" />
+                    )}
+                    <span className="hidden sm:inline">{importing ? "Importing…" : "Import"}</span>
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  We&apos;ll pull your logo, colours, services and contact details from your site.
+                  You review everything before it&apos;s used.
+                </p>
               </div>
+              {logoUrl && (
+                <div className="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-lg p-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={logoUrl} alt="Imported logo" className="h-12 max-w-[120px] object-contain bg-white rounded p-1" />
+                  <div className="text-sm text-gray-600 flex-1">Logo found on your site</div>
+                  <button type="button" onClick={() => setLogoUrl(null)}
+                    className="text-xs text-gray-400 hover:text-red-500 font-medium">
+                    Remove
+                  </button>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>Contact email</label>

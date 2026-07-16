@@ -40,6 +40,11 @@ type ProposalData = {
 
 const STATUSES = ["DRAFT", "READY", "SENT", "WON", "LOST"] as const
 
+// photoIds goes to the API as an array but is stored locally as a JSON string
+type SectionPatch = Partial<Omit<Section, "photoIds">> & {
+  photoIds?: string[] | string | null
+}
+
 export default function ProposalEditorPage() {
   const { proposalId } = useParams<{ proposalId: string }>()
   const [proposal, setProposal] = useState<ProposalData | null>(null)
@@ -60,7 +65,7 @@ export default function ProposalEditorPage() {
   }, [proposalId])
 
   const updateSection = useCallback(
-    (sectionId: string, patch: Partial<Section> & { photoIds?: string[] | string | null }) => {
+    (sectionId: string, patch: SectionPatch) => {
       // API expects photoIds as an array; local state stores the JSON string
       const localPatch = {
         ...patch,
@@ -346,7 +351,7 @@ function PhotoPicker({
 }: {
   proposal: ProposalData
   section: Section
-  updateSection: (id: string, patch: Partial<Section> & { photoIds?: any }) => void
+  updateSection: (id: string, patch: SectionPatch) => void
 }) {
   let selected: string[] = []
   try {
