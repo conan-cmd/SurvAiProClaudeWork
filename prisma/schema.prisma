@@ -1,0 +1,277 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String          @id @default(cuid())
+  email                 String          @unique
+  name                  String?
+  password              String? // hashed via NextAuth
+  emailVerified         DateTime?
+  image                 String?
+
+  organizationId        String
+  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  role                  UserRole        @default(MEMBER)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([organizationId])
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model Organization {
+  id                    String          @id @default(cuid())
+  name                  String
+  website               String?
+  logoUrl               String?
+
+  // Brand configuration
+  brandColor            String          @default("#2563EB")
+  secondaryColor        String          @default("#10B981")
+  accentColor           String          @default("#0F172A")
+
+  // Company details
+  email                 String?
+  phone                 String?
+  mainServices          String? // JSON array
+  areasCovered          String? // JSON array
+  yearEstablished       Int?
+  mainUSP               String?
+  reviewCount           Int?          @default(0)
+  whyChooseUs           String?
+  proposalTone          ProposalTone  @default(PROFESSIONAL)
+
+  // Reusable sections
+  aboutUsSection        String?
+  whyChooseUsSection    String?
+  ourExperienceSection  String?
+  ourApproachSection    String?
+
+  users                 User[]
+  surveys               SiteSurvey[]
+  proposals             Proposal[]
+  templates             ProposalTemplate[]
+
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+}
+
+enum ProposalTone {
+  FRIENDLY
+  PROFESSIONAL
+  PREMIUM
+  TECHNICAL
+}
+
+model SiteSurvey {
+  id                    String          @id @default(cuid())
+  organizationId        String
+  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Client info
+  clientName            String
+  clientCompany         String?
+  clientEmail           String?
+  clientPhone           String?
+  clientAddress         String
+
+  // Survey details
+  title                 String
+  serviceType           String
+  isResidential         Boolean
+  clientPriorities      String?
+  accessNotes           String?
+  measurements          String?
+  exclusions            String?
+
+  // Content
+  writtenDescription    String?
+  photos                SurveyPhoto[]
+  voiceNotes            VoiceNote[]
+  transcripts           Transcript[]
+
+  // Proposal linkage
+  proposal              Proposal?
+
+  status                SurveyStatus     @default(DRAFT)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+enum SurveyStatus {
+  DRAFT
+  SUBMITTED
+  ARCHIVED
+}
+
+model SurveyPhoto {
+  id                    String          @id @default(cuid())
+  surveyId              String
+  survey                SiteSurvey      @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  fileUrl               String
+  fileName              String
+  fileSize              Int
+  caption               String?
+
+  order                 Int             @default(0)
+  isCoverImage          Boolean         @default(false)
+  includeInProposal     Boolean         @default(true)
+  internalOnly          Boolean         @default(false)
+
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([surveyId])
+}
+
+model VoiceNote {
+  id                    String          @id @default(cuid())
+  surveyId              String
+  survey                SiteSurvey      @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  fileUrl               String
+  fileName              String
+  duration              Int // seconds
+
+  transcript            Transcript?
+
+  createdAt             DateTime        @default(now())
+
+  @@index([surveyId])
+}
+
+model Transcript {
+  id                    String          @id @default(cuid())
+  voiceNoteId           String          @unique
+  voiceNote             VoiceNote       @relation(fields: [voiceNoteId], references: [id], onDelete: Cascade)
+
+  surveyId              String
+  survey                SiteSurvey      @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  text                  String
+  approved              Boolean         @default(false)
+
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([surveyId])
+}
+
+model ProposalTemplate {
+  id                    String          @id @default(cuid())
+  organizationId        String
+  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name                  String          // Quick Quote, Consultative, Authority
+  sections              String          // JSON array of section configs
+  description           String?
+
+  createdAt             DateTime        @default(now())
+
+  @@index([organizationId])
+}
+
+model Proposal {
+  id                    String          @id @default(cuid())
+  organizationId        String
+  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  surveyId              String          @unique
+  survey                SiteSurvey      @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  // Client reference
+  clientName            String
+  clientEmail           String?
+
+  // Template & content
+  templateName          String          // Quick Quote, Consultative, Authority
+  sections              ProposalSection[]
+  pricingLineItems      PricingLineItem[]
+
+  // Metadata
+  status                ProposalStatus  @default(DRAFT)
+  sentAt                DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  shareLinks            ShareLink[]
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+model ShareLink {
+  id                    String          @id @default(cuid())
+  proposalId            String
+  proposal              Proposal        @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  token                 String          @unique // unguessable, generated with crypto
+  expiresAt             DateTime
+  revoked               Boolean         @default(false)
+  viewCount             Int             @default(0)
+  lastViewedAt          DateTime?
+
+  createdAt             DateTime        @default(now())
+
+  @@index([proposalId])
+}
+
+enum ProposalStatus {
+  DRAFT
+  READY
+  SENT
+  WON
+  LOST
+}
+
+model ProposalSection {
+  id                    String          @id @default(cuid())
+  proposalId            String
+  proposal              Proposal        @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  type                  String          // Cover, Scope, Photos, Pricing, etc
+  title                 String
+  content               String          // Markdown or structured data
+  order                 Int
+  isEditable            Boolean         @default(true)
+
+  photoIds              String? // JSON array of photo IDs to include
+
+  updatedAt             DateTime        @updatedAt
+
+  @@index([proposalId])
+}
+
+model PricingLineItem {
+  id                    String          @id @default(cuid())
+  proposalId            String
+  proposal              Proposal        @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  description           String
+  quantity              Float
+  unit                  String          // e.g., "hours", "sqft", "each"
+  unitPrice             Float
+  vat                   Float           @default(0)
+  discount              Float           @default(0)
+  isOptional            Boolean         @default(false)
+
+  order                 Int             @default(0)
+
+  @@index([proposalId])
+}
