@@ -113,7 +113,9 @@ export async function POST(request: NextRequest) {
           siteAddress: survey.clientAddress,
         })
       } else if (def.type === "terms") {
-        content = "Payment due within 14 days of invoice. Quote valid for 30 days. Please review and adjust these terms."
+        content =
+          org.termsAndConditions ||
+          "MISSING: Add your standard Terms and Conditions in Settings so they appear on every proposal automatically."
       }
 
       return {

@@ -59,6 +59,9 @@ model Organization {
   ourExperienceSection  String?
   ourApproachSection    String?
 
+  // Standard T&Cs library, reused on every proposal (user-editable)
+  termsAndConditions    String?
+
   users                 User[]
   surveys               SiteSurvey[]
   proposals             Proposal[]

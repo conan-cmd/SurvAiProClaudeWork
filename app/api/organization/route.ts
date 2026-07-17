@@ -23,6 +23,7 @@ const updateOrgSchema = z.object({
   whyChooseUsSection: z.string().optional(),
   ourExperienceSection: z.string().optional(),
   ourApproachSection: z.string().optional(),
+  termsAndConditions: z.string().optional(),
 })
 
 export async function GET() {

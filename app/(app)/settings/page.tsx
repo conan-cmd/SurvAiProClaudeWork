@@ -23,6 +23,7 @@ type Org = {
   whyChooseUsSection: string | null
   ourExperienceSection: string | null
   ourApproachSection: string | null
+  termsAndConditions: string | null
 }
 
 export default function SettingsPage() {
@@ -66,6 +67,7 @@ export default function SettingsPage() {
           whyChooseUsSection: org.whyChooseUsSection || "",
           ourExperienceSection: org.ourExperienceSection || "",
           ourApproachSection: org.ourApproachSection || "",
+          termsAndConditions: org.termsAndConditions || "",
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
@@ -202,6 +204,16 @@ export default function SettingsPage() {
               onChange={(e) => set(key, e.target.value)} />
           </div>
         ))}
+      </section>
+
+      <section className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+        <h2 className="font-semibold text-brand-navy">Standard Terms & Conditions</h2>
+        <p className="text-sm text-gray-500">
+          Added to every proposal automatically. One term per line.
+        </p>
+        <textarea rows={12} className={inputCls} value={org.termsAndConditions || ""}
+          onChange={(e) => set("termsAndConditions", e.target.value)}
+          placeholder={"Our quotation includes one continuous site visit for the works unless stated otherwise…\nAccess to water supply and electricity is assumed unless specified otherwise…\nPayment terms are 14 days from completion of works…"} />
       </section>
 
       <button onClick={save} disabled={saving}
