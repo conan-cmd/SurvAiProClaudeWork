@@ -26,3 +26,6 @@ next-env.d.ts
 
 # prisma
 prisma/migrations/dev/
+
+# local file storage
+uploads/
