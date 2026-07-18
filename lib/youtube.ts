@@ -1,6 +1,7 @@
 export type ChannelVideo = {
   videoId: string
   title: string
+  description?: string
   thumbnail: string
   url: string
 }
@@ -49,9 +50,14 @@ export async function fetchChannelVideos(channelUrl: string): Promise<ChannelVid
     // hashtag-titled Shorts, which say nothing useful about the job
     if (!videoId || !title || /^https?:\/\//i.test(title)) continue
     if ((title.match(/#/g) || []).length >= 2 || title.trim().startsWith("#")) continue
+    const description = entry
+      .match(/<media:description>([\s\S]*?)<\/media:description>/)?.[1]
+      ?.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+      .slice(0, 500)
     videos.push({
       videoId,
       title,
+      description,
       thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
       url: `https://www.youtube.com/watch?v=${videoId}`,
     })
@@ -76,11 +82,20 @@ export function rankRelevantVideos(
 
   const scored = videos
     .map((v) => {
-      const title = v.title.toLowerCase()
-      const score = terms.reduce((s, t) => s + (title.includes(t) ? 1 : 0), 0)
+      // Match on title + description with hashtags stripped out - tags are
+      // broad/generic and cause false matches. Title hits count double.
+      const clean = (s: string) => s.toLowerCase().replace(/#\w+/g, " ")
+      const title = clean(v.title)
+      const desc = clean(v.description || "")
+      const score = terms.reduce(
+        (s, t) => s + (title.includes(t) ? 2 : 0) + (desc.includes(t) ? 1 : 0),
+        0
+      )
       return { v, score }
     })
-    .filter((x) => x.score > 0)
+    // Require a solid match (a title hit, or multiple description hits) -
+    // a single stray description word is not "similar work"
+    .filter((x) => x.score >= 2)
     .sort((a, b) => b.score - a.score)
 
   return scored.slice(0, max).map((x) => x.v)
