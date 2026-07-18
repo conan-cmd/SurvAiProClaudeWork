@@ -36,6 +36,16 @@ customer through a salesperson's decision journey — not just display a quote.
 - Admin settings: deposit rules, payment methods, Stripe connection, bank
   details, deposit/invoice wording, proposal validity period.
 
+## Proposal engagement analytics (FUTURE — Conan, July 2026)
+Beyond the "Viewed" status: track TIME SPENT PER SECTION/PAGE on the shared
+proposal link (IntersectionObserver dwell-time on each section, batched pings).
+Surface to the business: total time, per-section breakdown, view count, last
+viewed, device. Sales value: see whether they lingered on Investment (price
+objection?) or testimonials (nearly convinced), time follow-up calls after a
+long read. Aggregate later into conversion insight ("proposals where the client
+reads Why Choose Us convert X% higher"). Privacy: disclose tracking in share
+footer; no third-party analytics needed - first-party pings to our API.
+
 ## RAMS & Job Pack generation (FUTURE — Conan, July 2026)
 Auto-generate RAMS (Risk Assessment & Method Statement) from site-visit + proposal
 data once a job is won:
