@@ -36,6 +36,24 @@ customer through a salesperson's decision journey — not just display a quote.
 - Admin settings: deposit rules, payment methods, Stripe connection, bank
   details, deposit/invoice wording, proposal validity period.
 
+## RAMS & Job Pack generation (FUTURE — Conan, July 2026)
+Auto-generate RAMS (Risk Assessment & Method Statement) from site-visit + proposal
+data once a job is won:
+- Method statement derived FROM the proposal's scope/solution/programme sections so
+  operatives execute exactly what was sold — no scope creep on site
+- Strips ALL pricing/commercial data (operatives don't see money)
+- Includes: site address + coordinates/what3words, access notes, site photos
+  (internal-only ones included), measurements, sequence of works, equipment
+- Risk assessment seeded from a per-service hazard library (working at height,
+  MEWPs/rope access, pressure/steam systems, COSHH for chemicals, public
+  protection, water runoff) + site-specific hazards detected in survey notes/photos
+- Org data feeds in: accreditations (CHAS etc.), insurance, trained operatives
+- CRITICAL: AI drafts, a competent person MUST review/approve before issue —
+  RAMS are safety documents, stronger human-review gate than proposals
+- Output: "Job Pack" PDF + structured export (JSON/CSV) for import into field
+  management systems (confirm which FMS + its import format with Conan)
+- Trigger: proposal marked Won → Job Created → job pack offered
+
 ## Long-term vision
 Survey → AI Proposal → Pricing → Supporting Docs → Signature → Deposit → Job →
 Invoice → Profit Analysis. Remove every manual step between surveying and getting
