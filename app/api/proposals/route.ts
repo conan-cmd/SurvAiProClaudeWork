@@ -4,6 +4,7 @@ import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { getTemplate } from "@/lib/templates"
 import { generateProposalSections, friendlyAIError } from "@/lib/ai"
+import { fetchChannelVideos, rankRelevantVideos } from "@/lib/youtube"
 
 const createProposalSchema = z.object({
   surveyId: z.string().min(1),
@@ -127,6 +128,33 @@ export async function POST(request: NextRequest) {
           def.type === "photos" ? JSON.stringify(survey.photos.map((p) => p.id)) : null,
       }
     })
+
+    // Auto-suggest similar-project videos from the org's YouTube channel.
+    // Only added when titles genuinely match the job; the user can remove
+    // or re-pick videos in the editor. Failure here never blocks generation.
+    if (org.youtubeChannelUrl) {
+      try {
+        const videos = await fetchChannelVideos(org.youtubeChannelUrl)
+        const relevant = rankRelevantVideos(
+          videos,
+          `${survey.serviceType} ${survey.title} ${survey.writtenDescription || ""}`
+        )
+        if (relevant.length) {
+          const pricingIndex = sectionsData.findIndex((s) => s.type === "pricing")
+          const insertAt = pricingIndex === -1 ? sectionsData.length : pricingIndex
+          sectionsData.splice(insertAt, 0, {
+            type: "videos",
+            title: "Similar Projects In Action",
+            content: JSON.stringify(relevant),
+            order: 0,
+            photoIds: null,
+          })
+          sectionsData.forEach((s, i) => (s.order = i))
+        }
+      } catch (err) {
+        console.error("Video suggestion skipped:", err)
+      }
+    }
 
     const proposal = await db.proposal.create({
       data: {

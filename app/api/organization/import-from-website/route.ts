@@ -137,6 +137,9 @@ export async function POST(request: NextRequest) {
   const logoUrl = extractLogo(html, url)
   const emailMatch = html.match(/mailto:([^"'?\s>]+)/i)
   const phoneMatch = html.match(/tel:([+\d()\s-]{7,20})["'\s>]/i)
+  const youtubeMatch = html.match(
+    /https?:\/\/(?:www\.)?youtube\.com\/(@[\w.-]+|channel\/UC[\w-]{22}|c\/[\w-]+|user\/[\w-]+)/i
+  )
 
   // AI extraction from visible text
   const text = htmlToText(html).slice(0, 9000)
@@ -182,6 +185,9 @@ Respond with JSON: {"companyName": string|null, "services": string[], "areasCove
     reviewCount: typeof aiData.reviewCount === "number" ? aiData.reviewCount : null,
     contactEmail: aiData.contactEmail || emailMatch?.[1] || null,
     contactPhone: aiData.contactPhone || phoneMatch?.[1]?.trim() || null,
+    youtubeChannelUrl: youtubeMatch
+      ? `https://www.youtube.com/${youtubeMatch[1]}`
+      : null,
     suggestedTone: ["FRIENDLY", "PROFESSIONAL", "PREMIUM", "TECHNICAL"].includes(
       aiData.suggestedTone as string
     )

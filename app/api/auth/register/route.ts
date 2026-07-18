@@ -4,10 +4,10 @@ import { z } from "zod"
 import { db } from "@/lib/db"
 
 const registerSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.string().trim().email("Invalid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  companyName: z.string().min(1, "Company name is required"),
-  name: z.string().optional(),
+  companyName: z.string().trim().min(1, "Company name is required"),
+  name: z.string().trim().optional(),
 })
 
 export async function POST(request: NextRequest) {

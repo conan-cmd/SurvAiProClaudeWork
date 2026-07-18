@@ -33,6 +33,7 @@ export default function OnboardingPage() {
     secondaryColor: "#10B981",
     email: "",
     phone: "",
+    youtubeChannelUrl: "",
     mainServices: "",
     areasCovered: "",
     yearEstablished: "",
@@ -72,6 +73,7 @@ export default function OnboardingPage() {
         website: data.website || prev.website,
         email: data.contactEmail || prev.email,
         phone: data.contactPhone || prev.phone,
+        youtubeChannelUrl: data.youtubeChannelUrl || prev.youtubeChannelUrl,
         mainServices: data.services?.length ? data.services.join(", ") : prev.mainServices,
         areasCovered: data.areasCovered?.length ? data.areasCovered.join(", ") : prev.areasCovered,
         yearEstablished: data.yearEstablished ? String(data.yearEstablished) : prev.yearEstablished,
@@ -99,6 +101,7 @@ export default function OnboardingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           website: form.website || "",
+          youtubeChannelUrl: form.youtubeChannelUrl || "",
           ...(logoUrl && { logoUrl }),
           brandColor: form.brandColor,
           secondaryColor: form.secondaryColor,
@@ -239,6 +242,14 @@ export default function OnboardingPage() {
                   <input type="tel" placeholder="020 1234 5678" className={inputCls}
                     value={form.phone} onChange={(e) => set("phone", e.target.value)} />
                 </div>
+              </div>
+              <div>
+                <label className={labelCls}>YouTube channel (optional)</label>
+                <input type="url" placeholder="https://www.youtube.com/@YourChannel" className={inputCls}
+                  value={form.youtubeChannelUrl} onChange={(e) => set("youtubeChannelUrl", e.target.value)} />
+                <p className="text-xs text-gray-400 mt-1">
+                  SurvAIPro will suggest videos of similar jobs to include in your proposals.
+                </p>
               </div>
               <div>
                 <label className={labelCls}>Main services (comma separated)</label>
