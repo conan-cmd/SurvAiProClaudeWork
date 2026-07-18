@@ -280,7 +280,7 @@ export function ProposalDocument({ data }: { data: ProposalDocumentData }) {
           <section key={section.id} className="py-8 px-2 md:px-0 break-inside-avoid-page">
             <h2
               className="text-xl font-bold mb-1"
-              style={{ color: "#0F172A" }}
+              style={{ color: data.organization.brandColor }}
             >
               {section.title}
             </h2>

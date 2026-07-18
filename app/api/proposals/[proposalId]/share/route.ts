@@ -24,7 +24,8 @@ export async function POST(
     data: { proposalId: proposal.id, token, expiresAt },
   })
 
-  const origin = request.nextUrl.origin
+  // Prefer the configured public URL so links work off-device (phones etc.)
+  const origin = process.env.NEXTAUTH_URL || request.nextUrl.origin
   return NextResponse.json({
     url: `${origin}/p/${link.token}`,
     expiresAt: link.expiresAt,

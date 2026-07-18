@@ -307,6 +307,9 @@ export default function ProposalEditorPage() {
                 <PricingEditor
                   proposalId={proposal.id}
                   initialItems={proposal.pricingLineItems}
+                  onItemsChange={(items) =>
+                    setProposal((p) => (p ? { ...p, pricingLineItems: items } : p))
+                  }
                 />
               ) : section.type === "photos" ? (
                 <PhotoPicker proposal={proposal} section={section} updateSection={updateSection} />

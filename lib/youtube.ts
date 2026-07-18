@@ -45,8 +45,10 @@ export async function fetchChannelVideos(channelUrl: string): Promise<ChannelVid
     const title = entry
       .match(/<title>([^<]*)<\/title>/)?.[1]
       ?.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-    // Skip entries whose "title" is just a URL (channel redirects, not real videos)
+    // Skip entries whose "title" is just a URL (channel redirects) and
+    // hashtag-titled Shorts, which say nothing useful about the job
     if (!videoId || !title || /^https?:\/\//i.test(title)) continue
+    if ((title.match(/#/g) || []).length >= 2 || title.trim().startsWith("#")) continue
     videos.push({
       videoId,
       title,
@@ -64,7 +66,7 @@ export async function fetchChannelVideos(channelUrl: string): Promise<ChannelVid
 export function rankRelevantVideos(
   videos: ChannelVideo[],
   jobText: string,
-  max = 4
+  max = 2
 ): ChannelVideo[] {
   const stop = new Set(["the", "and", "for", "with", "clean", "cleaning"])
   const terms = jobText

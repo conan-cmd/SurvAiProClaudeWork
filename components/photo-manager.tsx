@@ -111,7 +111,6 @@ export function PhotoManager({
         type="file"
         accept="image/*"
         multiple
-        capture="environment"
         className="hidden"
         onChange={(e) => upload(e.target.files)}
       />

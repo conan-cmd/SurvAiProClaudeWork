@@ -22,9 +22,11 @@ const UNITS = ["each", "hours", "days", "m²", "m", "visit", "item"]
 export function PricingEditor({
   proposalId,
   initialItems,
+  onItemsChange,
 }: {
   proposalId: string
   initialItems: EditableLineItem[]
+  onItemsChange?: (items: EditableLineItem[]) => void
 }) {
   const [items, setItems] = useState<EditableLineItem[]>(initialItems)
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle")
@@ -58,6 +60,12 @@ export function PricingEditor({
 
   const update = (id: string, patch: Partial<EditableLineItem>) =>
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
+
+  // Keep the parent (and therefore the live preview) in sync
+  useEffect(() => {
+    onItemsChange?.(items)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items])
 
   const addItem = () =>
     setItems((prev) => [
@@ -123,7 +131,8 @@ export function PricingEditor({
               </div>
               <div>
                 <label className="text-[11px] text-gray-500">Unit price £</label>
-                <input type="number" min="0" step="0.01" className={cell} value={item.unitPrice}
+                <input type="number" min="0" step="0.01" className={cell}
+                  value={item.unitPrice === 0 ? "" : item.unitPrice} placeholder="0"
                   onChange={(e) => update(item.id, { unitPrice: num(e.target.value) })} />
               </div>
               <div>
