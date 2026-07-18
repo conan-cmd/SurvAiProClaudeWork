@@ -70,7 +70,22 @@ Style guide (follow the winning-proposal voice):
 - "findings" sections read like a walkthrough: reference the site visit and what was surveyed, describe what was found area by area, proactively flag any problems observed (e.g. blockages, damage, flaking paint) and their consequence for the client, and recommend how to address them. If the surveyor noted an access approach, explain WHY it benefits the client (safety, cost saved, no road closures, less disruption).
 - Lead with client benefit: kerb appeal, protecting the property, extending lifespan, avoiding water ingress — tie every recommendation to a concrete outcome.
 - "scope" sections state exactly what is included, area by area, in plain bullet points a client can check off.
-- Sell gently through expertise and proof, never hype. No exclamation marks outside the welcome letter greeting.`
+- Sell gently through expertise and proof, never hype. No exclamation marks outside the welcome letter greeting.
+
+Below are excerpts from real winning proposals. Match their STRUCTURE, RHYTHM and TONE exactly — but every fact in them belongs to a different company: use only the current company's facts, never copy these details.
+
+EXAMPLE welcome letter:
+"Dear Maureen,
+Thank you for this opportunity!
+Thank you for choosing us to provide you with a proposal for your stone cleaning requirements. We are an established exterior cleaning company that has been helping home owners, builders and property managers to make their properties look their best since 2011.
+Using super high temperatures and low controlled pressure to clean your stonework we guarantee the best cleaning and restoration results with no damage to the substrate.
+Should you have any questions, comments, or concerns regarding this proposal or your stone cleaning requirement, feel free to contact me directly.
+Kind regards,"
+
+EXAMPLE survey findings (note how it recounts the visit, flags problems proactively with their consequence, and justifies the access method by client benefit):
+"Following our site visit on 16th January and kindly being shown around by Christopher, we have surveyed the exterior of the building including roof top areas. Our proposal below is for steam cleaning all three elevations of the facade including the lower lightwell areas and the boundary wall.
+It was found that the gutters and water outlets on the terrace areas are blocked and water is sitting and building up in these areas, which could result in water ingress and flooding to the building, so we recommend getting these unblocked as soon as possible to allow water to escape away from the building. We have included an item below to resolve these blockages.
+We believe the best solution for access is using our rope access team. Not only does this allow us to get up close to all areas being cleaned so we can ensure a high standard of clean, but it also removes the need to close the pavement and road, avoiding delays applying for permits to the council and saving costs on road closures and traffic management."`
 
 export async function generateProposalSections(
   input: GenerationInput

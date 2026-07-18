@@ -124,14 +124,14 @@ export default function ProposalEditorPage() {
     }
   }
 
-  const addSection = async () => {
+  const addSection = async (type = "custom", title = "New section") => {
     if (!proposal) return
     const res = await fetch(`/api/proposals/${proposalId}/sections`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        type: "custom",
-        title: "New section",
+        type,
+        title,
         content: "",
         order: proposal.sections.length,
       }),
@@ -143,6 +143,8 @@ export default function ProposalEditorPage() {
     const section = await res.json()
     setProposal({ ...proposal, sections: [...proposal.sections, section] })
   }
+
+  const addVideoSection = () => addSection("videos", "Watch Us In Action")
 
   const regenerate = async (sectionId: string) => {
     const feedback = prompt(
@@ -281,7 +283,7 @@ export default function ProposalEditorPage() {
                     className="p-1.5 hover:bg-gray-100 rounded disabled:opacity-30" title="Move down">
                     <ChevronDown className="w-4 h-4" />
                   </button>
-                  {!["cover", "photos", "pricing"].includes(section.type) && (
+                  {!["cover", "photos", "pricing", "videos"].includes(section.type) && (
                     <button onClick={() => regenerate(section.id)}
                       disabled={regenerating === section.id}
                       className="p-1.5 hover:bg-blue-50 hover:text-brand-blue rounded"
@@ -307,6 +309,8 @@ export default function ProposalEditorPage() {
                 />
               ) : section.type === "photos" ? (
                 <PhotoPicker proposal={proposal} section={section} updateSection={updateSection} />
+              ) : section.type === "videos" ? (
+                <VideoPicker section={section} updateSection={updateSection} />
               ) : section.type === "cover" ? (
                 <p className="text-sm text-gray-400">
                   The cover is generated from the survey details and your branding. See Preview.
@@ -327,10 +331,16 @@ export default function ProposalEditorPage() {
             </div>
           ))}
 
-          <button onClick={addSection}
-            className="w-full border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
-            <Plus className="w-5 h-5" /> Add section
-          </button>
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => addSection()}
+              className="border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
+              <Plus className="w-5 h-5" /> Add section
+            </button>
+            <button onClick={addVideoSection}
+              className="border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
+              <Plus className="w-5 h-5" /> Add videos
+            </button>
+          </div>
         </div>
       )}
 
@@ -340,6 +350,88 @@ export default function ProposalEditorPage() {
           <ProposalDocument data={docData} />
         </div>
       )}
+    </div>
+  )
+}
+
+type ChannelVideo = { videoId: string; title: string; thumbnail: string; url: string }
+
+function VideoPicker({
+  section,
+  updateSection,
+}: {
+  section: Section
+  updateSection: (id: string, patch: SectionPatch) => void
+}) {
+  const [videos, setVideos] = useState<ChannelVideo[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch("/api/organization/videos")
+      .then(async (r) => {
+        const data = await r.json()
+        if (!r.ok) throw new Error(data.error)
+        setVideos(data)
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load videos"))
+  }, [])
+
+  let selected: ChannelVideo[] = []
+  try {
+    selected = JSON.parse(section.content || "[]")
+  } catch {
+    selected = []
+  }
+
+  const toggle = (video: ChannelVideo) => {
+    const isOn = selected.some((v) => v.videoId === video.videoId)
+    const next = isOn
+      ? selected.filter((v) => v.videoId !== video.videoId)
+      : [...selected, video]
+    updateSection(section.id, { content: JSON.stringify(next) })
+  }
+
+  if (error) {
+    return <p className="text-sm text-amber-600">{error}</p>
+  }
+  if (!videos) {
+    return (
+      <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading your channel videos…
+      </div>
+    )
+  }
+  if (!videos.length) {
+    return <p className="text-sm text-gray-400">No videos found on your channel.</p>
+  }
+
+  return (
+    <div>
+      <p className="text-xs text-gray-500 mb-2">
+        Tick the videos of similar jobs to show in this proposal ({selected.length} selected).
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto pr-1">
+        {videos.map((video) => {
+          const on = selected.some((v) => v.videoId === video.videoId)
+          return (
+            <button key={video.videoId} type="button" onClick={() => toggle(video)}
+              className={`text-left rounded-lg overflow-hidden border-2 transition ${
+                on ? "border-brand-blue" : "border-transparent opacity-60 hover:opacity-100"
+              }`}>
+              <div className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={video.thumbnail} alt="" className="w-full aspect-video object-cover" />
+                {on && (
+                  <span className="absolute top-1 right-1 bg-brand-blue text-white rounded-full p-0.5">
+                    <Check className="w-3 h-3" />
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-600 p-1.5 leading-snug line-clamp-2">{video.title}</p>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

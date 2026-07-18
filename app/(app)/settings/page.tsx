@@ -24,6 +24,7 @@ type Org = {
   ourExperienceSection: string | null
   ourApproachSection: string | null
   termsAndConditions: string | null
+  youtubeChannelUrl: string | null
 }
 
 export default function SettingsPage() {
@@ -68,6 +69,7 @@ export default function SettingsPage() {
           ourExperienceSection: org.ourExperienceSection || "",
           ourApproachSection: org.ourApproachSection || "",
           termsAndConditions: org.termsAndConditions || "",
+          youtubeChannelUrl: org.youtubeChannelUrl || "",
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
@@ -158,6 +160,14 @@ export default function SettingsPage() {
           <div>
             <label className={labelCls}>Contact phone</label>
             <input className={inputCls} value={org.phone || ""} onChange={(e) => set("phone", e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>YouTube channel URL</label>
+            <input className={inputCls} placeholder="https://www.youtube.com/@YourChannel"
+              value={org.youtubeChannelUrl || ""} onChange={(e) => set("youtubeChannelUrl", e.target.value)} />
+            <p className="text-xs text-gray-400 mt-1">
+              Lets you embed videos of similar jobs in your proposals.
+            </p>
           </div>
           <div>
             <label className={labelCls}>Primary colour</label>

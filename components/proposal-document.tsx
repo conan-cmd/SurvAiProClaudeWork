@@ -189,6 +189,42 @@ function PricingSection({ data }: { data: ProposalDocumentData }) {
   )
 }
 
+function VideosSection({ section }: { section: Section }) {
+  let videos: { videoId: string; title: string; thumbnail: string; url: string }[] = []
+  try {
+    videos = JSON.parse(section.content || "[]")
+  } catch {
+    videos = []
+  }
+  if (!videos.length) {
+    return <p className="text-gray-400 italic">No videos selected yet.</p>
+  }
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      {videos.map((v) => (
+        <a
+          key={v.videoId}
+          href={v.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block group break-inside-avoid"
+        >
+          <div className="relative rounded-lg overflow-hidden">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={v.thumbnail} alt={v.title} className="w-full aspect-video object-cover" />
+            <span className="absolute inset-0 flex items-center justify-center">
+              <span className="w-12 h-12 rounded-full bg-black/60 group-hover:bg-red-600 transition flex items-center justify-center">
+                <span className="ml-1 border-y-8 border-y-transparent border-l-[14px] border-l-white" />
+              </span>
+            </span>
+          </div>
+          <p className="text-sm text-gray-600 mt-1.5 leading-snug">{v.title}</p>
+        </a>
+      ))}
+    </div>
+  )
+}
+
 function TextContent({ content }: { content: string }) {
   return (
     <div className="space-y-3 text-gray-700 leading-relaxed">
@@ -233,6 +269,8 @@ export function ProposalDocument({ data }: { data: ProposalDocumentData }) {
               <PhotosSection section={section} data={data} />
             ) : section.type === "pricing" ? (
               <PricingSection data={data} />
+            ) : section.type === "videos" ? (
+              <VideosSection section={section} />
             ) : (
               <TextContent content={section.content} />
             )}

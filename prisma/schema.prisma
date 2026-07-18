@@ -62,6 +62,9 @@ model Organization {
   // Standard T&Cs library, reused on every proposal (user-editable)
   termsAndConditions    String?
 
+  // YouTube channel for embedding similar-work videos in proposals
+  youtubeChannelUrl     String?
+
   users                 User[]
   surveys               SiteSurvey[]
   proposals             Proposal[]
