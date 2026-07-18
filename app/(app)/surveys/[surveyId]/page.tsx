@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { Loader2, Sparkles, FileText, Check } from "lucide-react"
 import { PhotoManager, Photo } from "@/components/photo-manager"
 import { VoiceNotes, VoiceNoteWithTranscript } from "@/components/voice-notes"
+import { DictateButton } from "@/components/dictate-button"
 
 type Survey = {
   id: string
@@ -134,7 +135,17 @@ export default function SurveyDetailPage() {
   const recommended = recommend(survey)
   const inputCls =
     "w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue text-base"
-  const labelCls = "block text-sm font-medium text-gray-700 mb-1"
+
+  // Appends dictated speech to a field's current value
+  const dictateInto = (field: keyof Survey) => (text: string) =>
+    updateField(field, (((survey[field] as string) || "") + " " + text).trim())
+
+  const FieldLabel = ({ label, field }: { label: string; field: keyof Survey }) => (
+    <div className="flex items-center justify-between mb-1">
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <DictateButton onText={dictateInto(field)} />
+    </div>
+  )
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -168,28 +179,28 @@ export default function SurveyDetailPage() {
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
         <h2 className="font-semibold text-brand-navy">Survey notes</h2>
         <div>
-          <label className={labelCls}>Written description</label>
+          <FieldLabel label="Written description" field="writtenDescription" />
           <textarea rows={4} className={inputCls} value={survey.writtenDescription || ""}
             onChange={(e) => updateField("writtenDescription", e.target.value)} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className={labelCls}>Client priorities</label>
+            <FieldLabel label="Client priorities" field="clientPriorities" />
             <textarea rows={2} className={inputCls} value={survey.clientPriorities || ""}
               onChange={(e) => updateField("clientPriorities", e.target.value)} />
           </div>
           <div>
-            <label className={labelCls}>Access notes</label>
+            <FieldLabel label="Access notes" field="accessNotes" />
             <textarea rows={2} className={inputCls} value={survey.accessNotes || ""}
               onChange={(e) => updateField("accessNotes", e.target.value)} />
           </div>
           <div>
-            <label className={labelCls}>Measurements</label>
+            <FieldLabel label="Measurements" field="measurements" />
             <textarea rows={2} className={inputCls} value={survey.measurements || ""}
               onChange={(e) => updateField("measurements", e.target.value)} />
           </div>
           <div>
-            <label className={labelCls}>Exclusions</label>
+            <FieldLabel label="Exclusions" field="exclusions" />
             <textarea rows={2} className={inputCls} value={survey.exclusions || ""}
               onChange={(e) => updateField("exclusions", e.target.value)} />
           </div>

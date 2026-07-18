@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { ArrowRight } from "lucide-react"
+import { DictateButton } from "@/components/dictate-button"
 
 const SERVICE_TYPES = [
   "Cleaning", "Roofing", "Landscaping", "Electrical", "Plumbing",
@@ -59,6 +60,17 @@ export default function NewSurveyPage() {
   const inputCls =
     "w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue text-base"
   const labelCls = "block text-sm font-medium text-gray-700 mb-1"
+
+  // Appends dictated speech to a field's current value
+  const dictateInto = (name: keyof typeof form) => (text: string) =>
+    set(name, ((form[name] as string) + " " + text).trim())
+
+  const FieldLabel = ({ label, field }: { label: string; field: keyof typeof form }) => (
+    <div className="flex items-center justify-between mb-1">
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <DictateButton onText={dictateInto(field)} />
+    </div>
+  )
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -137,33 +149,33 @@ export default function NewSurveyPage() {
             </div>
           </div>
           <div>
-            <label className={labelCls}>Written survey description</label>
+            <FieldLabel label="Written survey description" field="writtenDescription" />
             <textarea rows={4} className={inputCls} value={form.writtenDescription}
               onChange={(e) => set("writtenDescription", e.target.value)}
               placeholder="What you found on site, condition, recommended works…" />
           </div>
           <div>
-            <label className={labelCls}>Client priorities</label>
+            <FieldLabel label="Client priorities" field="clientPriorities" />
             <textarea rows={2} className={inputCls} value={form.clientPriorities}
               onChange={(e) => set("clientPriorities", e.target.value)}
               placeholder="e.g. Minimal disruption, done before end of month" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Access notes</label>
+              <FieldLabel label="Access notes" field="accessNotes" />
               <textarea rows={2} className={inputCls} value={form.accessNotes}
                 onChange={(e) => set("accessNotes", e.target.value)}
                 placeholder="Parking, keys, restrictions…" />
             </div>
             <div>
-              <label className={labelCls}>Measurements</label>
+              <FieldLabel label="Measurements" field="measurements" />
               <textarea rows={2} className={inputCls} value={form.measurements}
                 onChange={(e) => set("measurements", e.target.value)}
                 placeholder="e.g. Roof approx 85m², gutters 24m" />
             </div>
           </div>
           <div>
-            <label className={labelCls}>Exclusions</label>
+            <FieldLabel label="Exclusions" field="exclusions" />
             <textarea rows={2} className={inputCls} value={form.exclusions}
               onChange={(e) => set("exclusions", e.target.value)}
               placeholder="Anything not included in the job" />
