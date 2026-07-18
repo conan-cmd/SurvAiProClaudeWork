@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
+import { SocialButtons } from "@/components/social-buttons"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -42,6 +43,8 @@ export default function LoginPage() {
         <div className="bg-white rounded-xl shadow-lg p-8">
           <h1 className="text-3xl font-bold text-brand-navy mb-2">Sign In</h1>
           <p className="text-gray-600 mb-6">Welcome back to SurvAIPro</p>
+
+          <SocialButtons />
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

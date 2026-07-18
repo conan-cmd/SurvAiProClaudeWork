@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
+import { SocialButtons } from "@/components/social-buttons"
 
 export default function SignupPage() {
   const router = useRouter()
@@ -89,6 +90,8 @@ export default function SignupPage() {
         <div className="bg-white rounded-xl shadow-lg p-8">
           <h1 className="text-3xl font-bold text-brand-navy mb-2">Create Account</h1>
           <p className="text-gray-600 mb-6">Join thousands of service businesses using SurvAIPro</p>
+
+          <SocialButtons />
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
