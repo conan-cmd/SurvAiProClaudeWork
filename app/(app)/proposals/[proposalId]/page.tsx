@@ -5,7 +5,7 @@ import { useParams } from "next/navigation"
 import { toast } from "sonner"
 import {
   Loader2, Sparkles, ChevronUp, ChevronDown, Trash2, Plus, Eye,
-  Pencil, Link2, Printer, Check,
+  Pencil, Link2, Printer, Check, Send,
 } from "lucide-react"
 import { ProposalDocument } from "@/components/proposal-document"
 import { PricingEditor, EditableLineItem } from "@/components/pricing-editor"
@@ -22,6 +22,7 @@ type Section = {
 type ProposalData = {
   id: string
   clientName: string
+  clientEmail: string | null
   templateName: string
   status: string
   sections: Section[]
@@ -192,6 +193,35 @@ export default function ProposalEditorPage() {
     }
   }
 
+  const [sending, setSending] = useState(false)
+
+  const sendToClient = async () => {
+    if (!proposal) return
+    const to = prompt("Send proposal to:", proposal.clientEmail || "")
+    if (!to) return
+    const message = prompt(
+      "Add a short message (optional - a default will be used if blank):",
+      ""
+    )
+    if (message === null) return
+    setSending(true)
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, message: message || undefined }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setProposal({ ...proposal, status: "SENT", clientEmail: to })
+      toast.success(`Proposal emailed to ${to}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send")
+    } finally {
+      setSending(false)
+    }
+  }
+
   const createShareLink = async () => {
     setSharing(true)
     try {
@@ -254,8 +284,13 @@ export default function ProposalEditorPage() {
             <Printer className="w-4 h-4" /> PDF
           </button>
           <button onClick={createShareLink} disabled={sharing}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+            className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
             <Link2 className="w-4 h-4" /> Share
+          </button>
+          <button onClick={sendToClient} disabled={sending}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            Send
           </button>
         </div>
       </div>
