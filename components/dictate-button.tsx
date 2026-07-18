@@ -1,11 +1,11 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Mic, Square } from "lucide-react"
+import { Mic, Square, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
-// Tap-to-dictate using the browser's built-in speech recognition
-// (Chrome, Edge, Safari incl. iOS). Renders nothing when unsupported.
+// Tap-to-dictate powered by Whisper: record -> transcribe -> append text.
+// Works in every modern browser via MediaRecorder.
 export function DictateButton({
   onText,
   className = "",
@@ -13,65 +13,77 @@ export function DictateButton({
   onText: (text: string) => void
   className?: string
 }) {
-  const [supported, setSupported] = useState(false)
-  const [listening, setListening] = useState(false)
-  const recognitionRef = useRef<{ stop: () => void } | null>(null)
+  const [state, setState] = useState<"idle" | "recording" | "transcribing">("idle")
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
   const onTextRef = useRef(onText)
   onTextRef.current = onText
 
   useEffect(() => {
-    const w = window as unknown as Record<string, unknown>
-    setSupported(Boolean(w.SpeechRecognition || w.webkitSpeechRecognition))
-    return () => recognitionRef.current?.stop()
+    return () => {
+      if (recorderRef.current?.state === "recording") recorderRef.current.stop()
+    }
   }, [])
 
-  const toggle = () => {
-    if (listening) {
-      recognitionRef.current?.stop()
-      return
-    }
-    const w = window as unknown as Record<string, any>
-    const SR = w.SpeechRecognition || w.webkitSpeechRecognition
-    const rec = new SR()
-    rec.lang = "en-GB"
-    rec.continuous = true
-    rec.interimResults = false
-
-    rec.onresult = (event: any) => {
-      let text = ""
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) text += event.results[i][0].transcript
+  const start = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      chunksRef.current = []
+      recorder.ondataavailable = (e) => chunksRef.current.push(e.data)
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        setState("transcribing")
+        try {
+          const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" })
+          const formData = new FormData()
+          formData.append("audio", new File([blob], "dictation.webm", { type: blob.type }))
+          const res = await fetch("/api/dictate", { method: "POST", body: formData })
+          const data = await res.json()
+          if (!res.ok) throw new Error(data.error)
+          if (data.text?.trim()) onTextRef.current(data.text.trim())
+          else toast.message("Didn't catch that — try again a little closer to the mic")
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Transcription failed")
+        } finally {
+          setState("idle")
+        }
       }
-      if (text.trim()) onTextRef.current(text.trim())
+      recorder.start()
+      recorderRef.current = recorder
+      setState("recording")
+    } catch {
+      toast.error("Microphone blocked — allow mic access in your browser's address bar")
     }
-    rec.onerror = (event: any) => {
-      setListening(false)
-      if (event.error === "not-allowed") {
-        toast.error("Microphone blocked — allow mic access in your browser's address bar")
-      }
-    }
-    rec.onend = () => setListening(false)
-
-    rec.start()
-    recognitionRef.current = rec
-    setListening(true)
   }
 
-  if (!supported) return null
+  const toggle = () => {
+    if (state === "recording") recorderRef.current?.stop()
+    else if (state === "idle") start()
+  }
 
   return (
     <button
       type="button"
       onClick={toggle}
-      title={listening ? "Stop dictating" : "Dictate with your voice"}
+      disabled={state === "transcribing"}
+      title={state === "recording" ? "Stop and transcribe" : "Dictate with your voice"}
       className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold transition ${
-        listening
+        state === "recording"
           ? "bg-red-600 text-white animate-pulse"
-          : "text-brand-blue hover:bg-blue-50"
+          : state === "transcribing"
+            ? "text-gray-400"
+            : "text-brand-blue hover:bg-blue-50"
       } ${className}`}
     >
-      {listening ? <Square className="w-3 h-3" /> : <Mic className="w-3.5 h-3.5" />}
-      {listening ? "Stop" : "Dictate"}
+      {state === "recording" ? (
+        <Square className="w-3 h-3" />
+      ) : state === "transcribing" ? (
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+      ) : (
+        <Mic className="w-3.5 h-3.5" />
+      )}
+      {state === "recording" ? "Stop" : state === "transcribing" ? "Transcribing…" : "Dictate"}
     </button>
   )
 }
