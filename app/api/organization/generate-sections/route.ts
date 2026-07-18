@@ -40,7 +40,7 @@ Return JSON with exactly these keys: "aboutUs", "whyChooseUs", "ourExperience", 
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",

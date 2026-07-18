@@ -116,7 +116,7 @@ ${input.photoCaptions.length ? input.photoCaptions.map((c) => `- ${c}`).join("\n
 Respond with JSON: {"sections": [{"type": "...", "content": "..."}]} — one entry per requested section type, in the order requested.`
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4-turbo-preview",
+    model: "gpt-4o",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: userPrompt },
@@ -147,7 +147,7 @@ export async function regenerateSection(params: {
   feedback?: string
 }): Promise<string> {
   const response = await openai.chat.completions.create({
-    model: "gpt-4-turbo-preview",
+    model: "gpt-4o",
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       {
