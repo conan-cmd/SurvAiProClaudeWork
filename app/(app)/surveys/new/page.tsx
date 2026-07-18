@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { ArrowRight } from "lucide-react"
 import { DictateButton } from "@/components/dictate-button"
+import { AddressInput } from "@/components/address-input"
 
 const SERVICE_TYPES = [
   "Cleaning", "Roofing", "Landscaping", "Electrical", "Plumbing",
@@ -106,9 +107,9 @@ export default function NewSurveyPage() {
           </div>
           <div>
             <label className={labelCls}>Site address *</label>
-            <textarea rows={2} className={inputCls} value={form.clientAddress}
-              onChange={(e) => set("clientAddress", e.target.value)}
-              placeholder="12 High Street, London, SW1A 1AA" />
+            <AddressInput className={inputCls} value={form.clientAddress}
+              onChange={(v) => set("clientAddress", v)}
+              placeholder="Start typing the address…" />
           </div>
         </section>
 

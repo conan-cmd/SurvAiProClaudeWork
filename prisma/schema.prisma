@@ -111,6 +111,8 @@ model SiteSurvey {
   clientEmail           String?
   clientPhone           String?
   clientAddress         String
+  latitude              Float?
+  longitude             Float?
 
   // Survey details
   title                 String

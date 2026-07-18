@@ -54,6 +54,28 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // Geocode the address and attach street-view + aerial hero shots.
+    // Best-effort: survey creation never fails because of imagery.
+    try {
+      const { geocodeAddress, attachSiteImagery } = await import("@/lib/geo")
+      const coords = await geocodeAddress(survey.clientAddress)
+      if (coords) {
+        await db.siteSurvey.update({
+          where: { id: survey.id },
+          data: { latitude: coords.lat, longitude: coords.lng },
+        })
+        await attachSiteImagery({
+          surveyId: survey.id,
+          organizationId: user.organizationId,
+          address: survey.clientAddress,
+          lat: coords.lat,
+          lng: coords.lng,
+        })
+      }
+    } catch (err) {
+      console.error("Site imagery skipped:", err)
+    }
+
     return NextResponse.json(survey, { status: 201 })
   } catch (error) {
     console.error("Survey creation error:", error)
