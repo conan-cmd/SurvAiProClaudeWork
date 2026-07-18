@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
-import { regenerateSection } from "@/lib/ai"
+import { regenerateSection, friendlyAIError } from "@/lib/ai"
 
 const updateSectionSchema = z.object({
   title: z.string().min(1).optional(),
@@ -108,6 +108,9 @@ Approved transcripts: ${s.transcripts.map((t) => t.text).join(" | ") || "none"}`
     return NextResponse.json(updated)
   } catch (error) {
     console.error("Section regeneration error:", error)
-    return NextResponse.json({ error: "Regeneration failed. Please try again." }, { status: 500 })
+    return NextResponse.json(
+      { error: friendlyAIError(error, "Regeneration failed. Please try again.") },
+      { status: 500 }
+    )
   }
 }

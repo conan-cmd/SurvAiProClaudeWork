@@ -3,7 +3,7 @@ import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { getTemplate } from "@/lib/templates"
-import { generateProposalSections } from "@/lib/ai"
+import { generateProposalSections, friendlyAIError } from "@/lib/ai"
 
 const createProposalSchema = z.object({
   surveyId: z.string().min(1),
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Proposal generation error:", error)
     return NextResponse.json(
-      { error: "AI generation failed. Please try again." },
+      { error: friendlyAIError(error, "AI generation failed. Please try again.") },
       { status: 500 }
     )
   }

@@ -5,6 +5,18 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
+// Maps OpenAI auth failures to a message the user can actually act on.
+export function friendlyAIError(error: unknown, fallback: string): string {
+  const e = error as { status?: number; code?: string }
+  if (e?.status === 401 || e?.code === "invalid_api_key") {
+    return "AI isn't connected yet — add a valid OPENAI_API_KEY to your environment settings and try again."
+  }
+  if (e?.status === 429) {
+    return "The AI service is rate-limited or out of credit. Check your OpenAI account and try again."
+  }
+  return fallback
+}
+
 export type GeneratedSection = {
   type: string
   title: string

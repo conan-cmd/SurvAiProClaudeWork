@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "survai-pro",
+      "runtimeExecutable": "C:\\Users\\USER\\.claude\\Git\\tools\\node-v22.14.0-win-x64\\npm.cmd",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "C:\\Users\\USER\\.claude\\Git\\survai-pro",
+      "port": 3000
+    }
+  ]
+}

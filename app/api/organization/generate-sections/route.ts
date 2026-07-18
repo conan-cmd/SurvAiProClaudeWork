@@ -73,8 +73,9 @@ Return JSON with exactly these keys: "aboutUs", "whyChooseUs", "ourExperience", 
     })
   } catch (error) {
     console.error("Section generation error:", error)
+    const { friendlyAIError } = await import("@/lib/ai")
     return NextResponse.json(
-      { error: "Failed to generate sections. Please try again." },
+      { error: friendlyAIError(error, "Failed to generate sections. Please try again.") },
       { status: 500 }
     )
   }

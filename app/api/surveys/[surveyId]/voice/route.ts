@@ -75,8 +75,9 @@ export async function POST(
     return NextResponse.json({ voiceNote, transcript }, { status: 201 })
   } catch (error) {
     console.error("Voice note error:", error)
+    const { friendlyAIError } = await import("@/lib/ai")
     return NextResponse.json(
-      { error: "Failed to process voice note. Please try again." },
+      { error: friendlyAIError(error, "Failed to process voice note. Please try again.") },
       { status: 500 }
     )
   }
