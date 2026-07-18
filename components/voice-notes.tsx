@@ -126,7 +126,7 @@ export function VoiceNotes({
             <Square className="w-5 h-5" /> Stop recording ({fmt(elapsed)})
           </button>
         )}
-        <input ref={fileInput} type="file" accept="audio/*,video/mp4,video/webm" className="hidden"
+        <input ref={fileInput} type="file" accept="audio/*,video/*" className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0]
             if (f) uploadAudio(f, 0)

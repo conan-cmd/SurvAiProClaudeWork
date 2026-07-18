@@ -6,12 +6,13 @@ import OpenAI from "openai"
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
-const MAX_AUDIO_BYTES = 25 * 1024 * 1024 // Whisper API limit
-const ALLOWED_TYPES = [
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024 // Whisper API limit for direct upload
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024 // we extract the audio track ourselves
+const AUDIO_TYPES = [
   "audio/webm", "audio/mp4", "audio/mpeg", "audio/wav", "audio/x-m4a", "audio/ogg",
-  // Video walkthroughs: Whisper transcribes the audio track directly
-  "video/mp4", "video/webm",
 ]
+// Video walkthroughs, including iPhone .MOV - converted server-side with ffmpeg
+const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"]
 
 export async function POST(
   request: NextRequest,
@@ -33,20 +34,37 @@ export async function POST(
     if (!file) {
       return NextResponse.json({ error: "No audio file provided" }, { status: 400 })
     }
-    if (!ALLOWED_TYPES.some((t) => file.type.startsWith(t.split(";")[0]))) {
+    const baseType = file.type.split(";")[0]
+    const isVideo = VIDEO_TYPES.includes(baseType)
+    const isAudio = AUDIO_TYPES.some((t) => baseType === t)
+    if (!isVideo && !isAudio) {
       return NextResponse.json(
-        { error: `Unsupported audio type: ${file.type}` },
+        { error: `Unsupported file type: ${file.type}` },
         { status: 400 }
       )
     }
-    if (file.size > MAX_AUDIO_BYTES) {
+    if (isVideo && file.size > MAX_VIDEO_BYTES) {
       return NextResponse.json(
-        { error: "Audio file is over 25MB. Please record a shorter note." },
+        { error: "Video is over 200MB. Please record a shorter walkthrough." },
         { status: 400 }
       )
     }
 
-    // 1. Store the audio
+    // Videos (and oversized audio) get their audio track extracted to a
+    // compact MP3 so any phone format and length fits Whisper's 25MB limit.
+    let transcriptionFile = file
+    if (isVideo || file.size > MAX_AUDIO_BYTES) {
+      const { extractAudioForTranscription } = await import("@/lib/media")
+      transcriptionFile = await extractAudioForTranscription(file)
+      if (transcriptionFile.size > MAX_AUDIO_BYTES) {
+        return NextResponse.json(
+          { error: "Recording is too long to transcribe. Please split it into shorter walkthroughs." },
+          { status: 400 }
+        )
+      }
+    }
+
+    // 1. Store the original file (video kept for future frame extraction)
     const url = await uploadVoiceNote(file, user.organizationId, survey.id)
 
     const voiceNote = await db.voiceNote.create({
@@ -60,7 +78,7 @@ export async function POST(
 
     // 2. Transcribe with Whisper
     const transcription = await openai.audio.transcriptions.create({
-      file,
+      file: transcriptionFile,
       model: "whisper-1",
     })
 
