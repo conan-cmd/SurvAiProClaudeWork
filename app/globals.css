@@ -8,23 +8,14 @@
 
 html {
   scroll-behavior: smooth;
+  /* The app is designed as a light theme; force light rendering everywhere
+     (including native form controls) so text is always legible, regardless
+     of the device's dark-mode preference. */
+  color-scheme: light;
 }
 
 body {
   @apply bg-white text-gray-900;
-}
-
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
-  body {
-    @apply bg-gray-950 text-gray-50;
-  }
-  * {
-    @apply border-gray-800;
-  }
 }
 
 /* Animations */
