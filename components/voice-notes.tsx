@@ -126,7 +126,7 @@ export function VoiceNotes({
             <Square className="w-5 h-5" /> Stop recording ({fmt(elapsed)})
           </button>
         )}
-        <input ref={fileInput} type="file" accept="audio/*" className="hidden"
+        <input ref={fileInput} type="file" accept="audio/*,video/mp4,video/webm" className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0]
             if (f) uploadAudio(f, 0)
@@ -134,7 +134,7 @@ export function VoiceNotes({
           }} />
         <button type="button" onClick={() => fileInput.current?.click()} disabled={recording || processing}
           className="inline-flex items-center justify-center gap-2 px-5 py-3 border-2 border-gray-200 rounded-xl font-semibold text-gray-600 hover:border-brand-blue hover:text-brand-blue transition disabled:opacity-50">
-          <Upload className="w-5 h-5" /> Upload audio
+          <Upload className="w-5 h-5" /> Upload audio or video
         </button>
       </div>
 

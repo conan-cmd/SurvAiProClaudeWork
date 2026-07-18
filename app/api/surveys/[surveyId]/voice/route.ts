@@ -9,6 +9,8 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024 // Whisper API limit
 const ALLOWED_TYPES = [
   "audio/webm", "audio/mp4", "audio/mpeg", "audio/wav", "audio/x-m4a", "audio/ogg",
+  // Video walkthroughs: Whisper transcribes the audio track directly
+  "video/mp4", "video/webm",
 ]
 
 export async function POST(
