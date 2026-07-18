@@ -225,6 +225,29 @@ function VideosSection({ section }: { section: Section }) {
   )
 }
 
+function GallerySection({ section }: { section: Section }) {
+  let photos: { id: string; fileUrl: string; caption: string }[] = []
+  try {
+    photos = JSON.parse(section.content || "[]")
+  } catch {
+    photos = []
+  }
+  if (!photos.length) return <p className="text-gray-400 italic">No gallery photos selected.</p>
+  return (
+    <div className="grid grid-cols-2 gap-4">
+      {photos.map((p) => (
+        <figure key={p.id} className="break-inside-avoid">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={p.fileUrl} alt={p.caption || "Similar project"} className="w-full rounded-lg object-cover aspect-[4/3]" />
+          {p.caption && (
+            <figcaption className="text-sm text-gray-500 mt-1.5">{p.caption}</figcaption>
+          )}
+        </figure>
+      ))}
+    </div>
+  )
+}
+
 function TextContent({ content }: { content: string }) {
   return (
     <div className="space-y-3 text-gray-700 leading-relaxed">
@@ -271,6 +294,8 @@ export function ProposalDocument({ data }: { data: ProposalDocumentData }) {
               <PricingSection data={data} />
             ) : section.type === "videos" ? (
               <VideosSection section={section} />
+            ) : section.type === "gallery" ? (
+              <GallerySection section={section} />
             ) : (
               <TextContent content={section.content} />
             )}

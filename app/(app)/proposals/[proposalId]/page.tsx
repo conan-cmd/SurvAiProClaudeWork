@@ -145,6 +145,7 @@ export default function ProposalEditorPage() {
   }
 
   const addVideoSection = () => addSection("videos", "Watch Us In Action")
+  const addGallerySection = () => addSection("gallery", "Examples of Similar Work")
 
   const regenerate = async (sectionId: string) => {
     const feedback = prompt(
@@ -283,7 +284,7 @@ export default function ProposalEditorPage() {
                     className="p-1.5 hover:bg-gray-100 rounded disabled:opacity-30" title="Move down">
                     <ChevronDown className="w-4 h-4" />
                   </button>
-                  {!["cover", "photos", "pricing", "videos"].includes(section.type) && (
+                  {!["cover", "photos", "pricing", "videos", "gallery"].includes(section.type) && (
                     <button onClick={() => regenerate(section.id)}
                       disabled={regenerating === section.id}
                       className="p-1.5 hover:bg-blue-50 hover:text-brand-blue rounded"
@@ -311,6 +312,8 @@ export default function ProposalEditorPage() {
                 <PhotoPicker proposal={proposal} section={section} updateSection={updateSection} />
               ) : section.type === "videos" ? (
                 <VideoPicker section={section} updateSection={updateSection} />
+              ) : section.type === "gallery" ? (
+                <GalleryPicker section={section} updateSection={updateSection} />
               ) : section.type === "cover" ? (
                 <p className="text-sm text-gray-400">
                   The cover is generated from the survey details and your branding. See Preview.
@@ -339,6 +342,10 @@ export default function ProposalEditorPage() {
             <button onClick={addVideoSection}
               className="border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
               <Plus className="w-5 h-5" /> Add videos
+            </button>
+            <button onClick={addGallerySection}
+              className="col-span-2 border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
+              <Plus className="w-5 h-5" /> Add similar-work gallery photos
             </button>
           </div>
         </div>
@@ -428,6 +435,91 @@ function VideoPicker({
                 )}
               </div>
               <p className="text-xs text-gray-600 p-1.5 leading-snug line-clamp-2">{video.title}</p>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+type GalleryItem = { id: string; fileUrl: string; caption: string }
+
+function GalleryPicker({
+  section,
+  updateSection,
+}: {
+  section: Section
+  updateSection: (id: string, patch: SectionPatch) => void
+}) {
+  const [all, setAll] = useState<GalleryItem[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch("/api/gallery")
+      .then(async (r) => {
+        const data = await r.json()
+        if (!r.ok) throw new Error(data.error)
+        setAll(
+          data.map((p: { id: string; fileUrl: string; caption: string | null }) => ({
+            id: p.id,
+            fileUrl: p.fileUrl,
+            caption: p.caption || "",
+          }))
+        )
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load gallery"))
+  }, [])
+
+  let selected: GalleryItem[] = []
+  try {
+    selected = JSON.parse(section.content || "[]")
+  } catch {
+    selected = []
+  }
+
+  const toggle = (item: GalleryItem) => {
+    const on = selected.some((s) => s.id === item.id)
+    const next = on ? selected.filter((s) => s.id !== item.id) : [...selected, item]
+    updateSection(section.id, { content: JSON.stringify(next) })
+  }
+
+  if (error) return <p className="text-sm text-amber-600">{error}</p>
+  if (!all) {
+    return (
+      <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading gallery…
+      </div>
+    )
+  }
+  if (!all.length) {
+    return (
+      <p className="text-sm text-gray-400">
+        Your project gallery is empty — add before/after photos on the Gallery page.
+      </p>
+    )
+  }
+
+  return (
+    <div>
+      <p className="text-xs text-gray-500 mb-2">
+        Tick similar-work photos to include ({selected.length} selected).
+      </p>
+      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-72 overflow-y-auto pr-1">
+        {all.map((item) => {
+          const on = selected.some((s) => s.id === item.id)
+          return (
+            <button key={item.id} type="button" onClick={() => toggle(item)}
+              className={`relative rounded-lg overflow-hidden border-2 transition ${
+                on ? "border-brand-blue" : "border-transparent opacity-60 hover:opacity-100"
+              }`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={item.fileUrl} alt={item.caption} className="aspect-square object-cover w-full" />
+              {on && (
+                <span className="absolute top-1 right-1 bg-brand-blue text-white rounded-full p-0.5">
+                  <Check className="w-3 h-3" />
+                </span>
+              )}
             </button>
           )
         })}

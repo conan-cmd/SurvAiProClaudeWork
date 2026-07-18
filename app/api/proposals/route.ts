@@ -129,6 +129,47 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Auto-suggest similar-work photos from the org's project gallery.
+    // Keyword match on tags/captions; skipped entirely when nothing matches.
+    try {
+      const galleryPhotos = await db.galleryPhoto.findMany({
+        where: { organizationId: user.organizationId },
+      })
+      if (galleryPhotos.length) {
+        const jobText = `${survey.serviceType} ${survey.title} ${survey.writtenDescription || ""}`
+          .toLowerCase()
+        const terms = jobText.split(/[^a-z]+/).filter((t) => t.length > 3)
+        const matches = galleryPhotos
+          .map((p) => {
+            const hay = `${p.tags || ""} ${p.caption || ""}`.toLowerCase()
+            const score = terms.reduce((s, t) => s + (hay.includes(t) ? 1 : 0), 0)
+            return { p, score }
+          })
+          .filter((x) => x.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 6)
+          .map((x) => ({
+            id: x.p.id,
+            fileUrl: x.p.fileUrl,
+            caption: x.p.caption || "",
+          }))
+        if (matches.length) {
+          const anchor = sectionsData.findIndex((s) => s.type === "pricing")
+          const insertAt = anchor === -1 ? sectionsData.length : anchor
+          sectionsData.splice(insertAt, 0, {
+            type: "gallery",
+            title: "Examples of Similar Work",
+            content: JSON.stringify(matches),
+            order: 0,
+            photoIds: null,
+          })
+          sectionsData.forEach((s, i) => (s.order = i))
+        }
+      }
+    } catch (err) {
+      console.error("Gallery suggestion skipped:", err)
+    }
+
     // Auto-suggest similar-project videos from the org's YouTube channel.
     // Only added when titles genuinely match the job; the user can remove
     // or re-pick videos in the editor. Failure here never blocks generation.

@@ -69,6 +69,7 @@ model Organization {
   surveys               SiteSurvey[]
   proposals             Proposal[]
   templates             ProposalTemplate[]
+  galleryPhotos         GalleryPhoto[]
 
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
@@ -79,6 +80,24 @@ enum ProposalTone {
   PROFESSIONAL
   PREMIUM
   TECHNICAL
+}
+
+// Reusable best-work photos (before/afters), tagged so proposals can
+// auto-include examples of similar past jobs.
+model GalleryPhoto {
+  id                    String          @id @default(cuid())
+  organizationId        String
+  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  fileUrl               String
+  fileName              String
+  fileSize              Int
+  caption               String?
+  tags                  String? // comma-separated service types, e.g. "roof cleaning, moss removal"
+
+  createdAt             DateTime        @default(now())
+
+  @@index([organizationId])
 }
 
 model SiteSurvey {
