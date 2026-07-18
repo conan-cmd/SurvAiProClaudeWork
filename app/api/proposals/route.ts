@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
   })
 
   try {
-    const generated = await generateProposalSections({
+    const { sections: generated, lineItems: generatedLineItems } = await generateProposalSections({
       template,
       tone: org.proposalTone,
       company: {
@@ -205,6 +205,20 @@ export async function POST(request: NextRequest) {
         clientEmail: survey.clientEmail,
         templateName: template.id,
         sections: { create: sectionsData },
+        // Pre-build the pricing table: one line per service found in the
+        // survey, with rich descriptions. User only has to enter prices.
+        pricingLineItems: {
+          create: generatedLineItems.map((li, index) => ({
+            description: li.description,
+            quantity: 1,
+            unit: "each",
+            unitPrice: 0,
+            vat: 20,
+            discount: 0,
+            isOptional: false,
+            order: index,
+          })),
+        },
       },
       include: { sections: { orderBy: { order: "asc" } } },
     })

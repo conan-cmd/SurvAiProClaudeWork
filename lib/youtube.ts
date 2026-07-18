@@ -16,9 +16,12 @@ export async function resolveChannelId(channelUrl: string): Promise<string | nul
     })
     if (!res.ok) return null
     const html = await res.text()
+    // Order matters: canonical/externalId identify THIS channel; a bare
+    // "channelId" match can belong to a featured third-party channel.
     const m =
-      html.match(/"channelId":"(UC[\w-]{22})"/) ||
-      html.match(/channel_id=(UC[\w-]{22})/)
+      html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/channel\/(UC[\w-]{22})"/) ||
+      html.match(/"externalId":"(UC[\w-]{22})"/) ||
+      html.match(/"channelId":"(UC[\w-]{22})"/)
     return m ? m[1] : null
   } catch {
     return null

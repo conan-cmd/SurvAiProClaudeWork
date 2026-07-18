@@ -87,9 +87,16 @@ EXAMPLE survey findings (note how it recounts the visit, flags problems proactiv
 It was found that the gutters and water outlets on the terrace areas are blocked and water is sitting and building up in these areas, which could result in water ingress and flooding to the building, so we recommend getting these unblocked as soon as possible to allow water to escape away from the building. We have included an item below to resolve these blockages.
 We believe the best solution for access is using our rope access team. Not only does this allow us to get up close to all areas being cleaned so we can ensure a high standard of clean, but it also removes the need to close the pavement and road, avoiding delays applying for permits to the council and saving costs on road closures and traffic management."`
 
+export type GeneratedLineItem = { description: string }
+
+export type GenerationResult = {
+  sections: GeneratedSection[]
+  lineItems: GeneratedLineItem[]
+}
+
 export async function generateProposalSections(
   input: GenerationInput
-): Promise<GeneratedSection[]> {
+): Promise<GenerationResult> {
   const aiSections = input.template.sections.filter((s) => s.aiGenerated)
 
   const userPrompt = `Write the following proposal sections: ${aiSections
@@ -128,7 +135,13 @@ ${input.approvedTranscripts.length ? input.approvedTranscripts.map((t, i) => `[$
 PHOTO CAPTIONS:
 ${input.photoCaptions.length ? input.photoCaptions.map((c) => `- ${c}`).join("\n") : "none"}
 
-Respond with JSON: {"sections": [{"type": "...", "content": "..."}]} — one entry per requested section type, in the order requested.`
+ALSO identify each distinct service or work item in this job (from the service type, survey description, transcripts and measurements) and write one pricing line item per service. Format each as "Service Name - detail sentence describing exactly how the work is done and what it achieves", in the style of these real examples:
+- "Steam Clean Roof Cleaning - Steam cleaning all roof tiles to remove all organic staining and restore tiles to original appearance"
+- "Gutter Cleaning - Using industrial gutter vac to hoover out all debris in gutters, manually accessing areas if required"
+- "Brick Cleaning with Carbon Stain Removal - Using steam cleaning equipment which consists of super-heated water and low pressure to safely and effectively clean the surface. Window protection included"
+Only include services actually mentioned in the job information. NEVER include prices or quantities.
+
+Respond with JSON: {"sections": [{"type": "...", "content": "..."}], "lineItems": [{"description": "..."}]} — sections one entry per requested type in the order requested.`
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -146,11 +159,17 @@ Respond with JSON: {"sections": [{"type": "...", "content": "..."}]} — one ent
     (parsed.sections || []).map((s: { type: string; content: string }) => [s.type, s.content])
   )
 
-  return aiSections.map((def) => ({
+  const sections = aiSections.map((def) => ({
     type: def.type,
     title: def.title,
-    content: byType.get(def.type) || "⚠ MISSING: This section could not be generated. Please write it manually or regenerate.",
+    content: byType.get(def.type) || "MISSING: This section could not be generated. Please write it manually or regenerate.",
   }))
+
+  const lineItems: GeneratedLineItem[] = (parsed.lineItems || [])
+    .filter((li: { description?: unknown }) => typeof li?.description === "string" && li.description.trim())
+    .map((li: { description: string }) => ({ description: li.description.trim() }))
+
+  return { sections, lineItems }
 }
 
 export async function regenerateSection(params: {
