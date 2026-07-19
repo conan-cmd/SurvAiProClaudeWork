@@ -13,9 +13,31 @@ const STATUS_STYLES: Record<string, string> = {
   LOST: "bg-red-100 text-red-600",
 }
 
-export default async function DashboardPage() {
+function rangeFromParams(searchParams: { period?: string; from?: string; to?: string }) {
+  const now = new Date()
+  if (searchParams.from || searchParams.to) {
+    return {
+      label: "Custom range",
+      from: searchParams.from ? new Date(searchParams.from) : new Date(0),
+      to: searchParams.to ? new Date(searchParams.to + "T23:59:59") : now,
+    }
+  }
+  if (searchParams.period === "7d")
+    return { label: "Last 7 days", from: new Date(now.getTime() - 7 * 864e5), to: now }
+  if (searchParams.period === "30d")
+    return { label: "Last 30 days", from: new Date(now.getTime() - 30 * 864e5), to: now }
+  return { label: "All time", from: new Date(0), to: now }
+}
+
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { period?: string; from?: string; to?: string }
+}) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
+
+  const range = rangeFromParams(searchParams)
 
   const [surveys, proposals] = await Promise.all([
     db.siteSurvey.findMany({
@@ -34,11 +56,17 @@ export default async function DashboardPage() {
     }),
   ])
 
-  const byStatus = (s: string) => proposals.filter((p) => p.status === s)
-  const totalQuoted = proposals.reduce(
+  // Stats respect the selected time period (by proposal creation date)
+  const inRange = proposals.filter(
+    (p) => p.createdAt >= range.from && p.createdAt <= range.to
+  )
+  const byStatus = (s: string) => inRange.filter((p) => p.status === s)
+  const sentCount = inRange.filter((p) => p.sentAt && p.sentAt >= range.from && p.sentAt <= range.to).length
+  const totalQuoted = inRange.reduce(
     (sum, p) => sum + calculateProposalTotals(p.pricingLineItems).total,
     0
   )
+  const avgValue = inRange.length ? totalQuoted / inRange.length : 0
 
   // Average time from survey creation to proposal creation
   const creationTimes = proposals
@@ -63,13 +91,46 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
+      {/* Time period filter */}
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        {[["All time", "/dashboard"], ["Last 7 days", "/dashboard?period=7d"], ["Last 30 days", "/dashboard?period=30d"]].map(
+          ([label, href]) => (
+            <Link key={href} href={href}
+              className={`px-3 py-1.5 rounded-full font-medium border transition ${
+                range.label === label
+                  ? "bg-brand-navy text-white border-brand-navy"
+                  : "bg-white text-gray-600 hover:border-gray-400"
+              }`}>
+              {label}
+            </Link>
+          )
+        )}
+        <form className="flex items-center gap-1.5" action="/dashboard" method="get">
+          <input type="date" name="from" defaultValue={searchParams.from}
+            className="px-2 py-1 border rounded-lg bg-white text-xs" />
+          <span className="text-gray-400">to</span>
+          <input type="date" name="to" defaultValue={searchParams.to}
+            className="px-2 py-1 border rounded-lg bg-white text-xs" />
+          <button type="submit" className="px-3 py-1.5 rounded-full border font-medium bg-white text-gray-600 hover:border-gray-400">
+            Go
+          </button>
+        </form>
+      </div>
+
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
             <TrendingUp className="w-4 h-4" /> Total quoted
           </div>
           <div className="text-xl font-bold text-brand-navy">{formatCurrency(totalQuoted)}</div>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
+            <FileText className="w-4 h-4" /> Proposals
+          </div>
+          <div className="text-xl font-bold text-brand-navy">{inRange.length}</div>
+          <div className="text-xs text-gray-400">avg {formatCurrency(avgValue)}</div>
         </div>
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
@@ -83,7 +144,7 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
             <FileText className="w-4 h-4" /> Sent
           </div>
-          <div className="text-xl font-bold text-brand-navy">{byStatus("SENT").length}</div>
+          <div className="text-xl font-bold text-brand-navy">{sentCount}</div>
         </div>
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">

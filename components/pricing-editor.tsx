@@ -29,6 +29,7 @@ export function PricingEditor({
   onItemsChange?: (items: EditableLineItem[]) => void
 }) {
   const [items, setItems] = useState<EditableLineItem[]>(initialItems)
+  const [showDiscount, setShowDiscount] = useState(initialItems.some((i) => i.discount > 0))
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle")
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirst = useRef(true)
@@ -96,9 +97,17 @@ export function PricingEditor({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-brand-navy">Pricing</h3>
-        <span className="text-xs text-gray-400">
-          {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : ""}
-        </span>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 cursor-pointer select-none">
+            <input type="checkbox" checked={showDiscount}
+              onChange={(e) => setShowDiscount(e.target.checked)}
+              className="rounded accent-blue-600" />
+            Discounts
+          </label>
+          <span className="text-xs text-gray-400">
+            {saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : ""}
+          </span>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -116,7 +125,7 @@ export function PricingEditor({
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 items-center">
+            <div className={`grid grid-cols-3 gap-2 items-center ${showDiscount ? "sm:grid-cols-6" : "sm:grid-cols-5"}`}>
               <div>
                 <label className="text-[11px] text-gray-500">Qty</label>
                 <input type="number" min="0" step="any" className={cell} value={item.quantity}
@@ -140,11 +149,13 @@ export function PricingEditor({
                 <input type="number" min="0" max="100" className={cell} value={item.vat}
                   onChange={(e) => update(item.id, { vat: num(e.target.value) })} />
               </div>
-              <div>
-                <label className="text-[11px] text-gray-500">Discount %</label>
-                <input type="number" min="0" max="100" className={cell} value={item.discount}
-                  onChange={(e) => update(item.id, { discount: num(e.target.value) })} />
-              </div>
+              {showDiscount && (
+                <div>
+                  <label className="text-[11px] text-gray-500">Discount %</label>
+                  <input type="number" min="0" max="100" className={cell} value={item.discount}
+                    onChange={(e) => update(item.id, { discount: num(e.target.value) })} />
+                </div>
+              )}
               <div className="text-right">
                 <label className="text-[11px] text-gray-500 block">Net</label>
                 <div className="text-sm font-semibold py-1.5">{formatCurrency(lineNet(item))}</div>
