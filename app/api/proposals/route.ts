@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
   })
 
   try {
+    const generationStart = Date.now()
     const { sections: generated, lineItems: generatedLineItems } = await generateProposalSections({
       template,
       tone: org.proposalTone,
@@ -212,6 +213,7 @@ export async function POST(request: NextRequest) {
         clientName: survey.clientName,
         clientEmail: survey.clientEmail,
         templateName: template.id,
+        generationMs: Date.now() - generationStart,
         sections: { create: sectionsData },
         // Pre-build the pricing table: one line per service found in the
         // survey, with rich descriptions. User only has to enter prices.

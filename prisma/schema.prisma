@@ -235,6 +235,8 @@ model Proposal {
   status                ProposalStatus  @default(DRAFT)
   sentAt                DateTime?
 
+  generationMs          Int? // how long the AI draft took - proves the tagline
+
   // Client acceptance
   signedAt              DateTime?
   signedName            String?

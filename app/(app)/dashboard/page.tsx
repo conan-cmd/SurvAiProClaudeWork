@@ -69,12 +69,12 @@ export default async function DashboardPage({
   )
   const avgValue = inRange.length ? totalQuoted / inRange.length : 0
 
-  // Average time from survey creation to proposal creation
-  const creationTimes = proposals
-    .map((p) => p.createdAt.getTime() - p.survey.createdAt.getTime())
-    .filter((ms) => ms > 0)
-  const avgMinutes = creationTimes.length
-    ? Math.round(creationTimes.reduce((a, b) => a + b, 0) / creationTimes.length / 60000)
+  // Average AI generation time - the number that proves the tagline
+  const genTimes = proposals
+    .map((p) => p.generationMs)
+    .filter((ms): ms is number => typeof ms === "number" && ms > 0)
+  const avgGenSeconds = genTimes.length
+    ? Math.round(genTimes.reduce((a, b) => a + b, 0) / genTimes.length / 1000)
     : null
 
   return (
@@ -135,10 +135,10 @@ export default async function DashboardPage({
         </div>
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
-            <Clock className="w-4 h-4" /> Avg. creation time
+            <Clock className="w-4 h-4" /> Draft generated in
           </div>
           <div className="text-xl font-bold text-brand-navy">
-            {avgMinutes === null ? "—" : avgMinutes < 60 ? `${avgMinutes} min` : `${(avgMinutes / 60).toFixed(1)} hrs`}
+            {avgGenSeconds === null ? "—" : `${avgGenSeconds}s avg`}
           </div>
         </div>
         <div className="bg-white rounded-xl p-4 shadow-sm">
