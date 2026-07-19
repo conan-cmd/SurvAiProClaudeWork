@@ -8,8 +8,15 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "SurvAIPro - From Survey to Proposal in Seconds",
   description: "Turn site survey photos and notes into polished, branded proposals instantly.",
+  manifest: "/manifest.json",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "SurvAIPro",
+    statusBarStyle: "default",
   },
 }
 

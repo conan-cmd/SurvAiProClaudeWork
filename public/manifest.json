@@ -1,0 +1,13 @@
+{
+  "name": "SurvAIPro",
+  "short_name": "SurvAIPro",
+  "description": "From Survey to Proposal in Seconds",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0F172A",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
