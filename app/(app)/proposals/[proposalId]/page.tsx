@@ -410,16 +410,22 @@ function VideoPicker({
 }) {
   const [videos, setVideos] = useState<ChannelVideo[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [query, setQuery] = useState("")
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    fetch("/api/organization/videos")
-      .then(async (r) => {
-        const data = await r.json()
-        if (!r.ok) throw new Error(data.error)
-        setVideos(data)
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load videos"))
-  }, [])
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+    searchDebounce.current = setTimeout(() => {
+      fetch(`/api/organization/videos${query.trim() ? `?q=${encodeURIComponent(query)}` : ""}`)
+        .then(async (r) => {
+          const data = await r.json()
+          if (!r.ok) throw new Error(data.error)
+          setVideos(data)
+          setError(null)
+        })
+        .catch((e) => setError(e instanceof Error ? e.message : "Failed to load videos"))
+    }, 400)
+  }, [query])
 
   let selected: ChannelVideo[] = []
   try {
@@ -452,6 +458,12 @@ function VideoPicker({
 
   return (
     <div>
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search your whole channel (e.g. canopy cleaning)…"
+        className="w-full mb-2 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-brand-blue"
+      />
       <p className="text-xs text-gray-500 mb-2">
         Tick the videos of similar jobs to show in this proposal ({selected.length} selected).
       </p>
