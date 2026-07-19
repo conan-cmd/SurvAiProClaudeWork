@@ -69,6 +69,8 @@ export default async function DashboardPage({
     0
   )
   const avgValue = inRange.length ? totalQuoted / inRange.length : 0
+  const depositsPaid = inRange.filter((p) => p.depositPaidAt)
+  const depositsTotal = depositsPaid.reduce((s, p) => s + (p.depositAmount || 0), 0)
 
   // Average AI generation time - the number that proves the tagline
   const genTimes = proposals
@@ -120,7 +122,7 @@ export default async function DashboardPage({
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
             <TrendingUp className="w-4 h-4" /> Total quoted
@@ -147,6 +149,13 @@ export default async function DashboardPage({
             <FileText className="w-4 h-4" /> Sent
           </div>
           <div className="text-xl font-bold text-brand-navy">{sentCount}</div>
+        </div>
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
+            <TrendingUp className="w-4 h-4 text-brand-green" /> Deposits collected
+          </div>
+          <div className="text-xl font-bold text-emerald-600">{formatCurrency(depositsTotal)}</div>
+          <div className="text-xs text-gray-400">{depositsPaid.length} paid</div>
         </div>
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
