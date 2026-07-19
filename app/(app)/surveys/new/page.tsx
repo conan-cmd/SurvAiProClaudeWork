@@ -1,20 +1,37 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { ArrowRight } from "lucide-react"
 import { DictateButton } from "@/components/dictate-button"
 import { AddressInput } from "@/components/address-input"
 
-const SERVICE_TYPES = [
+// Fallback only - replaced by the organisation's own services when set
+const GENERIC_SERVICES = [
   "Cleaning", "Roofing", "Landscaping", "Electrical", "Plumbing",
-  "Painting & Decorating", "Flooring", "Windows & Doors", "General Building", "Other",
+  "Painting & Decorating", "Flooring", "Windows & Doors", "General Building",
 ]
 
 export default function NewSurveyPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  const [services, setServices] = useState<string[]>(GENERIC_SERVICES)
+  const [customService, setCustomService] = useState("")
+
+  useEffect(() => {
+    fetch("/api/organization")
+      .then((r) => r.json())
+      .then((org) => {
+        try {
+          const own = org?.mainServices ? JSON.parse(org.mainServices) : []
+          if (Array.isArray(own) && own.length) setServices(own)
+        } catch {
+          // keep generic fallback
+        }
+      })
+      .catch(() => {})
+  }, [])
   const [form, setForm] = useState({
     clientName: "",
     clientCompany: "",
@@ -42,10 +59,17 @@ export default function NewSurveyPage() {
     }
     setSaving(true)
     try {
+      const payload = {
+        ...form,
+        serviceType:
+          form.serviceType === "Other" && customService.trim()
+            ? customService.trim()
+            : form.serviceType,
+      }
       const res = await fetch("/api/surveys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error((await res.json()).error || "Failed to create survey")
       const survey = await res.json()
@@ -127,10 +151,15 @@ export default function NewSurveyPage() {
               <select className={inputCls} value={form.serviceType}
                 onChange={(e) => set("serviceType", e.target.value)}>
                 <option value="">Select…</option>
-                {SERVICE_TYPES.map((s) => (
+                {services.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
+                <option value="Other">Other…</option>
               </select>
+              {form.serviceType === "Other" && (
+                <input className={`${inputCls} mt-2`} placeholder="Describe the service"
+                  value={customService} onChange={(e) => setCustomService(e.target.value)} />
+              )}
             </div>
             <div>
               <label className={labelCls}>Property type</label>
