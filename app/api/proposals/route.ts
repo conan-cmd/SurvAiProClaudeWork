@@ -6,6 +6,8 @@ import { getTemplate } from "@/lib/templates"
 import { generateProposalSections, friendlyAIError } from "@/lib/ai"
 import { fetchChannelVideos, rankRelevantVideos } from "@/lib/youtube"
 
+export const maxDuration = 60 // AI generation takes 20-40s
+
 const createProposalSchema = z.object({
   surveyId: z.string().min(1),
   templateId: z.enum(["QUICK_QUOTE", "CONSULTATIVE", "AUTHORITY"]),

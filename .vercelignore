@@ -1,0 +1,6 @@
+.env
+.env.local
+uploads
+tools
+node_modules
+.next

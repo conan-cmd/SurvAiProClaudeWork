@@ -5,6 +5,8 @@ import { friendlyAIError } from "@/lib/ai"
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
+export const maxDuration = 60
+
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024
 
 // Lightweight Whisper transcription for field dictation.

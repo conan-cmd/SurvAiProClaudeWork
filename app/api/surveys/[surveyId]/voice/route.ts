@@ -6,6 +6,8 @@ import OpenAI from "openai"
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
+export const maxDuration = 60 // transcription can take a while
+
 const MAX_AUDIO_BYTES = 25 * 1024 * 1024 // Whisper API limit for direct upload
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024 // we extract the audio track ourselves
 const AUDIO_TYPES = [

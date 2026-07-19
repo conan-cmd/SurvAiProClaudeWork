@@ -5,6 +5,8 @@ import OpenAI from "openai"
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 
+export const maxDuration = 60
+
 // Generates the four reusable company sections from the org profile.
 // Output is a DRAFT: the user must review and edit before use.
 export async function POST() {
