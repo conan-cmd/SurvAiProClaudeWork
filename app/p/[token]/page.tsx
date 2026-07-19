@@ -2,13 +2,18 @@ import { notFound } from "next/navigation"
 import { db } from "@/lib/db"
 import { ProposalDocument } from "@/components/proposal-document"
 import { AcceptanceBlock } from "@/components/signature-pad"
+import { DepositCard } from "@/components/deposit-card"
+import { computeDeposit, retrieveCheckoutSession } from "@/lib/stripe"
+import { calculateProposalTotals, formatCurrency } from "@/lib/utils"
 
 export const dynamic = "force-dynamic"
 
 export default async function SharedProposalPage({
   params,
+  searchParams,
 }: {
   params: { token: string }
+  searchParams: { session_id?: string }
 }) {
   const link = await db.shareLink.findUnique({
     where: { token: params.token },
@@ -28,7 +33,7 @@ export default async function SharedProposalPage({
           organization: {
             select: {
               name: true, logoUrl: true, brandColor: true, secondaryColor: true,
-              email: true, phone: true, website: true,
+              email: true, phone: true, website: true, depositRules: true,
             },
           },
         },
@@ -48,7 +53,37 @@ export default async function SharedProposalPage({
     })
     .catch(() => {})
 
-  const p = link.proposal
+  let p = link.proposal
+
+  // Returning from Stripe Checkout: verify payment server-side and record it
+  if (
+    searchParams.session_id &&
+    p.stripeSessionId === searchParams.session_id &&
+    !p.depositPaidAt
+  ) {
+    try {
+      const session = await retrieveCheckoutSession(searchParams.session_id)
+      if (session.payment_status === "paid") {
+        p = {
+          ...p,
+          ...(await db.proposal.update({
+            where: { id: p.id },
+            data: { depositPaidAt: new Date(), status: "DEPOSIT_PAID" },
+          })),
+        }
+      }
+    } catch (err) {
+      console.error("Deposit verification failed:", err)
+    }
+  }
+
+  const depositDue = p.signedAt && !p.depositPaidAt
+    ? computeDeposit(
+        p.organization.depositRules,
+        p.survey.isResidential,
+        calculateProposalTotals(p.pricingLineItems).total
+      )
+    : 0
 
   return (
     <main className="min-h-screen bg-brand-gray py-6 px-3 md:py-10">
@@ -83,6 +118,23 @@ export default async function SharedProposalPage({
             token={params.token}
             clientName={p.clientName}
             clientCompany={p.survey.clientCompany}
+            brandColor={p.organization.brandColor}
+          />
+        )}
+        {p.depositPaidAt && (
+          <div className="mt-6 border-2 border-emerald-300 bg-emerald-50 rounded-xl p-6">
+            <h3 className="text-lg font-bold text-emerald-800 mb-1">Deposit received ✓</h3>
+            <p className="text-sm text-emerald-700">
+              {p.depositAmount ? formatCurrency(p.depositAmount) : "Your deposit"} was paid on{" "}
+              {new Intl.DateTimeFormat("en-GB").format(p.depositPaidAt)}. The remaining balance
+              is due on completion — we&apos;ll be in touch to arrange your start date.
+            </p>
+          </div>
+        )}
+        {depositDue > 0 && (
+          <DepositCard
+            token={params.token}
+            amountLabel={formatCurrency(depositDue)}
             brandColor={p.organization.brandColor}
           />
         )}

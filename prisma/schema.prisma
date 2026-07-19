@@ -65,6 +65,9 @@ model Organization {
   // YouTube channel for embedding similar-work videos in proposals
   youtubeChannelUrl     String?
 
+  // Deposit rules JSON: {"residential":{"type":"PERCENT|FIXED|NONE","value":50},"commercial":{...}}
+  depositRules          String?
+
   users                 User[]
   surveys               SiteSurvey[]
   proposals             Proposal[]
@@ -237,6 +240,11 @@ model Proposal {
 
   generationMs          Int? // how long the AI draft took - proves the tagline
 
+  // Deposit
+  depositAmount         Float?
+  depositPaidAt         DateTime?
+  stripeSessionId       String?
+
   // Client acceptance
   signedAt              DateTime?
   signedName            String?
@@ -273,6 +281,7 @@ enum ProposalStatus {
   READY
   SENT
   SIGNED
+  DEPOSIT_PAID
   WON
   LOST
 }

@@ -29,3 +29,6 @@ prisma/migrations/dev/
 
 # local file storage
 uploads/
+
+.vercel
+.env*

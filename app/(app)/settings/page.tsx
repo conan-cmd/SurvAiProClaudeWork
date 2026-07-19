@@ -25,6 +25,20 @@ type Org = {
   ourApproachSection: string | null
   termsAndConditions: string | null
   youtubeChannelUrl: string | null
+  depositRules: string | null
+}
+
+type DepositRule = { type: "NONE" | "PERCENT" | "FIXED"; value: number }
+const parseRules = (s: string | null): { residential: DepositRule; commercial: DepositRule } => {
+  try {
+    const r = JSON.parse(s || "{}")
+    return {
+      residential: r.residential || { type: "NONE", value: 0 },
+      commercial: r.commercial || { type: "NONE", value: 0 },
+    }
+  } catch {
+    return { residential: { type: "NONE", value: 0 }, commercial: { type: "NONE", value: 0 } }
+  }
 }
 
 export default function SettingsPage() {
@@ -70,6 +84,7 @@ export default function SettingsPage() {
           ourApproachSection: org.ourApproachSection || "",
           termsAndConditions: org.termsAndConditions || "",
           youtubeChannelUrl: org.youtubeChannelUrl || "",
+          depositRules: org.depositRules || "",
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
@@ -214,6 +229,41 @@ export default function SettingsPage() {
               onChange={(e) => set(key, e.target.value)} />
           </div>
         ))}
+      </section>
+
+      <section className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+        <h2 className="font-semibold text-brand-navy">Deposits</h2>
+        <p className="text-sm text-gray-500">
+          When a client signs a proposal, ask for a deposit before the job is confirmed.
+        </p>
+        {(["residential", "commercial"] as const).map((kind) => {
+          const rules = parseRules(org.depositRules)
+          const rule = rules[kind]
+          const update = (patch: Partial<DepositRule>) => {
+            const next = { ...rules, [kind]: { ...rule, ...patch } }
+            set("depositRules", JSON.stringify(next))
+          }
+          return (
+            <div key={kind} className="flex items-center gap-3">
+              <span className="w-28 text-sm font-medium text-gray-700 capitalize">{kind}</span>
+              <select className="px-3 py-2 border rounded-lg text-sm" value={rule.type}
+                onChange={(e) => update({ type: e.target.value as DepositRule["type"] })}>
+                <option value="NONE">No deposit</option>
+                <option value="PERCENT">Percentage</option>
+                <option value="FIXED">Fixed amount</option>
+              </select>
+              {rule.type !== "NONE" && (
+                <div className="flex items-center gap-1">
+                  {rule.type === "FIXED" && <span className="text-sm text-gray-500">£</span>}
+                  <input type="number" min="0" className="w-24 px-3 py-2 border rounded-lg text-sm"
+                    value={rule.value || ""}
+                    onChange={(e) => update({ value: parseFloat(e.target.value) || 0 })} />
+                  {rule.type === "PERCENT" && <span className="text-sm text-gray-500">%</span>}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </section>
 
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-3">

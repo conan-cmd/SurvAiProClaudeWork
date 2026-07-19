@@ -4,7 +4,7 @@ import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 
 const updateProposalSchema = z.object({
-  status: z.enum(["DRAFT", "READY", "SENT", "SIGNED", "WON", "LOST"]).optional(),
+  status: z.enum(["DRAFT", "READY", "SENT", "SIGNED", "DEPOSIT_PAID", "WON", "LOST"]).optional(),
   templateName: z.string().optional(),
   clientName: z.string().optional(),
   clientEmail: z.string().email().optional().or(z.literal("")),

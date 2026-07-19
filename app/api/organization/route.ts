@@ -25,6 +25,7 @@ const updateOrgSchema = z.object({
   ourApproachSection: z.string().optional(),
   termsAndConditions: z.string().optional(),
   youtubeChannelUrl: z.string().optional(),
+  depositRules: z.string().max(500).optional(),
 })
 
 export async function GET() {
