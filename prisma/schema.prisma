@@ -234,6 +234,13 @@ model Proposal {
   // Metadata
   status                ProposalStatus  @default(DRAFT)
   sentAt                DateTime?
+
+  // Client acceptance
+  signedAt              DateTime?
+  signedName            String?
+  signedPosition        String?
+  signedCompany         String?
+  signatureImage        String? // data URL of drawn signature
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
@@ -263,6 +270,7 @@ enum ProposalStatus {
   DRAFT
   READY
   SENT
+  SIGNED
   WON
   LOST
 }

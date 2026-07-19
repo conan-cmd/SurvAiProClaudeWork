@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { db } from "@/lib/db"
 import { ProposalDocument } from "@/components/proposal-document"
+import { AcceptanceBlock } from "@/components/signature-pad"
 
 export const dynamic = "force-dynamic"
 
@@ -62,6 +63,29 @@ export default async function SharedProposalPage({
             organization: p.organization,
           }}
         />
+        {p.signedAt ? (
+          <div className="mt-10 border rounded-xl p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Accepted</h3>
+            {p.signatureImage && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={p.signatureImage} alt="Signature" className="h-16 mb-2" />
+            )}
+            <p className="text-sm text-gray-600">
+              {p.signedName}
+              {p.signedPosition ? `, ${p.signedPosition}` : ""}
+              {p.signedCompany ? ` — ${p.signedCompany}` : ""}
+              {" · "}
+              {new Intl.DateTimeFormat("en-GB").format(p.signedAt)}
+            </p>
+          </div>
+        ) : (
+          <AcceptanceBlock
+            token={params.token}
+            clientName={p.clientName}
+            clientCompany={p.survey.clientCompany}
+            brandColor={p.organization.brandColor}
+          />
+        )}
       </div>
       <p className="text-center text-xs text-gray-400 mt-6">
         Prepared with SurvAIPro

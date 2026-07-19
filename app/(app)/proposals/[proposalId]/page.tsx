@@ -39,7 +39,7 @@ type ProposalData = {
   }
 }
 
-const STATUSES = ["DRAFT", "READY", "SENT", "WON", "LOST"] as const
+const STATUSES = ["DRAFT", "READY", "SENT", "SIGNED", "WON", "LOST"] as const
 
 // photoIds goes to the API as an array but is stored locally as a JSON string
 type SectionPatch = Partial<Omit<Section, "photoIds">> & {
