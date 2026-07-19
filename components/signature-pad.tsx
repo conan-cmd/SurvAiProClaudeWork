@@ -26,8 +26,13 @@ export function AcceptanceBlock({
   const [error, setError] = useState<string | null>(null)
 
   const pos = (e: React.PointerEvent) => {
-    const rect = canvasRef.current!.getBoundingClientRect()
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    // Scale from displayed size to canvas coordinates - critical on phones
+    const c = canvasRef.current!
+    const rect = c.getBoundingClientRect()
+    return {
+      x: (e.clientX - rect.left) * (c.width / rect.width),
+      y: (e.clientY - rect.top) * (c.height / rect.height),
+    }
   }
   const start = (e: React.PointerEvent) => {
     drawing.current = true

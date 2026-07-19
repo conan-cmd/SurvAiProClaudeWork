@@ -153,7 +153,9 @@ export default async function DashboardPage({
             <TrendingUp className="w-4 h-4 text-brand-green" /> Won / Lost
           </div>
           <div className="text-xl font-bold text-brand-navy">
-            <span className="text-emerald-600">{byStatus("WON").length}</span>
+            <span className="text-emerald-600">
+              {byStatus("WON").length + byStatus("DEPOSIT_PAID").length}
+            </span>
             {" / "}
             <span className="text-red-500">{byStatus("LOST").length}</span>
           </div>

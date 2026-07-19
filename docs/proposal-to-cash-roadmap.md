@@ -36,6 +36,20 @@ customer through a salesperson's decision journey — not just display a quote.
 - Admin settings: deposit rules, payment methods, Stripe connection, bank
   details, deposit/invoice wording, proposal validity period.
 
+## Near-term queue (Conan, 19 July 2026 — post-launch feedback)
+1. EMAIL NOTIFICATIONS: on proposal signed AND on deposit paid, email BOTH the
+   signee (confirmation) and the business (alert). Toggleable per-event in
+   Settings (org.notificationPrefs JSON). Use existing Resend send path.
+2. DASHBOARD DRILL-DOWN: every metric tile links to a filtered proposals list
+   (e.g. /proposals?status=WON&from=&to=) showing what makes up the number.
+3. DIRECT-TO-BLOB uploads (client-side) to beat Vercel's 4.5MB body cap —
+   unblocks walkthrough videos + long voice notes on production.
+4. XERO (v2, deliberately after launch): per-org "Connect Xero" OAuth; when
+   deposit paid -> create ACCREC invoice for deposit with payment applied, so
+   client + amounts appear in Xero automatically. INTERIM zero-code option:
+   install Stripe's official Xero app (Xero marketplace) for payout
+   reconciliation. Full invoice-per-client integration = native build later.
+
 ## Proposal engagement analytics (FUTURE — Conan, July 2026)
 Beyond the "Viewed" status: track TIME SPENT PER SECTION/PAGE on the shared
 proposal link (IntersectionObserver dwell-time on each section, batched pings).
