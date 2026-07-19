@@ -6,7 +6,8 @@ import path from "path"
 // Falls back to local disk storage when no Vercel Blob token is configured,
 // so the app is fully usable in local development.
 const useLocalStorage = () =>
-  process.env.STORAGE_TYPE === "local" || !process.env.BLOB_READ_WRITE_TOKEN
+  process.env.STORAGE_TYPE === "local" ||
+  (!process.env.BLOB_READ_WRITE_TOKEN && !process.env.BLOB_STORE_ID)
 
 const LOCAL_ROOT = path.join(process.cwd(), "uploads")
 
