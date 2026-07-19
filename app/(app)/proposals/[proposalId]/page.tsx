@@ -269,7 +269,7 @@ export default function ProposalEditorPage() {
             )}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <select value={proposal.status} onChange={(e) => setStatus(e.target.value)}
             className="px-3 py-2 border rounded-lg text-sm font-medium bg-white">
             {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
