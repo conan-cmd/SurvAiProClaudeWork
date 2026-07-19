@@ -66,6 +66,44 @@ export async function fetchChannelVideos(channelUrl: string): Promise<ChannelVid
 }
 
 /**
+ * Searches the channel's ENTIRE back catalogue via the YouTube Data API
+ * (uses YouTube's own relevance ranking). Requires the YouTube Data API v3
+ * to be enabled on the Google API key. Returns [] on any failure so callers
+ * can fall back to the RSS feed.
+ */
+export async function searchChannelVideos(
+  channelUrl: string,
+  query: string,
+  max = 6
+): Promise<ChannelVideo[]> {
+  const key = process.env.GOOGLE_MAPS_API_KEY
+  if (!key || !query.trim()) return []
+  const channelId = await resolveChannelId(channelUrl)
+  if (!channelId) return []
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&q=${encodeURIComponent(query)}&type=video&order=relevance&maxResults=${max}&key=${key}`,
+      { signal: AbortSignal.timeout(8000) }
+    )
+    if (!res.ok) return []
+    const data = await res.json()
+    return (data.items || [])
+      .filter((i: { id?: { videoId?: string } }) => i.id?.videoId)
+      .map((i: { id: { videoId: string }; snippet: { title: string; description?: string } }) => ({
+        videoId: i.id.videoId,
+        title: i.snippet.title
+          .replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'"),
+        description: i.snippet.description?.slice(0, 500),
+        thumbnail: `https://i.ytimg.com/vi/${i.id.videoId}/hqdefault.jpg`,
+        url: `https://www.youtube.com/watch?v=${i.id.videoId}`,
+      }))
+      .filter((v: ChannelVideo) => !v.title.trim().startsWith("#"))
+  } catch {
+    return []
+  }
+}
+
+/**
  * Picks videos relevant to a job by keyword overlap with the video title.
  * Returns [] when nothing genuinely matches - no forced filler.
  */

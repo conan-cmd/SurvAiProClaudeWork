@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
-import { fetchChannelVideos } from "@/lib/youtube"
+import { fetchChannelVideos, searchChannelVideos } from "@/lib/youtube"
 
 // Lists videos from the org's YouTube channel via the public RSS feed
 // (no API key required). Optional ?q= filters by title keywords.
@@ -18,6 +18,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const search = request.nextUrl.searchParams.get("q")?.trim()
+    if (search) {
+      const found = await searchChannelVideos(org.youtubeChannelUrl, search, 12)
+      if (found.length) return NextResponse.json(found)
+    }
     let videos = await fetchChannelVideos(org.youtubeChannelUrl)
     if (!videos.length) {
       return NextResponse.json(

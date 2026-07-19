@@ -175,11 +175,19 @@ export async function POST(request: NextRequest) {
     // or re-pick videos in the editor. Failure here never blocks generation.
     if (org.youtubeChannelUrl) {
       try {
-        const videos = await fetchChannelVideos(org.youtubeChannelUrl)
-        const relevant = rankRelevantVideos(
-          videos,
-          `${survey.serviceType} ${survey.title} ${survey.writtenDescription || ""}`
-        )
+        // Search the full channel catalogue first (YouTube's own relevance);
+        // fall back to keyword-matching the recent-videos feed.
+        const { searchChannelVideos } = await import("@/lib/youtube")
+        let relevant = (
+          await searchChannelVideos(org.youtubeChannelUrl, `${survey.serviceType} ${survey.title}`)
+        ).slice(0, 2)
+        if (!relevant.length) {
+          const videos = await fetchChannelVideos(org.youtubeChannelUrl)
+          relevant = rankRelevantVideos(
+            videos,
+            `${survey.serviceType} ${survey.title} ${survey.writtenDescription || ""}`
+          )
+        }
         if (relevant.length) {
           const pricingIndex = sectionsData.findIndex((s) => s.type === "pricing")
           const insertAt = pricingIndex === -1 ? sectionsData.length : pricingIndex
