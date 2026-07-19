@@ -63,7 +63,7 @@ export async function attachSiteImagery(params: {
       name: "aerial-view.jpg",
       caption: "Aerial view of the site",
       cover: false,
-      url: `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=19&size=640x480&maptype=satellite&key=${key}`,
+      url: `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=20&size=640x480&maptype=hybrid&markers=color:red%7C${lat},${lng}&key=${key}`,
     },
   ]
 

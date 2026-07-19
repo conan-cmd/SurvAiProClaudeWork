@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // Keep ffmpeg-static unbundled so its binary path stays valid
+    serverComponentsExternalPackages: ["ffmpeg-static"],
+  },
   images: {
     remotePatterns: [
       {
