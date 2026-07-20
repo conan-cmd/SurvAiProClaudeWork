@@ -8,7 +8,7 @@ import { toast } from "sonner"
 function JoinForm() {
   const router = useRouter()
   const token = useSearchParams().get("token") || ""
-  const [info, setInfo] = useState<{ email: string; organization: string } | null>(null)
+  const [info, setInfo] = useState<{ email: string; organization: string; existingAccount?: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [name, setName] = useState("")
   const [password, setPassword] = useState("")
@@ -59,14 +59,24 @@ function JoinForm() {
             <p className="text-gray-600 mb-6 text-sm">
               You&apos;re joining as <strong>{info.email}</strong>
             </p>
+            {info.existingAccount && (
+              <p className="text-sm bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-amber-800">
+                This email already has a SurvAIPro account. Enter its password to{" "}
+                <strong>move your account into {info.organization}&apos;s team</strong>. Anything in
+                your old workspace stays behind.
+              </p>
+            )}
             <form onSubmit={submit} className="space-y-4">
-              <input className={input} placeholder="Your full name" value={name}
-                onChange={(e) => setName(e.target.value)} required />
-              <input className={input} type="password" placeholder="Choose a password (8+ characters)"
+              {!info.existingAccount && (
+                <input className={input} placeholder="Your full name" value={name}
+                  onChange={(e) => setName(e.target.value)} required />
+              )}
+              <input className={input} type="password"
+                placeholder={info.existingAccount ? "Your account password" : "Choose a password (8+ characters)"}
                 value={password} onChange={(e) => setPassword(e.target.value)} required />
               <button type="submit" disabled={loading}
                 className="w-full py-2.5 bg-brand-blue text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                {loading ? "Joining…" : "Join the team"}
+                {loading ? "Joining…" : info.existingAccount ? "Move my account & join" : "Join the team"}
               </button>
             </form>
           </>

@@ -35,9 +35,10 @@ export async function POST(request: NextRequest) {
   const email = parsed.data.email.toLowerCase()
 
   const existing = await db.user.findUnique({ where: { email } })
-  if (existing) {
-    return NextResponse.json({ error: "That email already has an account" }, { status: 409 })
+  if (existing?.organizationId === user.organizationId) {
+    return NextResponse.json({ error: "That person is already on your team" }, { status: 409 })
   }
+  // An account in a DIFFERENT organisation may accept the invite to move over
 
   const token = randomBytes(24).toString("base64url")
   const invite = await db.invite.create({

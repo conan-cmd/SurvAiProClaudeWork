@@ -5,7 +5,7 @@ import { db } from "@/lib/db"
 
 const joinSchema = z.object({
   token: z.string().min(10),
-  name: z.string().trim().min(1, "Enter your name"),
+  name: z.string().trim().optional(),
   password: z.string().min(8, "Password must be at least 8 characters"),
 })
 
@@ -24,22 +24,38 @@ export async function POST(request: NextRequest) {
   if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
     return NextResponse.json({ error: "This invite is no longer valid" }, { status: 404 })
   }
-  if (await db.user.findUnique({ where: { email: invite.email } })) {
-    return NextResponse.json({ error: "This email already has an account" }, { status: 409 })
-  }
+  const existing = await db.user.findUnique({ where: { email: invite.email } })
 
-  await db.$transaction([
-    db.user.create({
-      data: {
-        email: invite.email,
-        name,
-        password: await hash(password, 12),
-        organizationId: invite.organizationId,
-        role: "MEMBER",
-      },
-    }),
-    db.invite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }),
-  ])
+  if (existing) {
+    // Existing account moving teams: verify their password, then switch org
+    const { compare } = await import("bcryptjs")
+    if (!existing.password || !(await compare(password, existing.password))) {
+      return NextResponse.json({ error: "Incorrect password for this account" }, { status: 401 })
+    }
+    await db.$transaction([
+      db.user.update({
+        where: { id: existing.id },
+        data: { organizationId: invite.organizationId, role: "MEMBER" },
+      }),
+      db.invite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }),
+    ])
+  } else {
+    if (!name?.trim()) {
+      return NextResponse.json({ error: "Enter your name" }, { status: 400 })
+    }
+    await db.$transaction([
+      db.user.create({
+        data: {
+          email: invite.email,
+          name,
+          password: await hash(password, 12),
+          organizationId: invite.organizationId,
+          role: "MEMBER",
+        },
+      }),
+      db.invite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }),
+    ])
+  }
 
   return NextResponse.json({ success: true, email: invite.email, organization: invite.organization.name })
 }
@@ -54,5 +70,10 @@ export async function GET(request: NextRequest) {
   if (!invite || invite.acceptedAt || invite.expiresAt < new Date()) {
     return NextResponse.json({ error: "This invite is no longer valid" }, { status: 404 })
   }
-  return NextResponse.json({ email: invite.email, organization: invite.organization.name })
+  const existing = await db.user.findUnique({ where: { email: invite.email } })
+  return NextResponse.json({
+    email: invite.email,
+    organization: invite.organization.name,
+    existingAccount: Boolean(existing),
+  })
 }
