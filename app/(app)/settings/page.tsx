@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Loader2, Upload, Sparkles } from "lucide-react"
+import { SignatureDraw } from "@/components/signature-draw"
 
 type Org = {
   name: string
@@ -355,33 +356,38 @@ export default function SettingsPage() {
           <input className={inputCls} placeholder="e.g. Conan Sammon, Managing Director"
             value={me?.signOffName || ""} onChange={(e) => saveMyName(e.target.value)} />
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          {([["headshot", "Headshot", me?.headshotUrl], ["signature", "Signature image", me?.signatureImageUrl]] as const).map(
-            ([kind, label, url]) => (
-              <div key={kind}>
-                <label className={labelCls}>{label}</label>
-                {url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={url} alt={label}
-                    className={kind === "headshot" ? "w-16 h-16 rounded-full object-cover border mb-2" : "h-12 object-contain border rounded p-1 mb-2 bg-white"} />
-                ) : (
-                  <div className="h-16 border-2 border-dashed rounded-lg flex items-center justify-center text-gray-300 text-xs mb-2">
-                    None yet
-                  </div>
-                )}
-                <label className="inline-flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs font-medium hover:bg-gray-50 cursor-pointer">
-                  <Upload className="w-3.5 h-3.5" /> Upload
-                  <input type="file" accept="image/*" className="hidden"
-                    onChange={(e) => uploadImage(e.target.files?.[0], kind)} />
-                </label>
+        <div>
+          <label className={labelCls}>Headshot</label>
+          <div className="flex items-center gap-3">
+            {me?.headshotUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={me.headshotUrl} alt="Headshot" className="w-16 h-16 rounded-full object-cover border" />
+            ) : (
+              <div className="w-16 h-16 rounded-full border-2 border-dashed flex items-center justify-center text-gray-300 text-xs">
+                None
               </div>
-            )
-          )}
+            )}
+            <label className="inline-flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs font-medium hover:bg-gray-50 cursor-pointer">
+              <Upload className="w-3.5 h-3.5" /> Upload photo
+              <input type="file" accept="image/*" className="hidden"
+                onChange={(e) => uploadImage(e.target.files?.[0], "headshot")} />
+            </label>
+          </div>
         </div>
-        <p className="text-xs text-gray-400">
-          Tip: sign white paper with a dark pen, photograph it straight-on, and upload — a
-          PNG with a white background works perfectly.
-        </p>
+        <div>
+          <label className={labelCls}>Your signature</label>
+          {me?.signatureImageUrl && (
+            <div className="flex items-center gap-2 mb-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={me.signatureImageUrl} alt="Current signature"
+                className="h-10 object-contain border rounded p-1 bg-white" />
+              <span className="text-xs text-gray-400">Current — draw below to replace</span>
+            </div>
+          )}
+          <SignatureDraw
+            onSaved={(url) => setMe((m) => (m ? { ...m, signatureImageUrl: url } : m))}
+          />
+        </div>
       </section>
 
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-3">
