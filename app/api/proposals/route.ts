@@ -117,7 +117,9 @@ export async function POST(request: NextRequest) {
           siteAddress: survey.clientAddress,
         })
       } else if (def.type === "terms") {
+        // Commercial jobs use the commercial template, falling back to standard
         content =
+          (!survey.isResidential && org.termsCommercial) ||
           org.termsAndConditions ||
           "MISSING: Add your standard Terms and Conditions in Settings so they appear on every proposal automatically."
       }

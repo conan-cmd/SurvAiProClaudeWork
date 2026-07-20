@@ -9,14 +9,23 @@ export const maxDuration = 60
 
 // Drafts a generic set of UK trades/services T&Cs for the org to review.
 // Returned as a DRAFT only - the user must review and save it themselves.
-export async function POST() {
+export async function POST(request: Request) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const body = await request.json().catch(() => ({}))
+  const type: "residential" | "commercial" =
+    body?.type === "commercial" ? "commercial" : "residential"
 
   const org = await db.organization.findUniqueOrThrow({
     where: { id: user.organizationId },
   })
   const services = org.mainServices ? JSON.parse(org.mainServices).join(", ") : "trade services"
+
+  const typeGuidance =
+    type === "commercial"
+      ? "These terms are for COMMERCIAL clients (property managers, facilities management, main contractors, developers). Include: presumption of free access to safe scaffolding/access equipment where quoted by others; scaffold sheeting where elevation cleaning is quoted; welfare facilities, storage, skips, waste disposal and parking provided by the client/main contractor; parking dispensations arranged by the client; 7-day valuations with 14-day payment for longer projects; retention deemed 0% due to quality management systems; right to claim additional preliminaries if scope increases; site sign-off by an authorised person each day. OMIT consumer cooling-off rights - these are B2B terms."
+      : "These terms are for RESIDENTIAL consumer clients. Include the 14-day cooling-off right under the Consumer Contracts Regulations 2013 for off-premises contracts, and a statement that statutory rights are unaffected. Keep language homeowner-friendly."
 
   try {
     const response = await openai.chat.completions.create({
@@ -28,7 +37,7 @@ export async function POST() {
         },
         {
           role: "user",
-          content: `Draft 15-20 concise terms for ${org.name}, providing ${services} in the UK.`,
+          content: `Draft 15-20 concise terms for ${org.name}, providing ${services} in the UK. ${typeGuidance}`,
         },
       ],
       temperature: 0.4,

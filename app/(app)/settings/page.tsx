@@ -25,6 +25,7 @@ type Org = {
   ourExperienceSection: string | null
   ourApproachSection: string | null
   termsAndConditions: string | null
+  termsCommercial: string | null
   youtubeChannelUrl: string | null
   depositRules: string | null
   signOffName: string | null
@@ -138,6 +139,7 @@ export default function SettingsPage() {
           ourExperienceSection: org.ourExperienceSection || "",
           ourApproachSection: org.ourApproachSection || "",
           termsAndConditions: org.termsAndConditions || "",
+          termsCommercial: org.termsCommercial || "",
           youtubeChannelUrl: org.youtubeChannelUrl || "",
           depositRules: org.depositRules || "",
           signOffName: org.signOffName || "",
@@ -170,19 +172,23 @@ export default function SettingsPage() {
   }
   const uploadLogo = (file: File | undefined) => uploadImage(file, "logo")
 
-  const [generatingTerms, setGeneratingTerms] = useState(false)
-  const generateTerms = async () => {
-    setGeneratingTerms(true)
+  const [generatingTerms, setGeneratingTerms] = useState<"residential" | "commercial" | null>(null)
+  const generateTerms = async (type: "residential" | "commercial") => {
+    setGeneratingTerms(type)
     try {
-      const res = await fetch("/api/organization/generate-terms", { method: "POST" })
+      const res = await fetch("/api/organization/generate-terms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      set("termsAndConditions", data.terms)
+      set(type === "commercial" ? "termsCommercial" : "termsAndConditions", data.terms)
       toast.success("Draft terms added — review and edit, then Save")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to draft terms")
     } finally {
-      setGeneratingTerms(false)
+      setGeneratingTerms(null)
     }
   }
 
@@ -425,22 +431,35 @@ export default function SettingsPage() {
         })}
       </section>
 
-      <section className="bg-white rounded-xl shadow-sm p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-brand-navy">Standard Terms & Conditions</h2>
-          <button onClick={generateTerms} disabled={generatingTerms}
-            className="inline-flex items-center gap-1.5 text-sm text-brand-blue font-medium hover:underline disabled:opacity-50">
-            {generatingTerms ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            Draft with AI
-          </button>
-        </div>
+      <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+        <h2 className="font-semibold text-brand-navy">Standard Terms & Conditions</h2>
         <p className="text-sm text-gray-500">
-          Added to every proposal automatically. One term per line. AI drafts are generic
-          templates — review carefully, and consider a professional check before relying on them.
+          Added to every proposal automatically based on the job&apos;s property type. One term
+          per line. AI drafts are generic templates — review carefully, and consider a
+          professional check before relying on them.
         </p>
-        <textarea rows={12} className={inputCls} value={org.termsAndConditions || ""}
-          onChange={(e) => set("termsAndConditions", e.target.value)}
-          placeholder={"Our quotation includes one continuous site visit for the works unless stated otherwise…\nAccess to water supply and electricity is assumed unless specified otherwise…\nPayment terms are 14 days from completion of works…"} />
+        {(
+          [
+            ["residential", "Residential clients", "termsAndConditions", org.termsAndConditions],
+            ["commercial", "Commercial clients", "termsCommercial", org.termsCommercial],
+          ] as const
+        ).map(([type, label, field, value]) => (
+          <div key={type}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-medium text-gray-700">{label}</span>
+              <button onClick={() => generateTerms(type)} disabled={generatingTerms !== null}
+                className="inline-flex items-center gap-1.5 text-sm text-brand-blue font-medium hover:underline disabled:opacity-50">
+                {generatingTerms === type ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Draft with AI
+              </button>
+            </div>
+            <textarea rows={9} className={inputCls} value={value || ""}
+              onChange={(e) => set(field, e.target.value)}
+              placeholder={type === "commercial"
+                ? "Leave empty to use the residential terms for commercial jobs too…"
+                : "Our quotation includes one continuous site visit for the works unless stated otherwise…"} />
+          </div>
+        ))}
       </section>
 
       <button onClick={save} disabled={saving}

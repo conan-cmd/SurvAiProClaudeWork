@@ -81,8 +81,10 @@ model Organization {
   ourExperienceSection  String?
   ourApproachSection    String?
 
-  // Standard T&Cs library, reused on every proposal (user-editable)
+  // Standard T&Cs library, reused on every proposal (user-editable).
+  // termsAndConditions = residential/default; termsCommercial falls back to it.
   termsAndConditions    String?
+  termsCommercial       String?
 
   // YouTube channel for embedding similar-work videos in proposals
   youtubeChannelUrl     String?
