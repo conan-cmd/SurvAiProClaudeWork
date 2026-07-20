@@ -27,6 +27,7 @@ export function VoiceNotes({
 }) {
   const [recording, setRecording] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const [progress, setProgress] = useState<number | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const mediaRecorder = useRef<MediaRecorder | null>(null)
   const chunks = useRef<Blob[]>([])
@@ -63,22 +64,62 @@ export function VoiceNotes({
 
   const uploadAudio = async (file: File, duration: number) => {
     setProcessing(true)
+    setProgress(0)
     try {
-      const formData = new FormData()
-      formData.append("audio", file)
-      formData.append("duration", String(duration))
-      const res = await fetch(`/api/surveys/${surveyId}/voice`, {
-        method: "POST",
-        body: formData,
-      })
-      if (!res.ok) throw new Error((await res.json()).error || "Upload failed")
-      const { voiceNote, transcript } = await res.json()
-      onChange([...voiceNotes, { ...voiceNote, transcript }])
+      let result: { voiceNote: unknown; transcript: unknown } | null = null
+
+      // Fast path: stream straight to Blob storage (no server size cap,
+      // single hop, real progress), then hand the URL over for transcription.
+      try {
+        const { upload } = await import("@vercel/blob/client")
+        const orgId = await fetch("/api/organization").then((r) => r.json()).then((o) => o.id)
+        const blob = await upload(
+          `organizations/${orgId}/surveys/${surveyId}/voice/${Date.now()}-${file.name}`,
+          file,
+          {
+            access: "public",
+            handleUploadUrl: "/api/blob/upload",
+            onUploadProgress: ({ percentage }) => setProgress(Math.round(percentage)),
+          }
+        )
+        setProgress(100)
+        const res = await fetch(`/api/surveys/${surveyId}/voice/from-blob`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: blob.url,
+            fileName: file.name || "recording",
+            mimeType: file.type,
+            duration,
+          }),
+        })
+        if (!res.ok) throw new Error((await res.json()).error || "Transcription failed")
+        result = await res.json()
+      } catch (fastPathErr) {
+        // Fall back to the classic multipart route (local dev / no Blob)
+        if (file.size > 4 * 1024 * 1024 && window.location.hostname !== "localhost") {
+          throw fastPathErr
+        }
+        setProgress(null)
+        const formData = new FormData()
+        formData.append("audio", file)
+        formData.append("duration", String(duration))
+        const res = await fetch(`/api/surveys/${surveyId}/voice`, {
+          method: "POST",
+          body: formData,
+        })
+        if (!res.ok) throw new Error((await res.json()).error || "Upload failed")
+        result = await res.json()
+      }
+
+      const { voiceNote, transcript } = result as never
+      onChange([...voiceNotes, { ...(voiceNote as object), transcript } as never])
       toast.success("Transcribed! Please review the transcript below.")
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to process voice note")
     } finally {
       setProcessing(false)
+      setProgress(null)
     }
   }
 
@@ -139,9 +180,21 @@ export function VoiceNotes({
       </div>
 
       {processing && (
-        <div className="flex items-center gap-3 text-gray-500 bg-blue-50 rounded-xl p-4">
-          <Loader2 className="w-5 h-5 animate-spin text-brand-blue" />
-          Uploading and transcribing — this can take up to a minute…
+        <div className="bg-blue-50 rounded-xl p-4 space-y-2">
+          <div className="flex items-center gap-3 text-gray-600 text-sm">
+            <Loader2 className="w-5 h-5 animate-spin text-brand-blue shrink-0" />
+            {progress !== null && progress < 100
+              ? `Uploading… ${progress}%`
+              : "Transcribing — this can take up to a minute…"}
+          </div>
+          {progress !== null && (
+            <div className="h-2 bg-blue-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-brand-blue rounded-full transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          )}
         </div>
       )}
 
