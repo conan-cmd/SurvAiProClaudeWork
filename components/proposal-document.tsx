@@ -34,6 +34,9 @@ export type ProposalDocumentData = {
     email?: string | null
     phone?: string | null
     website?: string | null
+    signOffName?: string | null
+    headshotUrl?: string | null
+    signatureImageUrl?: string | null
   }
 }
 
@@ -249,9 +252,14 @@ function GallerySection({ section }: { section: Section }) {
 }
 
 function TextContent({ content }: { content: string }) {
+  // Internal editor guidance (MISSING/ASSUMPTION flags) never reaches clients
+  const clean = content
+    .split("\n")
+    .filter((l) => !/^\s*(⚠\s*)?(MISSING|ASSUMPTION)\s*:/i.test(l))
+    .join("\n")
   return (
     <div className="space-y-3 text-gray-700 leading-relaxed">
-      {content.split(/\n{2,}|\n(?=- )/).map((block, i) => {
+      {clean.split(/\n{2,}|\n(?=- )/).map((block, i) => {
         const lines = block.split("\n").filter(Boolean)
         const isList = lines.every((l) => l.trim().startsWith("- "))
         if (isList && lines.length) {
@@ -265,6 +273,30 @@ function TextContent({ content }: { content: string }) {
         }
         return <p key={i}>{block}</p>
       })}
+    </div>
+  )
+}
+
+function SignOffBlock({ org }: { org: ProposalDocumentData["organization"] }) {
+  if (!org.signatureImageUrl && !org.headshotUrl && !org.signOffName) return null
+  return (
+    <div className="mt-8 pt-6 border-t break-inside-avoid flex items-center gap-4">
+      {org.headshotUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={org.headshotUrl} alt={org.signOffName || org.name}
+          className="w-16 h-16 rounded-full object-cover border" />
+      )}
+      <div>
+        {org.signatureImageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={org.signatureImageUrl} alt="Signature" className="h-12 mb-1 object-contain" />
+        )}
+        <p className="font-semibold text-gray-900">{org.signOffName || org.name}</p>
+        <p className="text-sm text-gray-500">
+          {org.name}
+          {org.phone ? ` · ${org.phone}` : ""}
+        </p>
+      </div>
     </div>
   )
 }
@@ -302,6 +334,7 @@ export function ProposalDocument({ data }: { data: ProposalDocumentData }) {
           </section>
         )
       })}
+      <SignOffBlock org={data.organization} />
     </div>
   )
 }

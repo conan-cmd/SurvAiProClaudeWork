@@ -68,6 +68,11 @@ model Organization {
   // Deposit rules JSON: {"residential":{"type":"PERCENT|FIXED|NONE","value":50},"commercial":{...}}
   depositRules          String?
 
+  // Personal sign-off shown at the bottom of every proposal
+  signOffName           String?
+  headshotUrl           String?
+  signatureImageUrl     String?
+
   users                 User[]
   surveys               SiteSurvey[]
   proposals             Proposal[]

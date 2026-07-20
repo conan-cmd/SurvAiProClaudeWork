@@ -26,6 +26,9 @@ type Org = {
   termsAndConditions: string | null
   youtubeChannelUrl: string | null
   depositRules: string | null
+  signOffName: string | null
+  headshotUrl: string | null
+  signatureImageUrl: string | null
 }
 
 type DepositRule = { type: "NONE" | "PERCENT" | "FIXED"; value: number }
@@ -85,6 +88,7 @@ export default function SettingsPage() {
           termsAndConditions: org.termsAndConditions || "",
           youtubeChannelUrl: org.youtubeChannelUrl || "",
           depositRules: org.depositRules || "",
+          signOffName: org.signOffName || "",
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
@@ -96,18 +100,37 @@ export default function SettingsPage() {
     }
   }
 
-  const uploadLogo = async (file: File | undefined) => {
+  const uploadImage = async (file: File | undefined, kind: "logo" | "headshot" | "signature") => {
     if (!file) return
     const formData = new FormData()
-    formData.append("logo", file)
+    formData.append("file", file)
+    formData.append("kind", kind)
     const res = await fetch("/api/organization/logo", { method: "POST", body: formData })
     if (!res.ok) {
-      toast.error((await res.json()).error || "Logo upload failed")
+      toast.error((await res.json()).error || "Upload failed")
       return
     }
-    const { logoUrl } = await res.json()
-    set("logoUrl", logoUrl)
-    toast.success("Logo updated")
+    const { url } = await res.json()
+    const field = kind === "logo" ? "logoUrl" : kind === "headshot" ? "headshotUrl" : "signatureImageUrl"
+    set(field, url)
+    toast.success("Image updated")
+  }
+  const uploadLogo = (file: File | undefined) => uploadImage(file, "logo")
+
+  const [generatingTerms, setGeneratingTerms] = useState(false)
+  const generateTerms = async () => {
+    setGeneratingTerms(true)
+    try {
+      const res = await fetch("/api/organization/generate-terms", { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      set("termsAndConditions", data.terms)
+      toast.success("Draft terms added — review and edit, then Save")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to draft terms")
+    } finally {
+      setGeneratingTerms(false)
+    }
   }
 
   const regenerateSections = async () => {
@@ -231,6 +254,45 @@ export default function SettingsPage() {
         ))}
       </section>
 
+      <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+        <h2 className="font-semibold text-brand-navy">Personal sign-off</h2>
+        <p className="text-sm text-gray-500">
+          Shown at the bottom of every proposal — your name, photo and signature.
+        </p>
+        <div>
+          <label className={labelCls}>Your name (as signed)</label>
+          <input className={inputCls} placeholder="e.g. Conan Sammon, Managing Director"
+            value={org.signOffName || ""} onChange={(e) => set("signOffName", e.target.value)} />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          {([["headshot", "Headshot", org.headshotUrl], ["signature", "Signature image", org.signatureImageUrl]] as const).map(
+            ([kind, label, url]) => (
+              <div key={kind}>
+                <label className={labelCls}>{label}</label>
+                {url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={url} alt={label}
+                    className={kind === "headshot" ? "w-16 h-16 rounded-full object-cover border mb-2" : "h-12 object-contain border rounded p-1 mb-2 bg-white"} />
+                ) : (
+                  <div className="h-16 border-2 border-dashed rounded-lg flex items-center justify-center text-gray-300 text-xs mb-2">
+                    None yet
+                  </div>
+                )}
+                <label className="inline-flex items-center gap-2 px-3 py-1.5 border rounded-lg text-xs font-medium hover:bg-gray-50 cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" /> Upload
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={(e) => uploadImage(e.target.files?.[0], kind)} />
+                </label>
+              </div>
+            )
+          )}
+        </div>
+        <p className="text-xs text-gray-400">
+          Tip: sign white paper with a dark pen, photograph it straight-on, and upload — a
+          PNG with a white background works perfectly.
+        </p>
+      </section>
+
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-3">
         <h2 className="font-semibold text-brand-navy">Deposits</h2>
         <p className="text-sm text-gray-500">
@@ -267,9 +329,17 @@ export default function SettingsPage() {
       </section>
 
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-3">
-        <h2 className="font-semibold text-brand-navy">Standard Terms & Conditions</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-brand-navy">Standard Terms & Conditions</h2>
+          <button onClick={generateTerms} disabled={generatingTerms}
+            className="inline-flex items-center gap-1.5 text-sm text-brand-blue font-medium hover:underline disabled:opacity-50">
+            {generatingTerms ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            Draft with AI
+          </button>
+        </div>
         <p className="text-sm text-gray-500">
-          Added to every proposal automatically. One term per line.
+          Added to every proposal automatically. One term per line. AI drafts are generic
+          templates — review carefully, and consider a professional check before relying on them.
         </p>
         <textarea rows={12} className={inputCls} value={org.termsAndConditions || ""}
           onChange={(e) => set("termsAndConditions", e.target.value)}

@@ -27,6 +27,7 @@ export async function GET(
         select: {
           name: true, logoUrl: true, brandColor: true, secondaryColor: true,
           email: true, phone: true, website: true,
+          signOffName: true, headshotUrl: true, signatureImageUrl: true,
         },
       },
     },

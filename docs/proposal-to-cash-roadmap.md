@@ -42,8 +42,9 @@ customer through a salesperson's decision journey — not just display a quote.
    Settings (org.notificationPrefs JSON). Use existing Resend send path.
 2. DASHBOARD DRILL-DOWN: every metric tile links to a filtered proposals list
    (e.g. /proposals?status=WON&from=&to=) showing what makes up the number.
-3. DIRECT-TO-BLOB uploads (client-side) to beat Vercel's 4.5MB body cap —
-   unblocks walkthrough videos + long voice notes on production.
+3. [BUILT 20 Jul] DIRECT-TO-BLOB uploads for voice/video: /api/blob/upload
+   token route + /voice/from-blob finaliser + progress bar. Photos still go
+   through the server (4.5MB-safe usually) — migrate them same way if needed.
 4. XERO (v2, deliberately after launch): per-org "Connect Xero" OAuth; when
    deposit paid -> create ACCREC invoice for deposit with payment applied, so
    client + amounts appear in Xero automatically. INTERIM zero-code option:

@@ -5,7 +5,16 @@ import { getCurrentUser } from "@/lib/session"
 
 const updateOrgSchema = z.object({
   name: z.string().min(1).optional(),
-  website: z.string().url().optional().or(z.literal("")),
+  // Accept bare domains ("lbcclean.co.uk", "www.x.com") - normalised below
+  website: z
+    .string()
+    .max(200)
+    .transform((v) => {
+      const t = v.trim()
+      if (!t) return ""
+      return /^https?:\/\//i.test(t) ? t : `https://${t}`
+    })
+    .optional(),
   logoUrl: z.string().optional(),
   brandColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
   secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
@@ -26,6 +35,7 @@ const updateOrgSchema = z.object({
   termsAndConditions: z.string().optional(),
   youtubeChannelUrl: z.string().optional(),
   depositRules: z.string().max(500).optional(),
+  signOffName: z.string().max(100).optional(),
 })
 
 export async function GET() {
