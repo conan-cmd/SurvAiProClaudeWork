@@ -216,6 +216,7 @@ export async function POST(request: NextRequest) {
         clientEmail: survey.clientEmail,
         templateName: template.id,
         generationMs: Date.now() - generationStart,
+        createdById: user.id,
         sections: { create: sectionsData },
         // Pre-build the pricing table: one line per service found in the
         // survey, with rich descriptions. User only has to enter prices.

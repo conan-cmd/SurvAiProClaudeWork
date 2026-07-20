@@ -28,6 +28,12 @@ type ProposalData = {
   sections: Section[]
   pricingLineItems: EditableLineItem[]
   survey: { id: string; photos: { id: string; fileUrl: string; caption: string | null }[] }
+  createdBy: {
+    name: string | null
+    signOffName: string | null
+    headshotUrl: string | null
+    signatureImageUrl: string | null
+  } | null
   organization: {
     name: string
     logoUrl: string | null
@@ -252,6 +258,7 @@ export default function ProposalEditorPage() {
     pricingLineItems: proposal.pricingLineItems,
     photos: proposal.survey.photos,
     organization: proposal.organization,
+    preparer: proposal.createdBy,
   }
 
   return (

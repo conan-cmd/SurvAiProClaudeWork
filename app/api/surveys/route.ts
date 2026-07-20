@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
       data: {
         ...parsed.data,
         organizationId: user.organizationId,
+        createdById: user.id,
       },
     })
 

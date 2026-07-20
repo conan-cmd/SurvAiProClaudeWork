@@ -19,8 +19,30 @@ model User {
   organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   role                  UserRole        @default(MEMBER)
+
+  // Personal sign-off for proposals this user creates
+  signOffName           String?
+  headshotUrl           String?
+  signatureImageUrl     String?
+
+  surveysCreated        SiteSurvey[]    @relation("SurveyCreator")
+  proposalsCreated      Proposal[]      @relation("ProposalCreator")
+
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
+
+  @@index([organizationId])
+}
+
+model Invite {
+  id                    String          @id @default(cuid())
+  organizationId        String
+  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email                 String
+  token                 String          @unique
+  expiresAt             DateTime
+  acceptedAt            DateTime?
+  createdAt             DateTime        @default(now())
 
   @@index([organizationId])
 }
@@ -74,6 +96,7 @@ model Organization {
   signatureImageUrl     String?
 
   users                 User[]
+  invites               Invite[]
   surveys               SiteSurvey[]
   proposals             Proposal[]
   templates             ProposalTemplate[]
@@ -139,6 +162,9 @@ model SiteSurvey {
 
   // Proposal linkage
   proposal              Proposal?
+
+  createdById           String?
+  createdBy             User?           @relation("SurveyCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   status                SurveyStatus     @default(DRAFT)
   createdAt             DateTime        @default(now())
@@ -244,6 +270,9 @@ model Proposal {
   sentAt                DateTime?
 
   generationMs          Int? // how long the AI draft took - proves the tagline
+
+  createdById           String?
+  createdBy             User?           @relation("ProposalCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   // Deposit
   depositAmount         Float?

@@ -30,6 +30,9 @@ export async function GET(
           signOffName: true, headshotUrl: true, signatureImageUrl: true,
         },
       },
+      createdBy: {
+        select: { name: true, signOffName: true, headshotUrl: true, signatureImageUrl: true },
+      },
     },
   })
 

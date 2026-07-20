@@ -37,6 +37,9 @@ export default async function SharedProposalPage({
               signOffName: true, headshotUrl: true, signatureImageUrl: true,
             },
           },
+          createdBy: {
+            select: { name: true, signOffName: true, headshotUrl: true, signatureImageUrl: true },
+          },
         },
       },
     },
@@ -97,6 +100,7 @@ export default async function SharedProposalPage({
             pricingLineItems: p.pricingLineItems,
             photos: p.survey.photos,
             organization: p.organization,
+            preparer: p.createdBy,
           }}
         />
         {p.signedAt ? (

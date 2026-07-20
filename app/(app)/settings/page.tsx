@@ -44,8 +44,26 @@ const parseRules = (s: string | null): { residential: DepositRule; commercial: D
   }
 }
 
+type Me = {
+  id: string
+  name: string | null
+  email: string
+  signOffName: string | null
+  headshotUrl: string | null
+  signatureImageUrl: string | null
+}
+
+type TeamData = {
+  users: { id: string; name: string | null; email: string; role: string; headshotUrl: string | null }[]
+  invites: { id: string; email: string; token: string }[]
+}
+
 export default function SettingsPage() {
   const [org, setOrg] = useState<Org | null>(null)
+  const [me, setMe] = useState<Me | null>(null)
+  const [team, setTeam] = useState<TeamData | null>(null)
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviting, setInviting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
   const logoInput = useRef<HTMLInputElement>(null)
@@ -55,7 +73,40 @@ export default function SettingsPage() {
       .then((r) => r.json())
       .then(setOrg)
       .catch(() => toast.error("Failed to load settings"))
+    fetch("/api/me").then((r) => r.json()).then(setMe).catch(() => {})
+    fetch("/api/team").then((r) => r.json()).then(setTeam).catch(() => {})
   }, [])
+
+  const saveMyName = async (signOffName: string) => {
+    setMe((m) => (m ? { ...m, signOffName } : m))
+    await fetch("/api/me", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ signOffName }),
+    })
+  }
+
+  const invite = async () => {
+    if (!inviteEmail.trim()) return
+    setInviting(true)
+    try {
+      const res = await fetch("/api/team", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      await navigator.clipboard?.writeText(data.joinUrl).catch(() => {})
+      toast.success(`Invite sent to ${inviteEmail} — link also copied to clipboard`)
+      setInviteEmail("")
+      fetch("/api/team").then((r) => r.json()).then(setTeam).catch(() => {})
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Invite failed")
+    } finally {
+      setInviting(false)
+    }
+  }
 
   const set = (field: keyof Org, value: string | number | null) =>
     setOrg((prev) => (prev ? { ...prev, [field]: value } : prev))
@@ -111,8 +162,9 @@ export default function SettingsPage() {
       return
     }
     const { url } = await res.json()
-    const field = kind === "logo" ? "logoUrl" : kind === "headshot" ? "headshotUrl" : "signatureImageUrl"
-    set(field, url)
+    if (kind === "logo") set("logoUrl", url)
+    else if (kind === "headshot") setMe((m) => (m ? { ...m, headshotUrl: url } : m))
+    else setMe((m) => (m ? { ...m, signatureImageUrl: url } : m))
     toast.success("Image updated")
   }
   const uploadLogo = (file: File | undefined) => uploadImage(file, "logo")
@@ -255,17 +307,56 @@ export default function SettingsPage() {
       </section>
 
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
-        <h2 className="font-semibold text-brand-navy">Personal sign-off</h2>
+        <h2 className="font-semibold text-brand-navy">Team</h2>
         <p className="text-sm text-gray-500">
-          Shown at the bottom of every proposal — your name, photo and signature.
+          Everyone here shares this organisation&apos;s surveys, proposals and settings.
+        </p>
+        <div className="space-y-2">
+          {team?.users.map((u) => (
+            <div key={u.id} className="flex items-center gap-3">
+              {u.headshotUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={u.headshotUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-brand-navy text-white flex items-center justify-center text-xs font-bold">
+                  {(u.name || u.email)[0].toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="text-sm font-medium truncate">{u.name || u.email}</div>
+                <div className="text-xs text-gray-400 truncate">{u.email} · {u.role.toLowerCase()}</div>
+              </div>
+            </div>
+          ))}
+          {team?.invites.map((i) => (
+            <div key={i.id} className="flex items-center gap-3 opacity-60">
+              <div className="w-8 h-8 rounded-full border-2 border-dashed" />
+              <div className="text-sm">{i.email} <span className="text-xs text-amber-600">invited</span></div>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input className={inputCls} type="email" placeholder="colleague@company.co.uk"
+            value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
+          <button onClick={invite} disabled={inviting}
+            className="shrink-0 px-4 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+            {inviting ? "Inviting…" : "Invite"}
+          </button>
+        </div>
+      </section>
+
+      <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+        <h2 className="font-semibold text-brand-navy">Your personal sign-off</h2>
+        <p className="text-sm text-gray-500">
+          Shown at the bottom of proposals <strong>you</strong> create — each team member sets their own.
         </p>
         <div>
           <label className={labelCls}>Your name (as signed)</label>
           <input className={inputCls} placeholder="e.g. Conan Sammon, Managing Director"
-            value={org.signOffName || ""} onChange={(e) => set("signOffName", e.target.value)} />
+            value={me?.signOffName || ""} onChange={(e) => saveMyName(e.target.value)} />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          {([["headshot", "Headshot", org.headshotUrl], ["signature", "Signature image", org.signatureImageUrl]] as const).map(
+          {([["headshot", "Headshot", me?.headshotUrl], ["signature", "Signature image", me?.signatureImageUrl]] as const).map(
             ([kind, label, url]) => (
               <div key={kind}>
                 <label className={labelCls}>{label}</label>

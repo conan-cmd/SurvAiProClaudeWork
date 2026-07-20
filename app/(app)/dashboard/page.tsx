@@ -34,12 +34,18 @@ function rangeFromParams(searchParams: { period?: string; from?: string; to?: st
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { period?: string; from?: string; to?: string }
+  searchParams: { period?: string; from?: string; to?: string; user?: string }
 }) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
 
   const range = rangeFromParams(searchParams)
+
+  const teamMembers = await db.user.findMany({
+    where: { organizationId: user.organizationId },
+    select: { id: true, name: true, email: true },
+    orderBy: { createdAt: "asc" },
+  })
 
   const [surveys, proposals] = await Promise.all([
     db.siteSurvey.findMany({
@@ -58,10 +64,19 @@ export default async function DashboardPage({
     }),
   ])
 
-  // Stats respect the selected time period (by proposal creation date)
+  // Stats respect the selected time period and team-member filter
+  const filterUser = searchParams.user
   const inRange = proposals.filter(
-    (p) => p.createdAt >= range.from && p.createdAt <= range.to
+    (p) =>
+      p.createdAt >= range.from &&
+      p.createdAt <= range.to &&
+      (!filterUser || p.createdById === filterUser)
   )
+  const periodQS = searchParams.period
+    ? `period=${searchParams.period}`
+    : searchParams.from || searchParams.to
+      ? `from=${searchParams.from || ""}&to=${searchParams.to || ""}`
+      : ""
   const byStatus = (s: string) => inRange.filter((p) => p.status === s)
   const sentCount = inRange.filter((p) => p.sentAt && p.sentAt >= range.from && p.sentAt <= range.to).length
   const totalQuoted = inRange.reduce(
@@ -120,6 +135,27 @@ export default async function DashboardPage({
           </button>
         </form>
       </div>
+
+      {/* Team member filter (shown once the team has more than one person) */}
+      {teamMembers.length > 1 && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Link href={`/dashboard${periodQS ? `?${periodQS}` : ""}`}
+            className={`px-3 py-1.5 rounded-full font-medium border transition ${
+              !filterUser ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"
+            }`}>
+            Whole team
+          </Link>
+          {teamMembers.map((m) => (
+            <Link key={m.id}
+              href={`/dashboard?user=${m.id}${periodQS ? `&${periodQS}` : ""}`}
+              className={`px-3 py-1.5 rounded-full font-medium border transition ${
+                filterUser === m.id ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"
+              }`}>
+              {(m.name || m.email).split(" ")[0]}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

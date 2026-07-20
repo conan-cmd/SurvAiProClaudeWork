@@ -31,14 +31,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Image must be under 4MB" }, { status: 400 })
     }
 
-    const url = await uploadFile(file, `organizations/${user.organizationId}/${kind}`)
+    const url = await uploadFile(file, `organizations/${user.organizationId}/${kind}-${user.id}`)
 
-    const org = await db.organization.update({
-      where: { id: user.organizationId },
-      data: { [KINDS[kind]]: url },
-    })
+    // Logo belongs to the organisation; headshot/signature belong to the USER
+    if (kind === "logo") {
+      await db.organization.update({
+        where: { id: user.organizationId },
+        data: { logoUrl: url },
+      })
+    } else {
+      await db.user.update({
+        where: { id: user.id },
+        data: { [KINDS[kind]]: url },
+      })
+    }
 
-    return NextResponse.json({ url, logoUrl: org.logoUrl })
+    return NextResponse.json({ url, logoUrl: kind === "logo" ? url : undefined })
   } catch (error) {
     console.error("Branding image upload error:", error)
     return NextResponse.json({ error: "Upload failed" }, { status: 500 })

@@ -38,6 +38,13 @@ export type ProposalDocumentData = {
     headshotUrl?: string | null
     signatureImageUrl?: string | null
   }
+  // The user who created the proposal - their sign-off wins over the org's
+  preparer?: {
+    name?: string | null
+    signOffName?: string | null
+    headshotUrl?: string | null
+    signatureImageUrl?: string | null
+  } | null
 }
 
 function CoverSection({ section, data }: { section: Section; data: ProposalDocumentData }) {
@@ -277,21 +284,26 @@ function TextContent({ content }: { content: string }) {
   )
 }
 
-function SignOffBlock({ org }: { org: ProposalDocumentData["organization"] }) {
-  if (!org.signatureImageUrl && !org.headshotUrl && !org.signOffName) return null
+function SignOffBlock({ data }: { data: ProposalDocumentData }) {
+  const org = data.organization
+  const p = data.preparer
+  const headshot = p?.headshotUrl || org.headshotUrl
+  const signature = p?.signatureImageUrl || org.signatureImageUrl
+  const name = p?.signOffName || p?.name || org.signOffName
+  if (!headshot && !signature && !name) return null
   return (
     <div className="mt-8 pt-6 border-t break-inside-avoid flex items-center gap-4">
-      {org.headshotUrl && (
+      {headshot && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={org.headshotUrl} alt={org.signOffName || org.name}
+        <img src={headshot} alt={name || org.name}
           className="w-16 h-16 rounded-full object-cover border" />
       )}
       <div>
-        {org.signatureImageUrl && (
+        {signature && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={org.signatureImageUrl} alt="Signature" className="h-12 mb-1 object-contain" />
+          <img src={signature} alt="Signature" className="h-12 mb-1 object-contain" />
         )}
-        <p className="font-semibold text-gray-900">{org.signOffName || org.name}</p>
+        <p className="font-semibold text-gray-900">{name || org.name}</p>
         <p className="text-sm text-gray-500">
           {org.name}
           {org.phone ? ` · ${org.phone}` : ""}
@@ -334,7 +346,7 @@ export function ProposalDocument({ data }: { data: ProposalDocumentData }) {
           </section>
         )
       })}
-      <SignOffBlock org={data.organization} />
+      <SignOffBlock data={data} />
     </div>
   )
 }
