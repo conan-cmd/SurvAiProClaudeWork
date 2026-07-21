@@ -5,7 +5,7 @@ import { useParams } from "next/navigation"
 import { toast } from "sonner"
 import {
   Loader2, Sparkles, ChevronUp, ChevronDown, Trash2, Plus, Eye,
-  Pencil, Link2, Printer, Check, Send,
+  Pencil, Link2, Printer, Check, Send, Copy, Share2, X,
 } from "lucide-react"
 import { ProposalDocument } from "@/components/proposal-document"
 import { PricingEditor, EditableLineItem } from "@/components/pricing-editor"
@@ -27,7 +27,12 @@ type ProposalData = {
   status: string
   sections: Section[]
   pricingLineItems: EditableLineItem[]
-  survey: { id: string; photos: { id: string; fileUrl: string; caption: string | null }[] }
+  survey: {
+    id: string
+    latitude: number | null
+    longitude: number | null
+    photos: { id: string; fileUrl: string; caption: string | null }[]
+  }
   createdBy: {
     name: string | null
     signOffName: string | null
@@ -58,6 +63,8 @@ export default function ProposalEditorPage() {
   const [mode, setMode] = useState<"edit" | "preview">("edit")
   const [regenerating, setRegenerating] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [canShare, setCanShare] = useState(false)
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle")
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
@@ -70,6 +77,12 @@ export default function ProposalEditorPage() {
       .then(setProposal)
       .catch(() => toast.error("Failed to load proposal"))
   }, [proposalId])
+
+  // Native share sheet is only offered where the browser supports it. Resolved
+  // after mount to avoid a server/client hydration mismatch on navigator.
+  useEffect(() => {
+    setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function")
+  }, [])
 
   const updateSection = useCallback(
     (sectionId: string, patch: SectionPatch) => {
@@ -234,12 +247,54 @@ export default function ProposalEditorPage() {
       const res = await fetch(`/api/proposals/${proposalId}/share`, { method: "POST" })
       if (!res.ok) throw new Error((await res.json()).error)
       const { url } = await res.json()
-      await navigator.clipboard.writeText(url).catch(() => {})
-      toast.success("Secure link created and copied to clipboard (valid 30 days)")
+      setShareUrl(url)
+      // Attempt an immediate copy for the desktop happy path. On iOS Safari the
+      // await above voids the tap's user activation, so writeText rejects — that's
+      // expected here; the link is now shown in the box below with Copy/Share
+      // buttons whose taps ARE fresh gestures and so succeed. Only claim "copied"
+      // when it genuinely worked, rather than toasting success unconditionally.
+      let copied = false
+      try {
+        await navigator.clipboard.writeText(url)
+        copied = true
+      } catch {
+        /* clipboard blocked (e.g. iOS after async work) — fall back to the box */
+      }
+      toast.success(
+        copied
+          ? "Secure link copied to clipboard (valid 30 days)"
+          : "Secure link created (valid 30 days) — tap Copy below"
+      )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to create link")
     } finally {
       setSharing(false)
+    }
+  }
+
+  // Triggered directly by a button tap with no await before the write, so the
+  // user activation is still live — this is what makes copy reliable on iOS.
+  const copyShareUrl = async () => {
+    if (!shareUrl) return
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      toast.success("Copied to clipboard")
+    } catch {
+      toast.error("Couldn't copy — select the link and copy it manually")
+    }
+  }
+
+  const nativeShareUrl = async () => {
+    if (!shareUrl) return
+    try {
+      await navigator.share({
+        title: proposal ? `Proposal — ${proposal.clientName}` : "Proposal",
+        url: shareUrl,
+      })
+    } catch (err) {
+      // User dismissed the share sheet — nothing to report.
+      if (err instanceof DOMException && err.name === "AbortError") return
+      toast.error("Couldn't open the share sheet")
     }
   }
 
@@ -257,6 +312,8 @@ export default function ProposalEditorPage() {
     sections: proposal.sections,
     pricingLineItems: proposal.pricingLineItems,
     photos: proposal.survey.photos,
+    latitude: proposal.survey.latitude,
+    longitude: proposal.survey.longitude,
     organization: proposal.organization,
     preparer: proposal.createdBy,
   }
@@ -301,6 +358,31 @@ export default function ProposalEditorPage() {
           </button>
         </div>
       </div>
+
+      {shareUrl && (
+        <div className="no-print flex flex-wrap items-center gap-2 rounded-lg border border-brand-blue/30 bg-blue-50 px-3 py-2">
+          <input
+            readOnly
+            value={shareUrl}
+            onFocus={(e) => e.currentTarget.select()}
+            className="flex-1 min-w-0 bg-white border rounded-md px-2 py-1.5 text-sm text-gray-700"
+          />
+          <button onClick={copyShareUrl}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+            <Copy className="w-4 h-4" /> Copy
+          </button>
+          {canShare && (
+            <button onClick={nativeShareUrl}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+              <Share2 className="w-4 h-4" /> Share
+            </button>
+          )}
+          <button onClick={() => setShareUrl(null)} aria-label="Dismiss"
+            className="inline-flex items-center justify-center p-1.5 text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {mode === "preview" ? (
         <div className="bg-white rounded-xl shadow-sm p-4 md:p-10 print-area">

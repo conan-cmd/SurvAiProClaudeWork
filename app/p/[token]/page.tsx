@@ -4,7 +4,7 @@ import { ProposalDocument } from "@/components/proposal-document"
 import { AcceptanceBlock } from "@/components/signature-pad"
 import { DepositCard } from "@/components/deposit-card"
 import { computeDeposit, retrieveCheckoutSession } from "@/lib/stripe"
-import { calculateProposalTotals, formatCurrency } from "@/lib/utils"
+import { calculateProposalTotals, formatCurrency, lineGross } from "@/lib/utils"
 
 export const dynamic = "force-dynamic"
 
@@ -81,12 +81,12 @@ export default async function SharedProposalPage({
     }
   }
 
+  // After signing, the deposit is based on the total the client actually agreed
+  // to (base + any optional extras they selected), falling back to the base total
+  // for proposals signed before optional-selection existed.
+  const agreedTotal = p.agreedTotal ?? calculateProposalTotals(p.pricingLineItems).total
   const depositDue = p.signedAt && !p.depositPaidAt
-    ? computeDeposit(
-        p.organization.depositRules,
-        p.survey.isResidential,
-        calculateProposalTotals(p.pricingLineItems).total
-      )
+    ? computeDeposit(p.organization.depositRules, p.survey.isResidential, agreedTotal)
     : 0
 
   return (
@@ -99,8 +99,11 @@ export default async function SharedProposalPage({
             sections: p.sections,
             pricingLineItems: p.pricingLineItems,
             photos: p.survey.photos,
+            latitude: p.survey.latitude,
+            longitude: p.survey.longitude,
             organization: p.organization,
             preparer: p.createdBy,
+            hideOptionalExtras: true,
           }}
         />
         {p.signedAt ? (
@@ -117,6 +120,38 @@ export default async function SharedProposalPage({
               {" · "}
               {new Intl.DateTimeFormat("en-GB").format(p.signedAt)}
             </p>
+            {(() => {
+              let ids: string[] = []
+              try {
+                ids = p.selectedOptionalIds ? JSON.parse(p.selectedOptionalIds) : []
+              } catch {
+                ids = []
+              }
+              const chosen = p.pricingLineItems.filter((i) => ids.includes(i.id))
+              if (!chosen.length && p.agreedTotal == null) return null
+              return (
+                <div className="mt-4 pt-4 border-t">
+                  {chosen.length > 0 && (
+                    <>
+                      <p className="text-sm font-semibold text-gray-700 mb-1">Optional extras included:</p>
+                      <ul className="text-sm text-gray-600 list-disc pl-5 mb-2">
+                        {chosen.map((i) => (
+                          <li key={i.id}>
+                            {i.description} — {formatCurrency(lineGross(i))}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  {p.agreedTotal != null && (
+                    <p className="text-sm text-gray-700">
+                      Total agreed:{" "}
+                      <span className="font-bold">{formatCurrency(p.agreedTotal)}</span>
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         ) : (
           <AcceptanceBlock
@@ -124,6 +159,10 @@ export default async function SharedProposalPage({
             clientName={p.clientName}
             clientCompany={p.survey.clientCompany}
             brandColor={p.organization.brandColor}
+            baseTotal={calculateProposalTotals(p.pricingLineItems).total}
+            optionalItems={p.pricingLineItems
+              .filter((i) => i.isOptional)
+              .map((i) => ({ id: i.id, description: i.description, amount: lineGross(i) }))}
           />
         )}
         {p.depositPaidAt && (

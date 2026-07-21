@@ -33,6 +33,13 @@ export function lineNet(item: PricingItem): number {
   return gross - (gross * item.discount) / 100
 }
 
+// Line total including its own VAT - used when a client adds an optional extra
+// to their agreed total at sign time.
+export function lineGross(item: PricingItem): number {
+  const net = lineNet(item)
+  return net + (net * item.vat) / 100
+}
+
 // Optional items are shown but excluded from totals until accepted.
 export function calculateProposalTotals(items: PricingItem[]) {
   const included = items.filter((i) => !i.isOptional)

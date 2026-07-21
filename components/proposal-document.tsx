@@ -45,6 +45,14 @@ export type ProposalDocumentData = {
     headshotUrl?: string | null
     signatureImageUrl?: string | null
   } | null
+  // Site location from the survey - shown on the cover when geocoded.
+  // what3words stays optional until the w3w integration is wired up.
+  latitude?: number | null
+  longitude?: number | null
+  what3words?: string | null
+  // Client view handles optional extras interactively (checkboxes to add to the
+  // total), so the static "Optional extras" list is suppressed there.
+  hideOptionalExtras?: boolean
 }
 
 function CoverSection({ section, data }: { section: Section; data: ProposalDocumentData }) {
@@ -80,6 +88,12 @@ function CoverSection({ section, data }: { section: Section; data: ProposalDocum
           {cover.clientCompany ? `, ${cover.clientCompany}` : ""}
         </p>
         <p className="opacity-60">{cover.siteAddress}</p>
+        {data.latitude != null && data.longitude != null && (
+          <p className="opacity-50 text-sm mt-1">
+            {data.latitude.toFixed(6)}, {data.longitude.toFixed(6)}
+            {data.what3words ? ` · ///${data.what3words}` : ""}
+          </p>
+        )}
       </div>
       <div className="px-10 py-6 text-sm opacity-70 flex flex-wrap gap-x-6 gap-y-1"
         style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
@@ -177,7 +191,7 @@ function PricingSection({ data }: { data: ProposalDocumentData }) {
         </tfoot>
       </table>
 
-      {optional.length > 0 && (
+      {optional.length > 0 && !data.hideOptionalExtras && (
         <div className="mt-6">
           <h4 className="font-semibold text-sm mb-2">Optional extras (not included in total)</h4>
           <table className="w-full text-sm">

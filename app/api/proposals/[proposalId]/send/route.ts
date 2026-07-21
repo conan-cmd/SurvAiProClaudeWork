@@ -3,6 +3,7 @@ import { randomBytes } from "crypto"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
+import { emailEnabled, sendEmail } from "@/lib/email"
 
 const sendSchema = z.object({
   to: z.string().email("Enter a valid email address"),
@@ -17,7 +18,7 @@ export async function POST(
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  if (!process.env.RESEND_API_KEY) {
+  if (!emailEnabled()) {
     return NextResponse.json(
       { error: "Email isn't set up yet - add a RESEND_API_KEY to enable sending." },
       { status: 503 }
@@ -61,24 +62,12 @@ export async function POST(
     </div>`
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: process.env.EMAIL_FROM || "SurvAIPro <onboarding@resend.dev>",
-        to: [to],
-        reply_to: org.email || user.email,
-        subject: `Your proposal from ${org.name} - ${proposal.survey.title}`,
-        html,
-      }),
+    await sendEmail({
+      to,
+      replyTo: org.email || user.email,
+      subject: `Your proposal from ${org.name} - ${proposal.survey.title}`,
+      html,
     })
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err.message || `Email service returned ${res.status}`)
-    }
 
     await db.proposal.update({
       where: { id: proposal.id },

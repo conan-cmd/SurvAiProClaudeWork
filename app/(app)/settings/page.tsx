@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Loader2, Upload, Sparkles } from "lucide-react"
+import { Loader2, Upload, Sparkles, Copy } from "lucide-react"
 import { SignatureDraw } from "@/components/signature-draw"
 
 type Org = {
@@ -66,6 +66,7 @@ export default function SettingsPage() {
   const [team, setTeam] = useState<TeamData | null>(null)
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviting, setInviting] = useState(false)
+  const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
   const logoInput = useRef<HTMLInputElement>(null)
@@ -99,14 +100,39 @@ export default function SettingsPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      await navigator.clipboard?.writeText(data.joinUrl).catch(() => {})
-      toast.success(`Invite sent to ${inviteEmail} — link also copied to clipboard`)
+      setInviteLink(data.joinUrl)
+      // Attempt an immediate copy for the desktop happy path. On iOS Safari the
+      // await above voids the tap's user activation so writeText rejects — that's
+      // expected; the link is shown in the box below with a Copy button whose tap
+      // is a fresh gesture. Only claim "copied" when it genuinely worked.
+      let copied = false
+      try {
+        await navigator.clipboard.writeText(data.joinUrl)
+        copied = true
+      } catch {
+        /* clipboard blocked (e.g. iOS after async work) — fall back to the box */
+      }
+      toast.success(
+        copied
+          ? `Invite sent to ${inviteEmail} — link copied to clipboard`
+          : `Invite sent to ${inviteEmail} — copy the link below`
+      )
       setInviteEmail("")
       fetch("/api/team").then((r) => r.json()).then(setTeam).catch(() => {})
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Invite failed")
     } finally {
       setInviting(false)
+    }
+  }
+
+  const copyInviteLink = async () => {
+    if (!inviteLink) return
+    try {
+      await navigator.clipboard.writeText(inviteLink)
+      toast.success("Copied to clipboard")
+    } catch {
+      toast.error("Couldn't copy — select the link and copy it manually")
     }
   }
 
@@ -350,6 +376,20 @@ export default function SettingsPage() {
             {inviting ? "Inviting…" : "Invite"}
           </button>
         </div>
+        {inviteLink && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-blue/30 bg-blue-50 px-3 py-2">
+            <input
+              readOnly
+              value={inviteLink}
+              onFocus={(e) => e.currentTarget.select()}
+              className="flex-1 min-w-0 bg-white border rounded-md px-2 py-1.5 text-sm text-gray-700"
+            />
+            <button onClick={copyInviteLink}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+              <Copy className="w-4 h-4" /> Copy
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">

@@ -3,6 +3,7 @@ import { randomBytes } from "crypto"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
+import { emailEnabled, sendEmail } from "@/lib/email"
 
 export async function GET() {
   const user = await getCurrentUser()
@@ -54,20 +55,13 @@ export async function POST(request: NextRequest) {
   const joinUrl = `${origin}/auth/join?token=${token}`
 
   // Best-effort email; the link is returned either way so it can be shared directly
-  if (process.env.RESEND_API_KEY) {
+  if (emailEnabled()) {
     try {
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: process.env.EMAIL_FROM || "SurvAIPro <onboarding@resend.dev>",
-          to: [email],
-          subject: `You've been invited to join ${user.organization.name} on SurvAIPro`,
-          html: `<div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto"><h2>Join ${user.organization.name}</h2><p>${user.name || "A colleague"} has invited you to their SurvAIPro team.</p><p><a href="${joinUrl}" style="background:#2563EB;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Accept invitation</a></p><p style="color:#64748b;font-size:13px">This link expires in 7 days.</p></div>`,
-        }),
+      await sendEmail({
+        to: email,
+        replyTo: user.email,
+        subject: `You've been invited to join ${user.organization.name} on SurvAIPro`,
+        html: `<div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto"><h2>Join ${user.organization.name}</h2><p>${user.name || "A colleague"} has invited you to their SurvAIPro team.</p><p><a href="${joinUrl}" style="background:#2563EB;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Accept invitation</a></p><p style="color:#64748b;font-size:13px">This link expires in 7 days.</p></div>`,
       })
     } catch (err) {
       console.error("Invite email failed:", err)

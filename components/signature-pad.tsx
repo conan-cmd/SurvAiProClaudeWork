@@ -2,20 +2,33 @@
 
 import { useRef, useState } from "react"
 import { CheckCircle2 } from "lucide-react"
+import { formatCurrency } from "@/lib/utils"
 
-// Client-side acceptance block on the public share page: draw a signature,
-// confirm details, accept the proposal.
+type OptionalItem = { id: string; description: string; amount: number }
+
+// Client-side acceptance block on the public share page: pick any optional
+// extras (adds to the live total), draw a signature, confirm details, accept.
 export function AcceptanceBlock({
   token,
   clientName,
   clientCompany,
   brandColor,
+  baseTotal = 0,
+  optionalItems = [],
 }: {
   token: string
   clientName: string
   clientCompany?: string | null
   brandColor: string
+  baseTotal?: number
+  optionalItems?: OptionalItem[]
 }) {
+  const [selected, setSelected] = useState<string[]>([])
+  const toggle = (id: string) =>
+    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+  const total =
+    baseTotal +
+    optionalItems.filter((i) => selected.includes(i.id)).reduce((sum, i) => sum + i.amount, 0)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawing = useRef(false)
   const hasInk = useRef(false)
@@ -73,6 +86,7 @@ export function AcceptanceBlock({
           position: position.trim() || undefined,
           company: company.trim() || undefined,
           signature: canvasRef.current!.toDataURL("image/png"),
+          selectedOptionalIds: selected,
         }),
       })
       const data = await res.json()
@@ -104,6 +118,35 @@ export function AcceptanceBlock({
       <p className="text-sm text-gray-500 mb-4">
         Sign below to accept this proposal and we&apos;ll be in touch to arrange the works.
       </p>
+
+      {optionalItems.length > 0 && (
+        <div className="mb-5">
+          <h4 className="font-semibold text-gray-900 mb-1">Optional extras</h4>
+          <p className="text-sm text-gray-500 mb-3">
+            Tick any you&apos;d like to include — your total updates automatically.
+          </p>
+          <div className="space-y-2">
+            {optionalItems.map((item) => (
+              <label key={item.id}
+                className="flex items-center gap-3 border rounded-lg px-3 py-2.5 cursor-pointer hover:bg-gray-50">
+                <input type="checkbox" checked={selected.includes(item.id)}
+                  onChange={() => toggle(item.id)}
+                  className="w-4 h-4 shrink-0" style={{ accentColor: brandColor }} />
+                <span className="flex-1 text-sm">{item.description}</span>
+                <span className="text-sm font-medium whitespace-nowrap">
+                  + {formatCurrency(item.amount)}
+                </span>
+              </label>
+            ))}
+          </div>
+          <div className="flex justify-between items-center mt-4 pt-3 border-t">
+            <span className="text-sm text-gray-500">Total to proceed</span>
+            <span className="text-2xl font-bold" style={{ color: brandColor }}>
+              {formatCurrency(total)}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="grid sm:grid-cols-3 gap-3 mb-4">
         <input className={input} placeholder="Full name *" value={name}
