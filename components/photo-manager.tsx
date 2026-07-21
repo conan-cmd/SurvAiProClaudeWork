@@ -5,24 +5,7 @@ import { toast } from "sonner"
 import {
   Camera, Trash2, Star, ChevronUp, ChevronDown, EyeOff, Loader2,
 } from "lucide-react"
-
-// iPhone camera-roll photos are HEIC, which Chrome/Android can't render in an
-// <img>. Detect them (type may be image/heic, image/heif or empty) and convert
-// to JPEG in the browser before upload so proposals display everywhere.
-const isHeic = (f: File) => /image\/hei[cf]/i.test(f.type) || /\.(heic|heif)$/i.test(f.name)
-
-const toJpegIfHeic = async (file: File): Promise<File> => {
-  if (!isHeic(file)) return file
-  try {
-    const heic2any = (await import("heic2any")).default
-    const out = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 })
-    const jpeg = Array.isArray(out) ? out[0] : out
-    return new File([jpeg], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" })
-  } catch {
-    // Conversion failed - upload the original so the photo isn't lost.
-    return file
-  }
-}
+import { uploadSurveyPhotos } from "@/lib/photo-upload"
 
 export type Photo = {
   id: string
@@ -47,70 +30,11 @@ export function PhotoManager({
   const fileInput = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
 
-  // Reads the error message from a response without assuming it's JSON. The
-  // classic multipart route can hit Vercel's 4.5MB body cap and return a
-  // non-JSON platform error - blindly calling res.json() on that throws an
-  // opaque "the string didn't match the expected pattern" on iOS Safari.
-  const errorFrom = async (res: Response): Promise<string> => {
-    try {
-      const data = await res.json()
-      return data.error || "Upload failed"
-    } catch {
-      return res.status === 413
-        ? "Photo is too large to upload. Please try a smaller one."
-        : "Upload failed"
-    }
-  }
-
   const upload = async (files: FileList | null) => {
     if (!files?.length) return
     setUploading(true)
     try {
-      // Convert any HEIC photos to JPEG up front (in-browser), so what we store
-      // and later show to clients displays in every browser.
-      const list: File[] = []
-      for (const f of Array.from(files)) list.push(await toJpegIfHeic(f))
-
-      // Fast path: stream each photo straight to Blob storage, then create the
-      // records from the returned URLs. This bypasses the 4.5MB serverless body
-      // cap that large iPhone / HEIC camera-roll photos routinely exceed.
-      try {
-        const { upload: blobUpload } = await import("@vercel/blob/client")
-        const orgId = await fetch("/api/organization").then((r) => r.json()).then((o) => o.id)
-        const uploaded: { url: string; fileName: string; fileSize: number }[] = []
-        for (const f of list) {
-          const blob = await blobUpload(
-            `organizations/${orgId}/surveys/${surveyId}/photos/${Date.now()}-${f.name}`,
-            f,
-            { access: "public", handleUploadUrl: "/api/blob/upload" }
-          )
-          uploaded.push({ url: blob.url, fileName: f.name || "photo", fileSize: f.size })
-        }
-        const res = await fetch(`/api/surveys/${surveyId}/photos/from-blob`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ photos: uploaded }),
-        })
-        if (!res.ok) throw new Error(await errorFrom(res))
-        const created: Photo[] = await res.json()
-        onChange([...photos, ...created])
-        toast.success(`${created.length} photo${created.length > 1 ? "s" : ""} uploaded`)
-        return
-      } catch (fastErr) {
-        // Fall back to the classic multipart route only when it's safe (local
-        // dev without Blob, or small files) - otherwise it just hits the cap.
-        const tooBig = list.some((f) => f.size > 4 * 1024 * 1024)
-        if (tooBig && window.location.hostname !== "localhost") throw fastErr
-      }
-
-      const formData = new FormData()
-      list.forEach((f) => formData.append("photos", f))
-      const res = await fetch(`/api/surveys/${surveyId}/photos`, {
-        method: "POST",
-        body: formData,
-      })
-      if (!res.ok) throw new Error(await errorFrom(res))
-      const created: Photo[] = await res.json()
+      const created = await uploadSurveyPhotos(surveyId, files)
       onChange([...photos, ...created])
       toast.success(`${created.length} photo${created.length > 1 ? "s" : ""} uploaded`)
     } catch (err) {

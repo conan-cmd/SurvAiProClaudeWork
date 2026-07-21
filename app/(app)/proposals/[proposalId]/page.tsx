@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { ProposalDocument } from "@/components/proposal-document"
 import { PricingEditor, EditableLineItem } from "@/components/pricing-editor"
+import { uploadSurveyPhotos, type UploadedPhoto } from "@/lib/photo-upload"
 
 type Section = {
   id: string
@@ -166,6 +167,7 @@ export default function ProposalEditorPage() {
 
   const addVideoSection = () => addSection("videos", "Watch Us In Action")
   const addGallerySection = () => addSection("gallery", "Examples of Similar Work")
+  const addPhotoSection = () => addSection("photos", "Photos")
 
   const regenerate = async (sectionId: string) => {
     const feedback = prompt(
@@ -436,7 +438,12 @@ export default function ProposalEditorPage() {
                   }
                 />
               ) : section.type === "photos" ? (
-                <PhotoPicker proposal={proposal} section={section} updateSection={updateSection} />
+                <PhotoPicker proposal={proposal} section={section} updateSection={updateSection}
+                  onPhotosUploaded={(newPhotos) =>
+                    setProposal((p) =>
+                      p ? { ...p, survey: { ...p.survey, photos: [...p.survey.photos, ...newPhotos] } } : p
+                    )
+                  } />
               ) : section.type === "videos" ? (
                 <VideoPicker section={section} updateSection={updateSection} />
               ) : section.type === "gallery" ? (
@@ -464,15 +471,19 @@ export default function ProposalEditorPage() {
           <div className="grid grid-cols-2 gap-3">
             <button onClick={() => addSection()}
               className="border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
-              <Plus className="w-5 h-5" /> Add section
+              <Plus className="w-5 h-5" /> Add text
+            </button>
+            <button onClick={addPhotoSection}
+              className="border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
+              <Plus className="w-5 h-5" /> Add photos
             </button>
             <button onClick={addVideoSection}
               className="border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
               <Plus className="w-5 h-5" /> Add videos
             </button>
             <button onClick={addGallerySection}
-              className="col-span-2 border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
-              <Plus className="w-5 h-5" /> Add similar-work gallery photos
+              className="border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
+              <Plus className="w-5 h-5" /> Add gallery photos
             </button>
           </div>
         </div>
@@ -671,11 +682,16 @@ function PhotoPicker({
   proposal,
   section,
   updateSection,
+  onPhotosUploaded,
 }: {
   proposal: ProposalData
   section: Section
   updateSection: (id: string, patch: SectionPatch) => void
+  onPhotosUploaded: (photos: UploadedPhoto[]) => void
 }) {
+  const fileInput = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+
   let selected: string[] = []
   try {
     selected = section.photoIds ? JSON.parse(section.photoIds) : []
@@ -690,29 +706,67 @@ function PhotoPicker({
     updateSection(section.id, { photoIds: next })
   }
 
+  // Upload photos the surveyor forgot to add on the survey step. New photos are
+  // attached to the survey and auto-selected into this proposal section.
+  const uploadPhotos = async (files: FileList | null) => {
+    if (!files?.length) return
+    setUploading(true)
+    try {
+      const created = await uploadSurveyPhotos(proposal.survey.id, files)
+      onPhotosUploaded(created)
+      updateSection(section.id, { photoIds: [...selected, ...created.map((p) => p.id)] })
+      toast.success(`${created.length} photo${created.length > 1 ? "s" : ""} added`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed")
+    } finally {
+      setUploading(false)
+      if (fileInput.current) fileInput.current.value = ""
+    }
+  }
+
+  const uploadButton = (
+    <>
+      <input ref={fileInput} type="file" accept="image/*" multiple className="hidden"
+        onChange={(e) => uploadPhotos(e.target.files)} />
+      <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading}
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue hover:underline disabled:opacity-50">
+        {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+        {uploading ? "Uploading…" : "Add photos"}
+      </button>
+    </>
+  )
+
   if (!proposal.survey.photos.length) {
-    return <p className="text-sm text-gray-400">No photos on this survey.</p>
+    return (
+      <div className="space-y-2">
+        <p className="text-sm text-gray-400">No photos on this survey yet.</p>
+        {uploadButton}
+      </div>
+    )
   }
 
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-      {proposal.survey.photos.map((photo) => {
-        const on = selected.includes(photo.id)
-        return (
-          <button key={photo.id} type="button" onClick={() => toggle(photo.id)}
-            className={`relative rounded-lg overflow-hidden border-2 transition ${
-              on ? "border-brand-blue" : "border-transparent opacity-50"
-            }`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photo.fileUrl} alt={photo.caption || ""} className="aspect-square object-cover w-full" />
-            {on && (
-              <span className="absolute top-1 right-1 bg-brand-blue text-white rounded-full p-0.5">
-                <Check className="w-3 h-3" />
-              </span>
-            )}
-          </button>
-        )
-      })}
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+        {proposal.survey.photos.map((photo) => {
+          const on = selected.includes(photo.id)
+          return (
+            <button key={photo.id} type="button" onClick={() => toggle(photo.id)}
+              className={`relative rounded-lg overflow-hidden border-2 transition ${
+                on ? "border-brand-blue" : "border-transparent opacity-50"
+              }`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photo.fileUrl} alt={photo.caption || ""} className="aspect-square object-cover w-full" />
+              {on && (
+                <span className="absolute top-1 right-1 bg-brand-blue text-white rounded-full p-0.5">
+                  <Check className="w-3 h-3" />
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      {uploadButton}
     </div>
   )
 }
