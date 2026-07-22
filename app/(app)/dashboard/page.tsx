@@ -96,15 +96,15 @@ export default async function DashboardPage({
     : null
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
+    <div className="space-y-6 overflow-x-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-brand-navy">Dashboard</h1>
           <p className="text-gray-500 text-sm">Welcome back{user.name ? `, ${user.name}` : ""}</p>
         </div>
         <Link
           href="/surveys/new"
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-blue text-white rounded-lg font-semibold hover:bg-blue-700 transition shadow-sm"
+          className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-brand-blue text-white rounded-lg font-semibold hover:bg-blue-700 transition shadow-sm"
         >
           <Plus className="w-5 h-5" /> New Site Survey
         </Link>
@@ -124,12 +124,12 @@ export default async function DashboardPage({
             </Link>
           )
         )}
-        <form className="flex items-center gap-1.5" action="/dashboard" method="get">
+        <form className="flex flex-wrap items-center gap-1.5" action="/dashboard" method="get">
           <input type="date" name="from" defaultValue={searchParams.from}
-            className="px-2 py-1 border rounded-lg bg-white text-xs" />
+            className="w-32 px-2 py-1 border rounded-lg bg-white text-xs" />
           <span className="text-gray-400">to</span>
           <input type="date" name="to" defaultValue={searchParams.to}
-            className="px-2 py-1 border rounded-lg bg-white text-xs" />
+            className="w-32 px-2 py-1 border rounded-lg bg-white text-xs" />
           <button type="submit" className="px-3 py-1.5 rounded-full border font-medium bg-white text-gray-600 hover:border-gray-400">
             Go
           </button>
@@ -238,7 +238,7 @@ export default async function DashboardPage({
                     </div>
                     {s.proposal && (
                       <span
-                        className={`text-xs font-semibold px-2 py-1 rounded-full ${STATUS_STYLES[s.proposal.status]}`}
+                        className={`shrink-0 ml-2 whitespace-nowrap text-xs font-semibold px-2 py-1 rounded-full ${STATUS_STYLES[s.proposal.status]}`}
                       >
                         {s.proposal.status}
                       </span>
@@ -279,7 +279,7 @@ export default async function DashboardPage({
                       </div>
                     </div>
                     <span
-                      className={`text-xs font-semibold px-2 py-1 rounded-full ${STATUS_STYLES[p.status]}`}
+                      className={`shrink-0 ml-2 whitespace-nowrap text-xs font-semibold px-2 py-1 rounded-full ${STATUS_STYLES[p.status]}`}
                     >
                       {p.status}
                     </span>

@@ -4,6 +4,7 @@ import { Plus } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { formatDate } from "@/lib/utils"
+import { ItemActions } from "@/components/item-actions"
 
 export default async function SurveysPage() {
   const user = await getCurrentUser()
@@ -35,27 +36,30 @@ export default async function SurveysPage() {
       ) : (
         <div className="bg-white rounded-xl shadow-sm divide-y">
           {surveys.map((s) => (
-            <Link key={s.id} href={`/surveys/${s.id}`}
-              className="flex items-center justify-between p-4 hover:bg-gray-50 transition">
-              <div className="min-w-0">
-                <div className="font-medium text-gray-900 truncate">{s.title}</div>
-                <div className="text-sm text-gray-500 truncate">
-                  {s.clientName} · {s.serviceType} · {formatDate(s.updatedAt)}
+            <div key={s.id} className="flex items-center gap-1 pr-2 hover:bg-gray-50 transition">
+              <Link href={`/surveys/${s.id}`}
+                className="flex items-center justify-between gap-3 p-4 flex-1 min-w-0">
+                <div className="min-w-0">
+                  <div className="font-medium text-gray-900 truncate">{s.title}</div>
+                  <div className="text-sm text-gray-500 truncate">
+                    {s.clientName} · {s.serviceType} · {formatDate(s.updatedAt)}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    {s._count.photos} photos · {s._count.voiceNotes} voice notes
+                  </div>
                 </div>
-                <div className="text-xs text-gray-400 mt-0.5">
-                  {s._count.photos} photos · {s._count.voiceNotes} voice notes
-                </div>
-              </div>
-              {s.proposal ? (
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
-                  {s.proposal.status}
-                </span>
-              ) : (
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">
-                  No proposal
-                </span>
-              )}
-            </Link>
+                {s.proposal ? (
+                  <span className="shrink-0 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
+                    {s.proposal.status}
+                  </span>
+                ) : (
+                  <span className="shrink-0 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-100 text-gray-500">
+                    No proposal
+                  </span>
+                )}
+              </Link>
+              <ItemActions kind="survey" id={s.id} title={s.title} />
+            </div>
           ))}
         </div>
       )}

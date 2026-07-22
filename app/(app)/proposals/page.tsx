@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { formatCurrency, formatDate, calculateProposalTotals } from "@/lib/utils"
+import { ItemActions } from "@/components/item-actions"
 
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-600",
@@ -38,18 +39,21 @@ export default async function ProposalsPage() {
       ) : (
         <div className="bg-white rounded-xl shadow-sm divide-y">
           {proposals.map((p) => (
-            <Link key={p.id} href={`/proposals/${p.id}`}
-              className="flex items-center justify-between p-4 hover:bg-gray-50 transition">
-              <div className="min-w-0">
-                <div className="font-medium text-gray-900 truncate">{p.survey.title}</div>
-                <div className="text-sm text-gray-500 truncate">
-                  {p.clientName} · {formatCurrency(calculateProposalTotals(p.pricingLineItems).total)} · {formatDate(p.updatedAt)}
+            <div key={p.id} className="flex items-center gap-1 pr-2 hover:bg-gray-50 transition">
+              <Link href={`/proposals/${p.id}`}
+                className="flex items-center justify-between gap-3 p-4 flex-1 min-w-0">
+                <div className="min-w-0">
+                  <div className="font-medium text-gray-900 truncate">{p.survey.title}</div>
+                  <div className="text-sm text-gray-500 truncate">
+                    {p.clientName} · {formatCurrency(calculateProposalTotals(p.pricingLineItems).total)} · {formatDate(p.updatedAt)}
+                  </div>
                 </div>
-              </div>
-              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[p.status]}`}>
-                {p.status}
-              </span>
-            </Link>
+                <span className={`shrink-0 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[p.status]}`}>
+                  {p.status}
+                </span>
+              </Link>
+              <ItemActions kind="proposal" id={p.id} surveyId={p.surveyId} title={p.survey.title} />
+            </div>
           ))}
         </div>
       )}
