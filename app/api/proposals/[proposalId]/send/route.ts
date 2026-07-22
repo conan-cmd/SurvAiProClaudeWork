@@ -3,7 +3,7 @@ import { randomBytes } from "crypto"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
-import { emailEnabled, sendEmail } from "@/lib/email"
+import { canSend, sendEmail } from "@/lib/email"
 
 const sendSchema = z.object({
   to: z.string().email("Enter a valid email address"),
@@ -18,9 +18,9 @@ export async function POST(
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  if (!emailEnabled()) {
+  if (!(await canSend(user.id))) {
     return NextResponse.json(
-      { error: "Email isn't set up yet - add a RESEND_API_KEY to enable sending." },
+      { error: "Email isn't set up yet — connect your email in Settings to send proposals." },
       { status: 503 }
     )
   }
@@ -67,6 +67,7 @@ export async function POST(
       replyTo: org.email || user.email,
       subject: `Your proposal from ${org.name} - ${proposal.survey.title}`,
       html,
+      fromUserId: user.id,
     })
 
     await db.proposal.update({

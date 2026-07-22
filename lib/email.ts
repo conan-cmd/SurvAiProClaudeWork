@@ -1,4 +1,5 @@
 import "server-only"
+import { db } from "./db"
 
 // Minimal Resend REST client (no SDK dependency), matching lib/stripe.ts style.
 const RESEND_API = "https://api.resend.com/emails"
@@ -32,9 +33,47 @@ export async function sendEmail(params: {
   subject: string
   html: string
   replyTo?: string | null
+  // When set, and that user has connected their Gmail, the email is sent from
+  // their own address via the Gmail API instead of the shared Resend sender.
+  fromUserId?: string
 }): Promise<void> {
+  const recipients = Array.isArray(params.to) ? params.to : [params.to]
+
+  if (params.fromUserId) {
+    const sender = await db.user.findUnique({
+      where: { id: params.fromUserId },
+      select: {
+        name: true,
+        gmailAddress: true,
+        gmailRefreshToken: true,
+        organization: { select: { name: true } },
+      },
+    })
+    if (sender?.gmailAddress && sender.gmailRefreshToken) {
+      const { decryptSecret } = await import("./crypto")
+      const { sendViaGmail } = await import("./gmail")
+      const refreshToken = decryptSecret(sender.gmailRefreshToken)
+      const fromName = sender.organization?.name || sender.name || "Proposals"
+      for (const recipient of recipients) {
+        await sendViaGmail({
+          refreshToken,
+          fromName,
+          fromEmail: sender.gmailAddress,
+          to: recipient,
+          subject: params.subject,
+          html: params.html,
+          replyTo: params.replyTo,
+        })
+      }
+      return
+    }
+  }
+
+  // Fall back to the shared Resend sender.
   if (!process.env.RESEND_API_KEY) {
-    throw new Error("Email isn't set up yet — add a RESEND_API_KEY to enable sending.")
+    throw new Error(
+      "Email isn't set up yet — connect your email in Settings, or add a RESEND_API_KEY."
+    )
   }
 
   const res = await fetch(RESEND_API, {
@@ -45,7 +84,7 @@ export async function sendEmail(params: {
     },
     body: JSON.stringify({
       from: fromAddress(),
-      to: Array.isArray(params.to) ? params.to : [params.to],
+      to: recipients,
       ...(params.replyTo ? { reply_to: params.replyTo } : {}),
       subject: params.subject,
       html: params.html,
@@ -57,4 +96,11 @@ export async function sendEmail(params: {
     const err = await res.json().catch(() => ({} as { message?: string }))
     throw new Error(err.message || `Email service returned ${res.status}`)
   }
+}
+
+// True when either the shared Resend sender or a per-user Gmail could be used.
+export async function canSend(userId: string): Promise<boolean> {
+  if (process.env.RESEND_API_KEY) return true
+  const u = await db.user.findUnique({ where: { id: userId }, select: { gmailRefreshToken: true } })
+  return Boolean(u?.gmailRefreshToken)
 }

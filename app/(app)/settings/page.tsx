@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Loader2, Upload, Sparkles, Copy, Globe } from "lucide-react"
+import { Loader2, Upload, Sparkles, Copy, Globe, Check } from "lucide-react"
 import { SignatureDraw } from "@/components/signature-draw"
 
 type Org = {
@@ -53,6 +53,7 @@ type Me = {
   signOffName: string | null
   headshotUrl: string | null
   signatureImageUrl: string | null
+  gmailAddress: string | null
 }
 
 type TeamData = {
@@ -79,6 +80,21 @@ export default function SettingsPage() {
       .catch(() => toast.error("Failed to load settings"))
     fetch("/api/me").then((r) => r.json()).then(setMe).catch(() => {})
     fetch("/api/team").then((r) => r.json()).then(setTeam).catch(() => {})
+  }, [])
+
+  // Surface the outcome of the "connect email" OAuth round-trip.
+  useEffect(() => {
+    const status = new URLSearchParams(window.location.search).get("email")
+    if (!status) return
+    if (status === "connected") {
+      toast.success("Email connected — proposals now send from your own address")
+      fetch("/api/me").then((r) => r.json()).then(setMe).catch(() => {})
+    } else if (status === "unavailable") {
+      toast.error("Connecting email isn't available right now")
+    } else if (status === "error") {
+      toast.error("Couldn't connect your email — please try again")
+    }
+    window.history.replaceState({}, "", "/settings")
   }, [])
 
   const saveMyName = async (signOffName: string) => {
@@ -134,6 +150,17 @@ export default function SettingsPage() {
       toast.success("Copied to clipboard")
     } catch {
       toast.error("Couldn't copy — select the link and copy it manually")
+    }
+  }
+
+  const disconnectEmail = async () => {
+    if (!confirm("Disconnect your email? Proposals will send from the shared sender instead.")) return
+    const res = await fetch("/api/email/google/disconnect", { method: "POST" })
+    if (res.ok) {
+      setMe((m) => (m ? { ...m, gmailAddress: null } : m))
+      toast.success("Email disconnected")
+    } else {
+      toast.error("Couldn't disconnect")
     }
   }
 
@@ -380,6 +407,29 @@ export default function SettingsPage() {
             </select>
           </div>
         </div>
+      </section>
+
+      <section className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+        <h2 className="font-semibold text-brand-navy">Send proposals from your own email</h2>
+        <p className="text-sm text-gray-500">
+          Connect your Google account and proposals send from your real email address — better
+          deliverability, and client replies come straight back to you.
+        </p>
+        {me?.gmailAddress ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
+              <Check className="w-4 h-4" /> Connected as {me.gmailAddress}
+            </span>
+            <button onClick={disconnectEmail} className="text-sm text-gray-500 hover:underline">
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <a href="/api/email/google/connect"
+            className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-semibold hover:bg-gray-50 w-fit">
+            <Globe className="w-4 h-4" /> Connect Google email
+          </a>
+        )}
       </section>
 
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">

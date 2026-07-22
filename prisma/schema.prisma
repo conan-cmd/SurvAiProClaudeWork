@@ -25,6 +25,11 @@ model User {
   headshotUrl           String?
   signatureImageUrl     String?
 
+  // Connected Gmail for sending proposals from the user's own address (Tier 2).
+  // The refresh token is encrypted at rest (lib/crypto).
+  gmailAddress          String?
+  gmailRefreshToken     String?
+
   surveysCreated        SiteSurvey[]    @relation("SurveyCreator")
   proposalsCreated      Proposal[]      @relation("ProposalCreator")
 

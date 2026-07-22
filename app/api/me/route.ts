@@ -6,6 +6,10 @@ import { getCurrentUser } from "@/lib/session"
 export async function GET() {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const conn = await db.user.findUnique({
+    where: { id: user.id },
+    select: { gmailAddress: true },
+  })
   return NextResponse.json({
     id: user.id,
     name: user.name,
@@ -13,6 +17,7 @@ export async function GET() {
     signOffName: user.signOffName,
     headshotUrl: user.headshotUrl,
     signatureImageUrl: user.signatureImageUrl,
+    gmailAddress: conn?.gmailAddress ?? null,
   })
 }
 
