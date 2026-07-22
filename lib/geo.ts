@@ -1,6 +1,10 @@
 import "server-only"
 import { db } from "./db"
-import { uploadFile } from "./storage"
+import { uploadFile, deleteFile } from "./storage"
+
+// The fixed file names of the auto-generated hero shots, so they can be found
+// and replaced when the user corrects the site location.
+export const AUTO_IMAGERY_NAMES = ["street-view.jpg", "aerial-view.jpg"]
 
 const KEY = () => process.env.GOOGLE_MAPS_API_KEY
 
@@ -47,17 +51,20 @@ export async function attachSiteImagery(params: {
   address: string
   lat: number
   lng: number
+  heading?: number
 }): Promise<void> {
-  const { surveyId, organizationId, lat, lng } = params
+  const { surveyId, organizationId, lat, lng, heading } = params
   const key = KEY()
   if (!key) return
 
+  const headingParam =
+    typeof heading === "number" && !Number.isNaN(heading) ? `&heading=${heading}` : ""
   const shots: { name: string; caption: string; url: string; cover: boolean }[] = [
     {
       name: "street-view.jpg",
       caption: "The property - street view",
       cover: true,
-      url: `https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${lat},${lng}&fov=75&key=${key}`,
+      url: `https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${lat},${lng}&fov=75${headingParam}&key=${key}`,
     },
     {
       name: "aerial-view.jpg",
@@ -90,4 +97,26 @@ export async function attachSiteImagery(params: {
       },
     })
   }
+}
+
+/**
+ * Re-fetches the Street View + aerial hero shots for a corrected site location.
+ * Removes only the previous AUTO-generated shots (by their fixed file names) so
+ * user-uploaded photos are left untouched, then attaches fresh ones.
+ */
+export async function refreshSiteImagery(params: {
+  surveyId: string
+  organizationId: string
+  lat: number
+  lng: number
+  heading?: number
+}): Promise<void> {
+  const prior = await db.surveyPhoto.findMany({
+    where: { surveyId: params.surveyId, fileName: { in: AUTO_IMAGERY_NAMES } },
+  })
+  for (const p of prior) {
+    await deleteFile(p.fileUrl).catch(() => {})
+    await db.surveyPhoto.delete({ where: { id: p.id } }).catch(() => {})
+  }
+  await attachSiteImagery({ ...params, address: "" })
 }

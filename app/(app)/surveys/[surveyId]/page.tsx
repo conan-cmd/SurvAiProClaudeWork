@@ -7,6 +7,7 @@ import { Loader2, Sparkles, FileText, Check } from "lucide-react"
 import { PhotoManager, Photo } from "@/components/photo-manager"
 import { VoiceNotes, VoiceNoteWithTranscript } from "@/components/voice-notes"
 import { DictateButton } from "@/components/dictate-button"
+import { SiteLocation } from "@/components/site-location"
 
 type Survey = {
   id: string
@@ -23,6 +24,8 @@ type Survey = {
   measurements: string | null
   exclusions: string | null
   writtenDescription: string | null
+  latitude: number | null
+  longitude: number | null
   photos: Photo[]
   voiceNotes: VoiceNoteWithTranscript[]
   proposal: { id: string; status: string } | null
@@ -216,6 +219,17 @@ export default function SurveyDetailPage() {
           surveyId={survey.id}
           photos={survey.photos}
           onChange={(photos) => setSurvey((s) => (s ? { ...s, photos } : s))}
+        />
+      </section>
+
+      {/* Site location & imagery */}
+      <section className="bg-white rounded-xl shadow-sm p-5">
+        <h2 className="font-semibold text-brand-navy mb-4">Site location &amp; imagery</h2>
+        <SiteLocation
+          surveyId={survey.id}
+          latitude={survey.latitude}
+          longitude={survey.longitude}
+          onPhotosChange={(photos) => setSurvey((s) => (s ? { ...s, photos } : s))}
         />
       </section>
 
