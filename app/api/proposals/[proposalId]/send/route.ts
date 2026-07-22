@@ -4,6 +4,7 @@ import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { canSend, sendEmail } from "@/lib/email"
+import { slugify } from "@/lib/utils"
 
 const sendSchema = z.object({
   to: z.string().email("Enter a valid email address"),
@@ -42,7 +43,8 @@ export async function POST(
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   await db.shareLink.create({ data: { proposalId: proposal.id, token, expiresAt } })
   const origin = process.env.NEXTAUTH_URL || request.nextUrl.origin
-  const url = `${origin}/p/${token}`
+  const slug = slugify(proposal.survey.title || "proposal")
+  const url = `${origin}/p/${slug}/${token}`
 
   const org = proposal.organization
   const html = `

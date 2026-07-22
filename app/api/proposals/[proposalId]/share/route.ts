@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { randomBytes } from "crypto"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
+import { slugify } from "@/lib/utils"
 
 const SHARE_LINK_DAYS = 30
 
@@ -14,6 +15,7 @@ export async function POST(
 
   const proposal = await db.proposal.findFirst({
     where: { id: params.proposalId, organizationId: user.organizationId },
+    include: { survey: { select: { title: true, clientAddress: true } } },
   })
   if (!proposal) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
@@ -24,10 +26,12 @@ export async function POST(
     data: { proposalId: proposal.id, token, expiresAt },
   })
 
-  // Prefer the configured public URL so links work off-device (phones etc.)
+  // Prefer the configured public URL so links work off-device (phones etc.).
+  // A readable slug (job title / address) makes the link look legitimate.
   const origin = process.env.NEXTAUTH_URL || request.nextUrl.origin
+  const slug = slugify(proposal.survey.title || proposal.survey.clientAddress || "proposal")
   return NextResponse.json({
-    url: `${origin}/p/${link.token}`,
+    url: `${origin}/p/${slug}/${link.token}`,
     expiresAt: link.expiresAt,
   }, { status: 201 })
 }

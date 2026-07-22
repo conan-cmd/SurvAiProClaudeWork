@@ -12,11 +12,15 @@ export default async function SharedProposalPage({
   params,
   searchParams,
 }: {
-  params: { token: string }
+  params: { slug: string[] }
   searchParams: { session_id?: string }
 }) {
+  // Links are /p/<readable-slug>/<token>, but old links are /p/<token>. Either
+  // way the secure token is the last path segment.
+  const token = params.slug[params.slug.length - 1]
+
   const link = await db.shareLink.findUnique({
-    where: { token: params.token },
+    where: { token },
     include: {
       proposal: {
         include: {
@@ -155,7 +159,7 @@ export default async function SharedProposalPage({
           </div>
         ) : (
           <AcceptanceBlock
-            token={params.token}
+            token={token}
             clientName={p.clientName}
             clientCompany={p.survey.clientCompany}
             brandColor={p.organization.brandColor}
@@ -177,7 +181,7 @@ export default async function SharedProposalPage({
         )}
         {depositDue > 0 && (
           <DepositCard
-            token={params.token}
+            token={token}
             amountLabel={formatCurrency(depositDue)}
             brandColor={p.organization.brandColor}
           />

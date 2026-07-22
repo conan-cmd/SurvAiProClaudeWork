@@ -12,6 +12,21 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
+// Builds a short, URL-friendly slug from a job title or address so share links
+// read as legitimate (e.g. /p/roof-clean-12-high-street/<token>) rather than a
+// bare random string, which improves open rates.
+export function slugify(text: string, maxWords = 6): string {
+  const slug = text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .split("-")
+    .filter(Boolean)
+    .slice(0, maxWords)
+    .join("-")
+  return slug || "proposal"
+}
+
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("en-GB", {
     year: "numeric",
