@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
-import { refreshSiteImagery } from "@/lib/geo"
+import { refreshSiteImagery, what3wordsFor } from "@/lib/geo"
 
 // Corrects the site location and re-fetches the Street View + aerial hero shots
 // for the new spot (replacing only the auto-generated ones).
@@ -29,9 +29,14 @@ export async function POST(
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
   }
 
+  const words = await what3wordsFor(parsed.data.latitude, parsed.data.longitude)
   await db.siteSurvey.update({
     where: { id: survey.id },
-    data: { latitude: parsed.data.latitude, longitude: parsed.data.longitude },
+    data: {
+      latitude: parsed.data.latitude,
+      longitude: parsed.data.longitude,
+      what3words: words,
+    },
   })
 
   try {

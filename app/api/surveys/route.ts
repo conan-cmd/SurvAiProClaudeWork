@@ -58,12 +58,13 @@ export async function POST(request: NextRequest) {
     // Geocode the address and attach street-view + aerial hero shots.
     // Best-effort: survey creation never fails because of imagery.
     try {
-      const { geocodeAddress, attachSiteImagery } = await import("@/lib/geo")
+      const { geocodeAddress, attachSiteImagery, what3wordsFor } = await import("@/lib/geo")
       const coords = await geocodeAddress(survey.clientAddress)
       if (coords) {
+        const words = await what3wordsFor(coords.lat, coords.lng)
         await db.siteSurvey.update({
           where: { id: survey.id },
-          data: { latitude: coords.lat, longitude: coords.lng },
+          data: { latitude: coords.lat, longitude: coords.lng, what3words: words },
         })
         await attachSiteImagery({
           surveyId: survey.id,

@@ -153,9 +153,14 @@ export default function SurveyDetailPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-brand-navy">{survey.title}</h1>
-          <p className="text-gray-500 text-sm">
+        <div className="min-w-0 flex-1">
+          <input
+            value={survey.title}
+            onChange={(e) => updateField("title", e.target.value)}
+            aria-label="Survey title"
+            className="text-2xl font-bold text-brand-navy bg-transparent w-full border-b border-transparent hover:border-gray-300 focus:border-brand-blue focus:outline-none"
+          />
+          <p className="text-gray-500 text-sm mt-0.5">
             {survey.clientName} · {survey.clientAddress}
           </p>
         </div>

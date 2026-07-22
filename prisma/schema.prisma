@@ -152,6 +152,7 @@ model SiteSurvey {
   clientAddress         String
   latitude              Float?
   longitude             Float?
+  what3words            String? // 3-word address derived from lat/lng
 
   // Survey details
   title                 String

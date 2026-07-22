@@ -29,6 +29,23 @@ export async function geocodeAddress(
   }
 }
 
+// Converts coordinates to a what3words address (e.g. "index.home.raft").
+// Returns null if the key is missing or the plan/quota rejects the call.
+export async function what3wordsFor(lat: number, lng: number): Promise<string | null> {
+  const key = process.env.WHAT3WORDS_API_KEY
+  if (!key) return null
+  try {
+    const res = await fetch(
+      `https://api.what3words.com/v3/convert-to-3wa?coordinates=${lat},${lng}&key=${key}`,
+      { signal: AbortSignal.timeout(8000) }
+    )
+    const data = await res.json()
+    return typeof data.words === "string" ? data.words : null
+  } catch {
+    return null
+  }
+}
+
 async function fetchImage(url: string): Promise<Buffer | null> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) })

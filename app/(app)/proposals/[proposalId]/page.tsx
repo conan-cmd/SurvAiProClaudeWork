@@ -30,9 +30,19 @@ type ProposalData = {
   pricingLineItems: EditableLineItem[]
   survey: {
     id: string
+    title: string
+    clientCompany: string | null
+    clientAddress: string
     latitude: number | null
     longitude: number | null
-    photos: { id: string; fileUrl: string; caption: string | null }[]
+    what3words: string | null
+    photos: {
+      id: string
+      fileUrl: string
+      caption: string | null
+      includeInProposal: boolean
+      internalOnly: boolean
+    }[]
   }
   createdBy: {
     name: string | null
@@ -311,11 +321,15 @@ export default function ProposalEditorPage() {
   const docData = {
     clientName: proposal.clientName,
     templateName: proposal.templateName,
+    title: proposal.survey.title,
+    clientCompany: proposal.survey.clientCompany,
+    siteAddress: proposal.survey.clientAddress,
     sections: proposal.sections,
     pricingLineItems: proposal.pricingLineItems,
-    photos: proposal.survey.photos,
+    photos: proposal.survey.photos.filter((p) => p.includeInProposal && !p.internalOnly),
     latitude: proposal.survey.latitude,
     longitude: proposal.survey.longitude,
+    what3words: proposal.survey.what3words,
     organization: proposal.organization,
     preparer: proposal.createdBy,
   }

@@ -23,6 +23,11 @@ type LineItem = PricingItem & {
 export type ProposalDocumentData = {
   clientName: string
   templateName: string
+  // Live cover facts (from the current survey); the cover prefers these over the
+  // snapshot stored at generation time, so edits show through immediately.
+  title?: string
+  clientCompany?: string | null
+  siteAddress?: string
   sections: Section[]
   pricingLineItems: LineItem[]
   photos: Photo[]
@@ -63,6 +68,7 @@ function CoverSection({ section, data }: { section: Section; data: ProposalDocum
     // fall through with defaults
   }
   const org = data.organization
+  const company = data.clientCompany ?? cover.clientCompany
 
   return (
     <div
@@ -82,17 +88,24 @@ function CoverSection({ section, data }: { section: Section; data: ProposalDocum
           className="w-16 h-1.5 rounded mb-6"
           style={{ backgroundColor: org.brandColor }}
         />
-        <h1 className="text-4xl font-bold mb-4">{cover.title}</h1>
+        <h1 className="text-4xl font-bold mb-4">{data.title || cover.title}</h1>
         <p className="text-lg opacity-80">
-          Prepared for {cover.clientName}
-          {cover.clientCompany ? `, ${cover.clientCompany}` : ""}
+          Prepared for {data.clientName || cover.clientName}
+          {company ? `, ${company}` : ""}
         </p>
-        <p className="opacity-60">{cover.siteAddress}</p>
+        <p className="opacity-60">{data.siteAddress || cover.siteAddress}</p>
         {data.latitude != null && data.longitude != null && (
-          <p className="opacity-50 text-sm mt-1">
-            {data.latitude.toFixed(6)}, {data.longitude.toFixed(6)}
-            {data.what3words ? ` · ///${data.what3words}` : ""}
-          </p>
+          <div className="opacity-60 text-sm mt-2 space-y-0.5">
+            <p>
+              <span className="opacity-70">GPS location:</span>{" "}
+              {data.latitude.toFixed(6)}, {data.longitude.toFixed(6)}
+            </p>
+            {data.what3words && (
+              <p>
+                <span className="opacity-70">what3words:</span> ///{data.what3words}
+              </p>
+            )}
+          </div>
         )}
       </div>
       <div className="px-10 py-6 text-sm opacity-70 flex flex-wrap gap-x-6 gap-y-1"
@@ -105,17 +118,10 @@ function CoverSection({ section, data }: { section: Section; data: ProposalDocum
   )
 }
 
-function PhotosSection({ section, data }: { section: Section; data: ProposalDocumentData }) {
-  let ids: string[] = []
-  try {
-    ids = section.photoIds ? JSON.parse(section.photoIds) : []
-  } catch {
-    ids = []
-  }
-  const photos = ids.length
-    ? (ids.map((id) => data.photos.find((p) => p.id === id)).filter(Boolean) as Photo[])
-    : data.photos
-
+// Site photos are shown live from the survey (those marked "In proposal"), so
+// photos added after the proposal was generated still appear.
+function PhotosSection({ data }: { data: ProposalDocumentData }) {
+  const photos = data.photos
   if (!photos.length) return null
 
   return (
@@ -347,7 +353,7 @@ export function ProposalDocument({ data }: { data: ProposalDocumentData }) {
               style={{ backgroundColor: data.organization.brandColor }}
             />
             {section.type === "photos" ? (
-              <PhotosSection section={section} data={data} />
+              <PhotosSection data={data} />
             ) : section.type === "pricing" ? (
               <PricingSection data={data} />
             ) : section.type === "videos" ? (

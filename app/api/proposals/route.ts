@@ -129,8 +129,8 @@ export async function POST(request: NextRequest) {
         title: def.title,
         content,
         order: index,
-        photoIds:
-          def.type === "photos" ? JSON.stringify(survey.photos.map((p) => p.id)) : null,
+        // Photos render live from the survey's "In proposal" set, so no snapshot.
+        photoIds: null,
       }
     })
 
