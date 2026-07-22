@@ -15,7 +15,7 @@ export function formatCurrency(amount: number): string {
 // Builds a short, URL-friendly slug from a job title or address so share links
 // read as legitimate (e.g. /p/roof-clean-12-high-street/<token>) rather than a
 // bare random string, which improves open rates.
-export function slugify(text: string, maxWords = 6): string {
+export function slugify(text: string, maxWords = 3): string {
   const slug = text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")

@@ -20,7 +20,7 @@ export async function POST(
   })
   if (!proposal) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
-  const token = randomBytes(32).toString("base64url")
+  const token = randomBytes(16).toString("base64url")
   const expiresAt = new Date(Date.now() + SHARE_LINK_DAYS * 24 * 60 * 60 * 1000)
 
   const link = await db.shareLink.create({

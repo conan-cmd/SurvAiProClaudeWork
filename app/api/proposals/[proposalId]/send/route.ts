@@ -40,7 +40,7 @@ export async function POST(
   const { to, message } = parsed.data
 
   // Fresh secure link for this send
-  const token = randomBytes(32).toString("base64url")
+  const token = randomBytes(16).toString("base64url")
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
   await db.shareLink.create({ data: { proposalId: proposal.id, token, expiresAt } })
   const origin = publicBaseUrl(request.nextUrl.origin)
