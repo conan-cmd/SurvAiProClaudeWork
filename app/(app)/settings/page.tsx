@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Loader2, Upload, Sparkles, Copy } from "lucide-react"
+import { Loader2, Upload, Sparkles, Copy, Globe } from "lucide-react"
 import { SignatureDraw } from "@/components/signature-draw"
 
 type Org = {
@@ -69,12 +69,13 @@ export default function SettingsPage() {
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [importing, setImporting] = useState(false)
   const logoInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch("/api/organization")
       .then((r) => r.json())
-      .then(setOrg)
+      .then((data: Org) => setOrg(normalizeOrg(data)))
       .catch(() => toast.error("Failed to load settings"))
     fetch("/api/me").then((r) => r.json()).then(setMe).catch(() => {})
     fetch("/api/team").then((r) => r.json()).then(setTeam).catch(() => {})
@@ -138,6 +139,50 @@ export default function SettingsPage() {
 
   const set = (field: keyof Org, value: string | number | null) =>
     setOrg((prev) => (prev ? { ...prev, [field]: value } : prev))
+
+  // Re-pull services, areas and details from the company website (the same
+  // extraction used at signup) so they can be refreshed any time. Populates the
+  // form only - the user reviews and Saves to keep it.
+  const importFromWebsite = async () => {
+    if (!org?.website?.trim()) {
+      toast.error("Enter your website address first")
+      return
+    }
+    setImporting(true)
+    try {
+      const res = await fetch("/api/organization/import-from-website", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: org.website.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Import failed")
+      setOrg((prev) =>
+        prev
+          ? {
+              ...prev,
+              website: data.website || prev.website,
+              logoUrl: data.logoUrl || prev.logoUrl,
+              brandColor: data.brandColor || prev.brandColor,
+              email: data.contactEmail || prev.email,
+              phone: data.contactPhone || prev.phone,
+              youtubeChannelUrl: data.youtubeChannelUrl || prev.youtubeChannelUrl,
+              mainServices: data.services?.length ? data.services.join(", ") : prev.mainServices,
+              areasCovered: data.areasCovered?.length ? data.areasCovered.join(", ") : prev.areasCovered,
+              yearEstablished: data.yearEstablished ?? prev.yearEstablished,
+              mainUSP: data.mainUSP || prev.mainUSP,
+              reviewCount: data.reviewCount ?? prev.reviewCount,
+              whyChooseUs: data.whyChooseUs || prev.whyChooseUs,
+            }
+          : prev
+      )
+      toast.success("Imported from your website — review and Save to keep it")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Import failed")
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const save = async () => {
     if (!org) return
@@ -274,7 +319,17 @@ export default function SettingsPage() {
           </div>
           <div>
             <label className={labelCls}>Website</label>
-            <input className={inputCls} value={org.website || ""} onChange={(e) => set("website", e.target.value)} />
+            <div className="flex gap-2">
+              <input className={inputCls} value={org.website || ""} onChange={(e) => set("website", e.target.value)} />
+              <button type="button" onClick={importFromWebsite} disabled={importing}
+                className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 bg-brand-navy text-white rounded-lg text-sm font-semibold hover:bg-slate-800 disabled:opacity-50">
+                {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                <span className="hidden sm:inline">{importing ? "Importing…" : "Import"}</span>
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              Re-pull your services, areas and details from your site. Review, then Save.
+            </p>
           </div>
           <div>
             <label className={labelCls}>Contact email</label>
@@ -291,6 +346,19 @@ export default function SettingsPage() {
             <p className="text-xs text-gray-400 mt-1">
               Lets you embed videos of similar jobs in your proposals.
             </p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Main services (comma separated)</label>
+            <input className={inputCls} placeholder="Roof cleaning, Gutter clearance, Render cleaning"
+              value={org.mainServices || ""} onChange={(e) => set("mainServices", e.target.value)} />
+            <p className="text-xs text-gray-400 mt-1">
+              Used to tailor proposal wording and your T&amp;Cs. Empty services is why terms come out generic.
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Areas covered (comma separated)</label>
+            <input className={inputCls} placeholder="London, Surrey, Kent"
+              value={org.areasCovered || ""} onChange={(e) => set("areasCovered", e.target.value)} />
           </div>
           <div>
             <label className={labelCls}>Primary colour</label>
@@ -516,5 +584,16 @@ function tryParse(value: string): string[] {
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return value.split(",").map((s) => s.trim()).filter(Boolean)
+  }
+}
+
+// The DB stores services/areas as JSON strings; the form edits them as plain
+// comma-separated text. Normalise on load so the inputs show clean text and
+// save() (which runs them back through tryParse) round-trips correctly.
+function normalizeOrg(o: Org): Org {
+  return {
+    ...o,
+    mainServices: o.mainServices ? tryParse(o.mainServices).join(", ") : "",
+    areasCovered: o.areasCovered ? tryParse(o.areasCovered).join(", ") : "",
   }
 }
