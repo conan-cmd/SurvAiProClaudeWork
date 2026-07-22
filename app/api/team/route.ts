@@ -4,6 +4,7 @@ import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { canSend, sendEmail } from "@/lib/email"
+import { publicBaseUrl } from "@/lib/public-url"
 
 export async function GET() {
   const user = await getCurrentUser()
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     },
   })
 
-  const origin = process.env.NEXTAUTH_URL || request.nextUrl.origin
+  const origin = publicBaseUrl(request.nextUrl.origin)
   const joinUrl = `${origin}/auth/join?token=${token}`
 
   // Best-effort email; the link is returned either way so it can be shared directly.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { stripeEnabled, createDepositCheckout, computeDeposit } from "@/lib/stripe"
 import { calculateProposalTotals } from "@/lib/utils"
+import { publicBaseUrl } from "@/lib/public-url"
 
 // Public: client pays their deposit after signing, via the secure share link.
 export async function POST(
@@ -46,7 +47,7 @@ export async function POST(
     return NextResponse.json({ error: "No deposit is due on this proposal" }, { status: 400 })
   }
 
-  const origin = process.env.NEXTAUTH_URL || request.nextUrl.origin
+  const origin = publicBaseUrl(request.nextUrl.origin)
   try {
     const session = await createDepositCheckout({
       amountPence: Math.round(deposit * 100),

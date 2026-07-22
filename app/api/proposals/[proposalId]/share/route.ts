@@ -3,6 +3,7 @@ import { randomBytes } from "crypto"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { slugify } from "@/lib/utils"
+import { publicBaseUrl } from "@/lib/public-url"
 
 const SHARE_LINK_DAYS = 30
 
@@ -28,7 +29,7 @@ export async function POST(
 
   // Prefer the configured public URL so links work off-device (phones etc.).
   // A readable slug (job title / address) makes the link look legitimate.
-  const origin = process.env.NEXTAUTH_URL || request.nextUrl.origin
+  const origin = publicBaseUrl(request.nextUrl.origin)
   const slug = slugify(proposal.survey.title || proposal.survey.clientAddress || "proposal")
   return NextResponse.json({
     url: `${origin}/p/${slug}/${link.token}`,
