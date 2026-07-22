@@ -60,6 +60,16 @@ export type ProposalDocumentData = {
   hideOptionalExtras?: boolean
 }
 
+// Perceived brightness of a hex colour (0-1) so we can pick readable text.
+function coverLuminance(hex: string): number {
+  const h = hex.replace("#", "")
+  if (!/^[0-9A-Fa-f]{6}$/.test(h)) return 0
+  const r = parseInt(h.slice(0, 2), 16)
+  const g = parseInt(h.slice(2, 4), 16)
+  const b = parseInt(h.slice(4, 6), 16)
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255
+}
+
 function CoverSection({ section, data }: { section: Section; data: ProposalDocumentData }) {
   let cover = { title: "", clientName: "", clientCompany: "", siteAddress: "" }
   try {
@@ -70,15 +80,28 @@ function CoverSection({ section, data }: { section: Section; data: ProposalDocum
   const org = data.organization
   const company = data.clientCompany ?? cover.clientCompany
 
+  // Lead with the company's brand colour; fall back to navy if it's not a valid
+  // hex. Text colour flips to stay readable on light brand colours.
+  const brand = /^#[0-9A-Fa-f]{6}$/.test(org.brandColor) ? org.brandColor : "#0F172A"
+  const onDark = coverLuminance(brand) < 0.6
+  const textColor = onDark ? "#FFFFFF" : "#0F172A"
+  const accent = /^#[0-9A-Fa-f]{6}$/.test(org.secondaryColor)
+    ? org.secondaryColor
+    : onDark
+      ? "#FFFFFF"
+      : brand
+
   return (
     <div
-      className="doc-page flex flex-col justify-between text-white rounded-lg overflow-hidden"
-      style={{ backgroundColor: "#0F172A", minHeight: "500px" }}
+      className="doc-page flex flex-col justify-between rounded-lg overflow-hidden"
+      style={{ backgroundColor: brand, color: textColor, minHeight: "500px" }}
     >
       <div className="p-10">
         {org.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={org.logoUrl} alt={org.name} className="h-14 object-contain mb-2" />
+          <div className="inline-block bg-white rounded-lg p-2 shadow-sm">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={org.logoUrl} alt={org.name} className="h-12 object-contain" />
+          </div>
         ) : (
           <div className="text-2xl font-bold">{org.name}</div>
         )}
@@ -86,7 +109,7 @@ function CoverSection({ section, data }: { section: Section; data: ProposalDocum
       <div className="p-10">
         <div
           className="w-16 h-1.5 rounded mb-6"
-          style={{ backgroundColor: org.brandColor }}
+          style={{ backgroundColor: accent }}
         />
         <h1 className="text-4xl font-bold mb-4">{data.title || cover.title}</h1>
         <p className="text-lg opacity-80">
@@ -108,8 +131,8 @@ function CoverSection({ section, data }: { section: Section; data: ProposalDocum
           </div>
         )}
       </div>
-      <div className="px-10 py-6 text-sm opacity-70 flex flex-wrap gap-x-6 gap-y-1"
-        style={{ backgroundColor: "rgba(255,255,255,0.06)" }}>
+      <div className="px-10 py-6 text-sm flex flex-wrap gap-x-6 gap-y-1"
+        style={{ backgroundColor: onDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)" }}>
         {org.phone && <span>{org.phone}</span>}
         {org.email && <span>{org.email}</span>}
         {org.website && <span>{org.website}</span>}
