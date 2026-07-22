@@ -31,6 +31,7 @@ type Org = {
   signOffName: string | null
   headshotUrl: string | null
   signatureImageUrl: string | null
+  membersViewAll: boolean
 }
 
 type DepositRule = { type: "NONE" | "PERCENT" | "FIXED"; value: number }
@@ -54,6 +55,7 @@ type Me = {
   headshotUrl: string | null
   signatureImageUrl: string | null
   gmailAddress: string | null
+  role: string
 }
 
 type TeamData = {
@@ -164,7 +166,7 @@ export default function SettingsPage() {
     }
   }
 
-  const set = (field: keyof Org, value: string | number | null) =>
+  const set = (field: keyof Org, value: string | number | boolean | null) =>
     setOrg((prev) => (prev ? { ...prev, [field]: value } : prev))
 
   // Re-pull services, areas and details from the company website (the same
@@ -241,6 +243,7 @@ export default function SettingsPage() {
           youtubeChannelUrl: org.youtubeChannelUrl || "",
           depositRules: org.depositRules || "",
           signOffName: org.signOffName || "",
+          membersViewAll: org.membersViewAll,
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
@@ -507,6 +510,25 @@ export default function SettingsPage() {
               <Copy className="w-4 h-4" /> Copy
             </button>
           </div>
+        )}
+        {me?.role === "OWNER" && (
+          <label className="flex items-start gap-2 text-sm text-gray-700 pt-3 border-t cursor-pointer">
+            <input type="checkbox" checked={org.membersViewAll}
+              onChange={async (e) => {
+                set("membersViewAll", e.target.checked)
+                await fetch("/api/organization", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ membersViewAll: e.target.checked }),
+                })
+                toast.success("Saved")
+              }}
+              className="rounded accent-blue-600 mt-0.5" />
+            <span>
+              Let team members view <strong>everyone&apos;s</strong> surveys &amp; proposals
+              <span className="block text-xs text-gray-400">Otherwise each member sees only their own. Owners always see all.</span>
+            </span>
+          </label>
         )}
       </section>
 

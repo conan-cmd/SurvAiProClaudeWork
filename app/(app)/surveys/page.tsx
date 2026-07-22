@@ -9,23 +9,38 @@ import { ItemActions } from "@/components/item-actions"
 export default async function SurveysPage({
   searchParams,
 }: {
-  searchParams: { folder?: string }
+  searchParams: { folder?: string; scope?: string }
 }) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
 
   const folderId = searchParams.folder
+  const canViewAll = user.role === "OWNER" || user.organization.membersViewAll
+  const viewingAll = searchParams.scope === "all" && canViewAll
+  const buildLink = (folder?: string, all?: boolean) => {
+    const p = new URLSearchParams()
+    if (all) p.set("scope", "all")
+    if (folder) p.set("folder", folder)
+    const s = p.toString()
+    return `/surveys${s ? `?${s}` : ""}`
+  }
+
   const [folders, surveys] = await Promise.all([
     db.folder.findMany({
       where: { organizationId: user.organizationId },
       orderBy: { name: "asc" },
     }),
     db.siteSurvey.findMany({
-      where: { organizationId: user.organizationId, ...(folderId ? { folderId } : {}) },
+      where: {
+        organizationId: user.organizationId,
+        ...(folderId ? { folderId } : {}),
+        ...(viewingAll ? {} : { createdById: user.id }),
+      },
       orderBy: { updatedAt: "desc" },
       include: {
         proposal: { select: { id: true, status: true } },
         _count: { select: { photos: true, voiceNotes: true } },
+        createdBy: { select: { name: true, email: true } },
       },
     }),
   ])
@@ -40,14 +55,27 @@ export default async function SurveysPage({
         </Link>
       </div>
 
+      {canViewAll && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Link href={buildLink(folderId, false)}
+            className={`px-3 py-1.5 rounded-full font-medium border transition ${!viewingAll ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
+            Mine
+          </Link>
+          <Link href={buildLink(folderId, true)}
+            className={`px-3 py-1.5 rounded-full font-medium border transition ${viewingAll ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
+            Everyone
+          </Link>
+        </div>
+      )}
+
       {folders.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Link href="/surveys"
+          <Link href={buildLink(undefined, viewingAll)}
             className={`px-3 py-1.5 rounded-full font-medium border transition ${!folderId ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"}`}>
             All
           </Link>
           {folders.map((f) => (
-            <Link key={f.id} href={`/surveys?folder=${f.id}`}
+            <Link key={f.id} href={buildLink(f.id, viewingAll)}
               className={`px-3 py-1.5 rounded-full font-medium border transition ${folderId === f.id ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"}`}>
               {f.name}
             </Link>
@@ -69,6 +97,7 @@ export default async function SurveysPage({
                   <div className="font-medium text-gray-900 truncate">{s.title}</div>
                   <div className="text-sm text-gray-500 truncate">
                     {s.clientName} · {s.serviceType} · {formatDate(s.updatedAt)}
+                    {viewingAll && s.createdBy && ` · by ${s.createdBy.name || s.createdBy.email}`}
                   </div>
                   <div className="text-xs text-gray-400 mt-0.5">
                     {s._count.photos} photos · {s._count.voiceNotes} voice notes

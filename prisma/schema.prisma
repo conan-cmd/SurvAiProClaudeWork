@@ -108,6 +108,9 @@ model Organization {
   proposals             Proposal[]
   templates             ProposalTemplate[]
   folders               Folder[]
+
+  // When true, team members can view everyone's surveys/proposals (owners always can)
+  membersViewAll        Boolean         @default(false)
   galleryPhotos         GalleryPhoto[]
 
   createdAt             DateTime        @default(now())

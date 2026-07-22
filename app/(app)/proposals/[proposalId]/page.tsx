@@ -401,9 +401,15 @@ export default function ProposalEditorPage() {
       )}
 
       {mode === "preview" ? (
-        <div className="bg-white rounded-xl shadow-sm p-4 md:p-10 print-area">
-          <ProposalDocument data={docData} />
-        </div>
+        <>
+          <div className="bg-white rounded-xl shadow-sm p-4 md:p-10 print-area">
+            <ProposalDocument data={docData} />
+          </div>
+          <button onClick={() => setMode("edit")}
+            className="no-print mt-4 w-full inline-flex items-center justify-center gap-2 py-3 border rounded-xl font-medium text-gray-700 hover:bg-gray-50">
+            <Pencil className="w-4 h-4" /> Back to editing
+          </button>
+        </>
       ) : (
         <div className="space-y-4 no-print">
           {proposal.sections.map((section, index) => (
@@ -500,6 +506,11 @@ export default function ProposalEditorPage() {
               <Plus className="w-5 h-5" /> Add gallery photos
             </button>
           </div>
+
+          <button onClick={() => setMode("preview")}
+            className="w-full inline-flex items-center justify-center gap-2 py-3.5 bg-brand-navy text-white rounded-xl font-semibold hover:bg-slate-800 transition">
+            <Eye className="w-5 h-5" /> Preview proposal
+          </button>
         </div>
       )}
 

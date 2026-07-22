@@ -18,6 +18,7 @@ export async function GET() {
     headshotUrl: user.headshotUrl,
     signatureImageUrl: user.signatureImageUrl,
     gmailAddress: conn?.gmailAddress ?? null,
+    role: user.role,
   })
 }
 
