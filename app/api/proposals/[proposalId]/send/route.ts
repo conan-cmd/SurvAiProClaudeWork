@@ -81,9 +81,12 @@ export async function POST(
     return NextResponse.json({ success: true, url })
   } catch (error) {
     console.error("Send proposal error:", error)
-    return NextResponse.json(
-      { error: "Failed to send the email. Please try again." },
-      { status: 500 }
-    )
+    // Surface the real reason (e.g. Resend "domain not verified") instead of a
+    // generic message, so send failures can actually be diagnosed.
+    const msg =
+      error instanceof Error && error.message
+        ? `Couldn't send: ${error.message}`
+        : "Failed to send the email. Please try again."
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
