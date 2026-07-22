@@ -107,6 +107,7 @@ model Organization {
   surveys               SiteSurvey[]
   proposals             Proposal[]
   templates             ProposalTemplate[]
+  folders               Folder[]
   galleryPhotos         GalleryPhoto[]
 
   createdAt             DateTime        @default(now())
@@ -170,6 +171,10 @@ model SiteSurvey {
   // Proposal linkage
   proposal              Proposal?
 
+  // Optional folder for organising jobs (proposals follow their survey)
+  folderId              String?
+  folder                Folder?         @relation(fields: [folderId], references: [id], onDelete: SetNull)
+
   createdById           String?
   createdBy             User?           @relation("SurveyCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
@@ -185,6 +190,17 @@ enum SurveyStatus {
   DRAFT
   SUBMITTED
   ARCHIVED
+}
+
+model Folder {
+  id                    String          @id @default(cuid())
+  organizationId        String
+  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name                  String
+  surveys               SiteSurvey[]
+  createdAt             DateTime        @default(now())
+
+  @@index([organizationId])
 }
 
 model SurveyPhoto {

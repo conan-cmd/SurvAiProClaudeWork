@@ -3,10 +3,14 @@
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { MoreVertical, Pencil, Copy, Trash2, Loader2 } from "lucide-react"
+import {
+  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus,
+} from "lucide-react"
 
-// Row action menu for survey/proposal lists: rename, duplicate (surveys), delete.
-// Sits alongside the row link; its clicks don't navigate.
+type FolderOption = { id: string; name: string }
+
+// Row action menu for survey/proposal lists: rename, duplicate (surveys),
+// move to folder, delete. Sits alongside the row link; its clicks don't navigate.
 export function ItemActions({
   kind,
   id,
@@ -15,18 +19,25 @@ export function ItemActions({
 }: {
   kind: "survey" | "proposal"
   id: string
-  // For proposals, the title shown is the linked survey's title, so rename edits it.
+  // For proposals, actions that target the job (rename/move) act on the survey.
   surveyId?: string
   title: string
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [showFolders, setShowFolders] = useState(false)
+  const [folders, setFolders] = useState<FolderOption[] | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+
+  const targetSurvey = kind === "survey" ? id : surveyId
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+        setShowFolders(false)
+      }
     }
     document.addEventListener("mousedown", onDoc)
     return () => document.removeEventListener("mousedown", onDoc)
@@ -35,9 +46,7 @@ export function ItemActions({
   const rename = async () => {
     setOpen(false)
     const next = window.prompt("Rename to:", title)
-    if (next === null || !next.trim() || next.trim() === title) return
-    const targetSurvey = kind === "survey" ? id : surveyId
-    if (!targetSurvey) return
+    if (next === null || !next.trim() || next.trim() === title || !targetSurvey) return
     setBusy(true)
     const res = await fetch(`/api/surveys/${targetSurvey}`, {
       method: "PATCH",
@@ -76,6 +85,55 @@ export function ItemActions({
     } else toast.error("Couldn't delete")
   }
 
+  const openFolders = async () => {
+    setShowFolders(true)
+    if (folders === null) {
+      try {
+        const res = await fetch("/api/folders")
+        setFolders(res.ok ? await res.json() : [])
+      } catch {
+        setFolders([])
+      }
+    }
+  }
+
+  const moveTo = async (folderId: string | null) => {
+    if (!targetSurvey) return
+    setOpen(false)
+    setShowFolders(false)
+    setBusy(true)
+    const res = await fetch(`/api/surveys/${targetSurvey}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folderId }),
+    })
+    setBusy(false)
+    if (res.ok) {
+      toast.success(folderId ? "Moved to folder" : "Removed from folder")
+      router.refresh()
+    } else toast.error("Couldn't move")
+  }
+
+  const newFolderAndMove = async () => {
+    const name = window.prompt("New folder name:")
+    if (name === null || !name.trim()) return
+    setBusy(true)
+    const res = await fetch("/api/folders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim() }),
+    })
+    if (!res.ok) {
+      setBusy(false)
+      toast.error("Couldn't create folder")
+      return
+    }
+    const folder = await res.json()
+    await moveTo(folder.id)
+  }
+
+  const menuItem = "w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2"
+
   return (
     <div className="relative shrink-0" ref={ref}>
       <button
@@ -83,6 +141,7 @@ export function ItemActions({
         onClick={(e) => {
           e.preventDefault()
           e.stopPropagation()
+          setShowFolders(false)
           setOpen((o) => !o)
         }}
         disabled={busy}
@@ -92,27 +151,53 @@ export function ItemActions({
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoreVertical className="w-4 h-4" />}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-40 bg-white border rounded-lg shadow-lg py-1 z-30 text-sm">
-          <button
-            onClick={(e) => { e.preventDefault(); rename() }}
-            className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2"
-          >
-            <Pencil className="w-4 h-4" /> Rename
-          </button>
-          {kind === "survey" && (
-            <button
-              onClick={(e) => { e.preventDefault(); duplicate() }}
-              className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2"
-            >
-              <Copy className="w-4 h-4" /> Duplicate
-            </button>
+        <div className="absolute right-0 top-full mt-1 w-48 bg-white border rounded-lg shadow-lg py-1 z-30 text-sm">
+          {!showFolders ? (
+            <>
+              <button onClick={(e) => { e.preventDefault(); rename() }} className={menuItem}>
+                <Pencil className="w-4 h-4" /> Rename
+              </button>
+              {kind === "survey" && (
+                <button onClick={(e) => { e.preventDefault(); duplicate() }} className={menuItem}>
+                  <Copy className="w-4 h-4" /> Duplicate
+                </button>
+              )}
+              {targetSurvey && (
+                <button onClick={(e) => { e.preventDefault(); openFolders() }} className={menuItem}>
+                  <FolderInput className="w-4 h-4" /> Move to folder
+                </button>
+              )}
+              <button onClick={(e) => { e.preventDefault(); remove() }}
+                className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-600 flex items-center gap-2">
+                <Trash2 className="w-4 h-4" /> Delete
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="px-3 py-1.5 text-xs text-gray-400">Move to…</div>
+              {folders === null ? (
+                <div className="px-3 py-2 text-gray-400 flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Loading…
+                </div>
+              ) : (
+                <>
+                  {folders.map((f) => (
+                    <button key={f.id} onClick={(e) => { e.preventDefault(); moveTo(f.id) }} className={menuItem}>
+                      <Folder className="w-4 h-4" /> <span className="truncate">{f.name}</span>
+                    </button>
+                  ))}
+                  <button onClick={(e) => { e.preventDefault(); newFolderAndMove() }}
+                    className={`${menuItem} text-brand-blue`}>
+                    <Plus className="w-4 h-4" /> New folder…
+                  </button>
+                  <button onClick={(e) => { e.preventDefault(); moveTo(null) }}
+                    className={`${menuItem} text-gray-500`}>
+                    Remove from folder
+                  </button>
+                </>
+              )}
+            </>
           )}
-          <button
-            onClick={(e) => { e.preventDefault(); remove() }}
-            className="w-full text-left px-3 py-2 hover:bg-red-50 text-red-600 flex items-center gap-2"
-          >
-            <Trash2 className="w-4 h-4" /> Delete
-          </button>
         </div>
       )}
     </div>

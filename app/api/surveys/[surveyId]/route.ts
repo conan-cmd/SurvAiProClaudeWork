@@ -45,11 +45,19 @@ export async function PATCH(
     const allowed = [
       "clientName", "clientCompany", "clientEmail", "clientPhone", "clientAddress",
       "title", "serviceType", "isResidential", "clientPriorities", "accessNotes",
-      "measurements", "exclusions", "writtenDescription", "status",
+      "measurements", "exclusions", "writtenDescription", "status", "folderId",
     ]
     const data: Record<string, unknown> = {}
     for (const key of allowed) {
       if (key in body) data[key] = body[key]
+    }
+
+    // A non-null folder must belong to the caller's organization.
+    if (data.folderId) {
+      const folder = await db.folder.findFirst({
+        where: { id: String(data.folderId), organizationId: user.organizationId },
+      })
+      if (!folder) return NextResponse.json({ error: "Folder not found" }, { status: 400 })
     }
 
     const survey = await db.siteSurvey.update({

@@ -15,22 +15,51 @@ const STATUS_STYLES: Record<string, string> = {
   LOST: "bg-red-100 text-red-600",
 }
 
-export default async function ProposalsPage() {
+export default async function ProposalsPage({
+  searchParams,
+}: {
+  searchParams: { folder?: string }
+}) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
 
-  const proposals = await db.proposal.findMany({
-    where: { organizationId: user.organizationId },
-    orderBy: { updatedAt: "desc" },
-    include: {
-      pricingLineItems: true,
-      survey: { select: { title: true } },
-    },
-  })
+  const folderId = searchParams.folder
+  const [folders, proposals] = await Promise.all([
+    db.folder.findMany({
+      where: { organizationId: user.organizationId },
+      orderBy: { name: "asc" },
+    }),
+    db.proposal.findMany({
+      where: {
+        organizationId: user.organizationId,
+        ...(folderId ? { survey: { folderId } } : {}),
+      },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        pricingLineItems: true,
+        survey: { select: { title: true } },
+      },
+    }),
+  ])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       <h1 className="text-2xl font-bold text-brand-navy">Proposals</h1>
+
+      {folders.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Link href="/proposals"
+            className={`px-3 py-1.5 rounded-full font-medium border transition ${!folderId ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"}`}>
+            All
+          </Link>
+          {folders.map((f) => (
+            <Link key={f.id} href={`/proposals?folder=${f.id}`}
+              className={`px-3 py-1.5 rounded-full font-medium border transition ${folderId === f.id ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"}`}>
+              {f.name}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {proposals.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-10 text-center text-gray-400">

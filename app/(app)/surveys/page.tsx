@@ -6,28 +6,54 @@ import { getCurrentUser } from "@/lib/session"
 import { formatDate } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
 
-export default async function SurveysPage() {
+export default async function SurveysPage({
+  searchParams,
+}: {
+  searchParams: { folder?: string }
+}) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
 
-  const surveys = await db.siteSurvey.findMany({
-    where: { organizationId: user.organizationId },
-    orderBy: { updatedAt: "desc" },
-    include: {
-      proposal: { select: { id: true, status: true } },
-      _count: { select: { photos: true, voiceNotes: true } },
-    },
-  })
+  const folderId = searchParams.folder
+  const [folders, surveys] = await Promise.all([
+    db.folder.findMany({
+      where: { organizationId: user.organizationId },
+      orderBy: { name: "asc" },
+    }),
+    db.siteSurvey.findMany({
+      where: { organizationId: user.organizationId, ...(folderId ? { folderId } : {}) },
+      orderBy: { updatedAt: "desc" },
+      include: {
+        proposal: { select: { id: true, status: true } },
+        _count: { select: { photos: true, voiceNotes: true } },
+      },
+    }),
+  ])
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 overflow-x-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-brand-navy">Site surveys</h1>
         <Link href="/surveys/new"
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-blue text-white rounded-lg font-semibold hover:bg-blue-700 transition">
+          className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-brand-blue text-white rounded-lg font-semibold hover:bg-blue-700 transition">
           <Plus className="w-5 h-5" /> New survey
         </Link>
       </div>
+
+      {folders.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Link href="/surveys"
+            className={`px-3 py-1.5 rounded-full font-medium border transition ${!folderId ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"}`}>
+            All
+          </Link>
+          {folders.map((f) => (
+            <Link key={f.id} href={`/surveys?folder=${f.id}`}
+              className={`px-3 py-1.5 rounded-full font-medium border transition ${folderId === f.id ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"}`}>
+              {f.name}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {surveys.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-10 text-center text-gray-400">
