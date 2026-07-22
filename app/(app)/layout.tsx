@@ -1,12 +1,13 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/session"
-import { LayoutDashboard, ClipboardList, FileText, Images, Settings } from "lucide-react"
+import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings } from "lucide-react"
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/surveys", label: "Surveys", icon: ClipboardList },
   { href: "/proposals", label: "Proposals", icon: FileText },
+  { href: "/customers", label: "Customers", icon: Users },
   { href: "/gallery", label: "Gallery", icon: Images },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
@@ -44,7 +45,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       {/* Bottom tab bar (mobile) */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t z-40">
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {NAV.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
