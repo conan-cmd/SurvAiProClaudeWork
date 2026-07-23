@@ -32,6 +32,7 @@ type Org = {
   headshotUrl: string | null
   signatureImageUrl: string | null
   membersViewAll: boolean
+  showCoordinatesOnProposal: boolean
 }
 
 type DepositRule = { type: "NONE" | "PERCENT" | "FIXED"; value: number }
@@ -244,6 +245,7 @@ export default function SettingsPage() {
           depositRules: org.depositRules || "",
           signOffName: org.signOffName || "",
           membersViewAll: org.membersViewAll,
+          showCoordinatesOnProposal: org.showCoordinatesOnProposal,
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
@@ -409,6 +411,12 @@ export default function SettingsPage() {
               ))}
             </select>
           </div>
+          <label className="sm:col-span-2 flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <input type="checkbox" checked={org.showCoordinatesOnProposal}
+              onChange={(e) => set("showCoordinatesOnProposal", e.target.checked)}
+              className="rounded accent-blue-600" />
+            Show GPS coordinates &amp; what3words on proposals
+          </label>
         </div>
       </section>
 

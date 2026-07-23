@@ -37,7 +37,7 @@ export default async function SharedProposalPage({
           organization: {
             select: {
               name: true, logoUrl: true, brandColor: true, secondaryColor: true,
-              email: true, phone: true, website: true, depositRules: true,
+              email: true, phone: true, website: true, depositRules: true, showCoordinatesOnProposal: true,
               signOffName: true, headshotUrl: true, signatureImageUrl: true,
             },
           },
@@ -109,6 +109,7 @@ export default async function SharedProposalPage({
             latitude: p.survey.latitude,
             longitude: p.survey.longitude,
             what3words: p.survey.what3words,
+            showCoordinates: p.organization.showCoordinatesOnProposal,
             organization: p.organization,
             preparer: p.createdBy,
             hideOptionalExtras: true,

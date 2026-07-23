@@ -26,7 +26,7 @@ export async function GET(
       organization: {
         select: {
           name: true, logoUrl: true, brandColor: true, secondaryColor: true,
-          email: true, phone: true, website: true,
+          email: true, phone: true, website: true, showCoordinatesOnProposal: true,
           signOffName: true, headshotUrl: true, signatureImageUrl: true,
         },
       },

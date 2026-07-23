@@ -24,6 +24,7 @@ const updateOrgSchema = z.object({
   mainServices: z.array(z.string()).optional(),
   areasCovered: z.array(z.string()).optional(),
   membersViewAll: z.boolean().optional(),
+  showCoordinatesOnProposal: z.boolean().optional(),
   yearEstablished: z.number().int().min(1800).max(2100).optional().nullable(),
   mainUSP: z.string().optional(),
   reviewCount: z.number().int().min(0).optional().nullable(),

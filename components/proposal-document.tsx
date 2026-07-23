@@ -55,6 +55,8 @@ export type ProposalDocumentData = {
   latitude?: number | null
   longitude?: number | null
   what3words?: string | null
+  // Org toggle: whether to show GPS/what3words on the cover (default true)
+  showCoordinates?: boolean
   // Client view handles optional extras interactively (checkboxes to add to the
   // total), so the static "Optional extras" list is suppressed there.
   hideOptionalExtras?: boolean
@@ -117,7 +119,7 @@ function CoverSection({ section, data }: { section: Section; data: ProposalDocum
           {company ? `, ${company}` : ""}
         </p>
         <p className="opacity-60">{data.siteAddress || cover.siteAddress}</p>
-        {data.latitude != null && data.longitude != null && (
+        {data.latitude != null && data.longitude != null && data.showCoordinates !== false && (
           <div className="opacity-60 text-sm mt-2 space-y-0.5">
             <p>
               <span className="opacity-70">GPS location:</span>{" "}

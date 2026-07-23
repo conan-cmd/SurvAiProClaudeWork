@@ -26,6 +26,7 @@ type Survey = {
   writtenDescription: string | null
   latitude: number | null
   longitude: number | null
+  what3words: string | null
   photos: Photo[]
   voiceNotes: VoiceNoteWithTranscript[]
   proposal: { id: string; status: string } | null
@@ -163,6 +164,12 @@ export default function SurveyDetailPage() {
           <p className="text-gray-500 text-sm mt-0.5">
             {survey.clientName} · {survey.clientAddress}
           </p>
+          {survey.latitude != null && survey.longitude != null && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              GPS {survey.latitude.toFixed(5)}, {survey.longitude.toFixed(5)}
+              {survey.what3words ? ` · ///${survey.what3words}` : ""}
+            </p>
+          )}
         </div>
         <span className="text-xs text-gray-400 whitespace-nowrap pt-2">
           {saveState === "saving" && "Saving…"}

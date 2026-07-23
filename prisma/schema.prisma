@@ -111,6 +111,8 @@ model Organization {
 
   // When true, team members can view everyone's surveys/proposals (owners always can)
   membersViewAll        Boolean         @default(false)
+  // Show GPS coordinates + what3words on the proposal cover
+  showCoordinatesOnProposal Boolean     @default(true)
   galleryPhotos         GalleryPhoto[]
 
   createdAt             DateTime        @default(now())

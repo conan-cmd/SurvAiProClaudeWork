@@ -58,6 +58,7 @@ type ProposalData = {
     email: string | null
     phone: string | null
     website: string | null
+    showCoordinatesOnProposal: boolean
   }
 }
 
@@ -330,6 +331,7 @@ export default function ProposalEditorPage() {
     latitude: proposal.survey.latitude,
     longitude: proposal.survey.longitude,
     what3words: proposal.survey.what3words,
+    showCoordinates: proposal.organization.showCoordinatesOnProposal,
     organization: proposal.organization,
     preparer: proposal.createdBy,
   }
