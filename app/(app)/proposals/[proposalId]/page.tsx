@@ -10,6 +10,7 @@ import {
 import { ProposalDocument } from "@/components/proposal-document"
 import { PricingEditor, EditableLineItem } from "@/components/pricing-editor"
 import { uploadSurveyPhotos, type UploadedPhoto } from "@/lib/photo-upload"
+import { RamsButton } from "@/components/rams-button"
 
 type Section = {
   id: string
@@ -366,6 +367,8 @@ export default function ProposalEditorPage() {
             className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
             <Printer className="w-4 h-4" /> PDF
           </button>
+          <RamsButton surveyId={proposal.survey.id}
+            className="inline-flex items-center gap-1.5 px-3 py-2 border border-amber-200 rounded-lg text-sm font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50" />
           <button onClick={createShareLink} disabled={sharing}
             className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
             <Link2 className="w-4 h-4" /> Share
