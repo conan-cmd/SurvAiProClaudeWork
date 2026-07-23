@@ -33,6 +33,8 @@ export async function sendEmail(params: {
   subject: string
   html: string
   replyTo?: string | null
+  // Plain-text alternative — improves deliverability and inbox placement.
+  text?: string
   // When set, and that user has connected their Gmail, the email is sent from
   // their own address via the Gmail API instead of the shared Resend sender.
   fromUserId?: string
@@ -88,6 +90,7 @@ export async function sendEmail(params: {
       ...(params.replyTo ? { reply_to: params.replyTo } : {}),
       subject: params.subject,
       html: params.html,
+      ...(params.text ? { text: params.text } : {}),
     }),
     signal: AbortSignal.timeout(15000),
   })
