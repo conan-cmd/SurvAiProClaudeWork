@@ -20,11 +20,13 @@ export async function GET(request: NextRequest) {
   const type = sp.get("type") === "streetview" ? "streetview" : "aerial"
   const headingRaw = parseFloat(sp.get("heading") || "")
   const heading = Number.isNaN(headingRaw) ? "" : `&heading=${headingRaw}`
+  const zoomRaw = parseInt(sp.get("zoom") || "20", 10)
+  const zoom = Number.isNaN(zoomRaw) ? 20 : Math.min(21, Math.max(15, zoomRaw))
 
   const url =
     type === "streetview"
       ? `https://maps.googleapis.com/maps/api/streetview?size=640x480&location=${lat},${lng}&fov=75${heading}&key=${key}`
-      : `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=20&scale=2&size=640x480&maptype=hybrid&markers=color:red%7C${lat},${lng}&key=${key}`
+      : `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&scale=2&size=640x480&maptype=hybrid&markers=color:red%7C${lat},${lng}&key=${key}`
 
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(10000) })
