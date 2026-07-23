@@ -60,6 +60,7 @@ type ProposalData = {
     website: string | null
     showCoordinatesOnProposal: boolean
   }
+  views: { totalSeconds: number; sections: string | null; createdAt: string }[]
 }
 
 const STATUSES = ["DRAFT", "READY", "SENT", "SIGNED", "DEPOSIT_PAID", "WON", "LOST"] as const
@@ -401,6 +402,44 @@ export default function ProposalEditorPage() {
           </button>
         </div>
       )}
+
+      {proposal.views.length > 0 && (() => {
+        const viewCount = proposal.views.length
+        const totalRead = proposal.views.reduce((s, v) => s + v.totalSeconds, 0)
+        const avg = Math.round(totalRead / viewCount)
+        const secByTitle: Record<string, number> = {}
+        for (const v of proposal.views) {
+          try {
+            const arr = v.sections ? (JSON.parse(v.sections) as { title: string; seconds: number }[]) : []
+            for (const s of arr) secByTitle[s.title] = (secByTitle[s.title] || 0) + s.seconds
+          } catch {
+            /* ignore malformed */
+          }
+        }
+        const top = Object.entries(secByTitle).sort((a, b) => b[1] - a[1]).slice(0, 5)
+        const fmt = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`)
+        return (
+          <div className="no-print bg-white rounded-xl shadow-sm p-4 text-sm">
+            <div className="font-semibold text-brand-navy mb-2">Client engagement</div>
+            <div className="flex flex-wrap gap-4 text-gray-600 mb-3">
+              <span><strong>{viewCount}</strong> read{viewCount > 1 ? "s" : ""}</span>
+              <span>Total time <strong>{fmt(totalRead)}</strong></span>
+              <span>Avg <strong>{fmt(avg)}</strong></span>
+            </div>
+            {top.length > 0 && (
+              <div className="space-y-1">
+                <div className="text-xs text-gray-400">Time on each section</div>
+                {top.map(([title, secs]) => (
+                  <div key={title} className="flex items-center gap-2">
+                    <span className="text-gray-600 truncate flex-1 min-w-0">{title}</span>
+                    <span className="text-gray-400 text-xs whitespace-nowrap">{fmt(secs)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {mode === "preview" ? (
         <>

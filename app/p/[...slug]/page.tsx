@@ -5,6 +5,7 @@ import { AcceptanceBlock } from "@/components/signature-pad"
 import { DepositCard } from "@/components/deposit-card"
 import { computeDeposit, retrieveCheckoutSession } from "@/lib/stripe"
 import { calculateProposalTotals, formatCurrency, lineGross } from "@/lib/utils"
+import { ReadTracker } from "@/components/read-tracker"
 
 export const dynamic = "force-dynamic"
 
@@ -195,6 +196,7 @@ export default async function SharedProposalPage({
       <p className="text-center text-xs text-gray-400 mt-6">
         Prepared with SurvAIPro
       </p>
+      <ReadTracker token={token} />
     </main>
   )
 }

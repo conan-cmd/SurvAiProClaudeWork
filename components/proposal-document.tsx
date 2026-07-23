@@ -95,6 +95,7 @@ function CoverSection({ section, data }: { section: Section; data: ProposalDocum
 
   return (
     <div
+      data-track-section="Cover"
       className="doc-page flex flex-col justify-between rounded-lg overflow-hidden"
       style={{ backgroundColor: brand, color: textColor, minHeight: "500px" }}
     >
@@ -366,7 +367,8 @@ export function ProposalDocument({ data }: { data: ProposalDocumentData }) {
           return <CoverSection key={section.id} section={section} data={data} />
         }
         return (
-          <section key={section.id} className="py-8 px-2 md:px-0 break-inside-avoid-page">
+          <section key={section.id} data-track-section={section.title}
+            className="py-8 px-2 md:px-0 break-inside-avoid-page">
             <h2
               className="text-xl font-bold mb-1"
               style={{ color: data.organization.brandColor }}

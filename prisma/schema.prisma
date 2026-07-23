@@ -320,9 +320,27 @@ model Proposal {
   updatedAt             DateTime        @updatedAt
 
   shareLinks            ShareLink[]
+  views                 ProposalView[]
 
   @@index([organizationId])
   @@index([status])
+}
+
+// One record per client viewing session (anonymous). Tracks how long the client
+// spent reading and which sections held their attention.
+model ProposalView {
+  id                    String          @id @default(cuid())
+  proposalId            String
+  proposal              Proposal        @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  sessionId             String          @unique // client-generated per page load
+  totalSeconds          Int             @default(0)
+  sections              String? // JSON: [{ title, seconds }]
+
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([proposalId])
 }
 
 model ShareLink {

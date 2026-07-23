@@ -33,6 +33,10 @@ export async function GET(
       createdBy: {
         select: { name: true, signOffName: true, headshotUrl: true, signatureImageUrl: true },
       },
+      views: {
+        select: { totalSeconds: true, sections: true, createdAt: true },
+        orderBy: { updatedAt: "desc" },
+      },
     },
   })
 
