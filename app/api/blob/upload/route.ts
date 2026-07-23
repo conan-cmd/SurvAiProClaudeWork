@@ -28,6 +28,10 @@ export async function POST(request: NextRequest) {
             "video/mp4", "video/webm", "video/quicktime",
             "audio/webm", "audio/mp4", "audio/mpeg", "audio/wav", "audio/x-m4a", "audio/ogg",
             "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif",
+            // Company documents (insurance, certs) attached to proposals.
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             // iPhone HEIC straight from the camera roll sometimes reports no /
             // a generic type - allow octet-stream so those still upload.
             "application/octet-stream",

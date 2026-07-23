@@ -110,6 +110,7 @@ model Organization {
   templates             ProposalTemplate[]
   folders               Folder[]
   rams                  Rams[]
+  documents             OrgDocument[]
 
   // When true, team members can view everyone's surveys/proposals (owners always can)
   membersViewAll        Boolean         @default(false)
@@ -203,6 +204,21 @@ enum SurveyStatus {
   DRAFT
   SUBMITTED
   ARCHIVED
+}
+
+// Reusable company documents (insurance, certs, accreditations) that can be
+// attached to proposal emails.
+model OrgDocument {
+  id                    String          @id @default(cuid())
+  organizationId        String
+  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name                  String
+  fileUrl               String
+  fileType              String?
+  fileSize              Int             @default(0)
+  createdAt             DateTime        @default(now())
+
+  @@index([organizationId])
 }
 
 model Folder {

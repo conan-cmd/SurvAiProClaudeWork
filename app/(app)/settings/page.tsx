@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Loader2, Upload, Sparkles, Copy, Globe, Check } from "lucide-react"
+import { Loader2, Upload, Sparkles, Copy, Globe, Check, Trash2 } from "lucide-react"
 import { SignatureDraw } from "@/components/signature-draw"
 
 type Org = {
+  id: string
   name: string
   website: string | null
   logoUrl: string | null
@@ -72,6 +73,9 @@ export default function SettingsPage() {
   const [inviting, setInviting] = useState(false)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [referral, setReferral] = useState<{ code: string | null; count: number } | null>(null)
+  const [documents, setDocuments] = useState<{ id: string; name: string; fileUrl: string }[]>([])
+  const [uploadingDoc, setUploadingDoc] = useState(false)
+  const docInput = useRef<HTMLInputElement>(null)
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -85,6 +89,7 @@ export default function SettingsPage() {
     fetch("/api/me").then((r) => r.json()).then(setMe).catch(() => {})
     fetch("/api/team").then((r) => r.json()).then(setTeam).catch(() => {})
     fetch("/api/referral").then((r) => r.json()).then(setReferral).catch(() => {})
+    fetch("/api/documents").then((r) => r.json()).then(setDocuments).catch(() => {})
   }, [])
 
   // Surface the outcome of the "connect email" OAuth round-trip.
@@ -166,6 +171,42 @@ export default function SettingsPage() {
     } catch {
       toast.error("Couldn't copy — select the link and copy it manually")
     }
+  }
+
+  const uploadDoc = async (file: File | undefined) => {
+    if (!file || !org) return
+    setUploadingDoc(true)
+    try {
+      const { upload } = await import("@vercel/blob/client")
+      const blob = await upload(
+        `organizations/${org.id}/documents/${Date.now()}-${file.name}`,
+        file,
+        { access: "public", handleUploadUrl: "/api/blob/upload" }
+      )
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: file.name, fileUrl: blob.url, fileType: file.type, fileSize: file.size }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error || "Upload failed")
+      const doc = await res.json()
+      setDocuments((d) => [doc, ...d])
+      toast.success("Document uploaded")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed")
+    } finally {
+      setUploadingDoc(false)
+      if (docInput.current) docInput.current.value = ""
+    }
+  }
+
+  const deleteDoc = async (id: string) => {
+    if (!confirm("Delete this document?")) return
+    const res = await fetch(`/api/documents/${id}`, { method: "DELETE" })
+    if (res.ok) {
+      setDocuments((d) => d.filter((x) => x.id !== id))
+      toast.success("Deleted")
+    } else toast.error("Couldn't delete")
   }
 
   const disconnectEmail = async () => {
@@ -452,6 +493,33 @@ export default function SettingsPage() {
             className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-semibold hover:bg-gray-50 w-fit">
             <Globe className="w-4 h-4" /> Connect Google email
           </a>
+        )}
+      </section>
+
+      <section className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+        <h2 className="font-semibold text-brand-navy">Document library</h2>
+        <p className="text-sm text-gray-500">
+          Upload insurance certificates, accreditations, etc. You&apos;ll be able to attach these to proposal emails.
+        </p>
+        <input ref={docInput} type="file" accept="application/pdf,image/*,.doc,.docx" className="hidden"
+          onChange={(e) => uploadDoc(e.target.files?.[0])} />
+        <button onClick={() => docInput.current?.click()} disabled={uploadingDoc}
+          className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50 w-fit">
+          {uploadingDoc ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+          {uploadingDoc ? "Uploading…" : "Upload document"}
+        </button>
+        {documents.length > 0 && (
+          <ul className="divide-y border-t">
+            {documents.map((d) => (
+              <li key={d.id} className="flex items-center justify-between py-2 gap-2">
+                <a href={d.fileUrl} target="_blank" rel="noopener noreferrer"
+                  className="text-sm text-brand-blue truncate min-w-0 hover:underline">{d.name}</a>
+                <button onClick={() => deleteDoc(d.id)} className="p-1.5 text-gray-300 hover:text-red-600 shrink-0" aria-label="Delete document">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
