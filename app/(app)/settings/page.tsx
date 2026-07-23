@@ -71,6 +71,7 @@ export default function SettingsPage() {
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviting, setInviting] = useState(false)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [referral, setReferral] = useState<{ code: string | null; count: number } | null>(null)
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -83,6 +84,7 @@ export default function SettingsPage() {
       .catch(() => toast.error("Failed to load settings"))
     fetch("/api/me").then((r) => r.json()).then(setMe).catch(() => {})
     fetch("/api/team").then((r) => r.json()).then(setTeam).catch(() => {})
+    fetch("/api/referral").then((r) => r.json()).then(setReferral).catch(() => {})
   }, [])
 
   // Surface the outcome of the "connect email" OAuth round-trip.
@@ -151,6 +153,16 @@ export default function SettingsPage() {
     try {
       await navigator.clipboard.writeText(inviteLink)
       toast.success("Copied to clipboard")
+    } catch {
+      toast.error("Couldn't copy — select the link and copy it manually")
+    }
+  }
+
+  const copyReferral = async () => {
+    if (!referral?.code) return
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/auth/signup?ref=${referral.code}`)
+      toast.success("Referral link copied")
     } catch {
       toast.error("Couldn't copy — select the link and copy it manually")
     }
@@ -440,6 +452,29 @@ export default function SettingsPage() {
             className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-semibold hover:bg-gray-50 w-fit">
             <Globe className="w-4 h-4" /> Connect Google email
           </a>
+        )}
+      </section>
+
+      <section className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+        <h2 className="font-semibold text-brand-navy">Refer another business</h2>
+        <p className="text-sm text-gray-500">
+          Share your link with another service business.
+          {referral && referral.count > 0 ? ` ${referral.count} signed up so far.` : ""}
+          <span className="block text-xs text-gray-400 mt-0.5">A free-month reward is coming with billing.</span>
+        </p>
+        {referral?.code ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-blue/30 bg-blue-50 px-3 py-2">
+            <input readOnly
+              value={`${typeof window !== "undefined" ? window.location.origin : ""}/auth/signup?ref=${referral.code}`}
+              onFocus={(e) => e.currentTarget.select()}
+              className="flex-1 min-w-0 bg-white border rounded-md px-2 py-1.5 text-sm text-gray-700" />
+            <button onClick={copyReferral}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+              <Copy className="w-4 h-4" /> Copy
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">Generating your link…</p>
         )}
       </section>
 

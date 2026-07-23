@@ -8,6 +8,7 @@ const registerSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   companyName: z.string().trim().min(1, "Company name is required"),
   name: z.string().trim().optional(),
+  referredByCode: z.string().trim().max(30).optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -34,10 +35,21 @@ export async function POST(request: NextRequest) {
 
     const hashedPassword = await hash(password, 12)
 
+    // Only honour a referral code that matches a real org.
+    let referredByCode: string | undefined
+    if (parsed.data.referredByCode) {
+      const referrer = await db.organization.findUnique({
+        where: { referralCode: parsed.data.referredByCode },
+        select: { id: true },
+      })
+      if (referrer) referredByCode = parsed.data.referredByCode
+    }
+
     // Create organization and owner user together
     const organization = await db.organization.create({
       data: {
         name: companyName,
+        ...(referredByCode ? { referredByCode } : {}),
         users: {
           create: {
             email,

@@ -47,6 +47,10 @@ export default function SignupPage() {
     }
 
     try {
+      const referredByCode =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("ref") || undefined
+          : undefined
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -55,6 +59,7 @@ export default function SignupPage() {
           password: formData.password,
           companyName: formData.companyName,
           name: formData.fullName,
+          referredByCode,
         }),
       })
 

@@ -113,6 +113,10 @@ model Organization {
   membersViewAll        Boolean         @default(false)
   // Show GPS coordinates + what3words on the proposal cover
   showCoordinatesOnProposal Boolean     @default(true)
+
+  // Referral programme
+  referralCode          String?         @unique
+  referredByCode        String?
   galleryPhotos         GalleryPhoto[]
 
   createdAt             DateTime        @default(now())
