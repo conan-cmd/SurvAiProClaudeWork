@@ -4,6 +4,7 @@ import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { formatCurrency, formatDate, calculateProposalTotals } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
+import { ProposalStatus } from "@prisma/client"
 
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-600",
@@ -18,7 +19,7 @@ const STATUS_STYLES: Record<string, string> = {
 export default async function ProposalsPage({
   searchParams,
 }: {
-  searchParams: { folder?: string; scope?: string }
+  searchParams: { folder?: string; scope?: string; status?: string }
 }) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
@@ -26,6 +27,10 @@ export default async function ProposalsPage({
   const folderId = searchParams.folder
   const canViewAll = user.role === "OWNER" || user.organization.membersViewAll
   const viewingAll = searchParams.scope === "all" && canViewAll
+  const statusFilter =
+    searchParams.status && searchParams.status in STATUS_STYLES
+      ? (searchParams.status as ProposalStatus)
+      : undefined
   const buildLink = (folder?: string, all?: boolean) => {
     const p = new URLSearchParams()
     if (all) p.set("scope", "all")
@@ -44,6 +49,7 @@ export default async function ProposalsPage({
         organizationId: user.organizationId,
         ...(folderId ? { survey: { folderId } } : {}),
         ...(viewingAll ? {} : { createdById: user.id }),
+        ...(statusFilter ? { status: statusFilter } : {}),
       },
       orderBy: { updatedAt: "desc" },
       include: {
@@ -83,6 +89,15 @@ export default async function ProposalsPage({
               {f.name}
             </Link>
           ))}
+        </div>
+      )}
+
+      {statusFilter && (
+        <div className="text-sm">
+          <span className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-brand-blue font-medium">
+            Showing {statusFilter.replace(/_/g, " ")}
+            <Link href={buildLink(folderId, viewingAll)} className="text-gray-400 hover:text-gray-600" aria-label="Clear filter">✕</Link>
+          </span>
         </div>
       )}
 

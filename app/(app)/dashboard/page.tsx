@@ -159,19 +159,19 @@ export default async function DashboardPage({
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-white rounded-xl p-4 shadow-sm">
+        <Link href="/proposals?scope=all" className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition block">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
             <TrendingUp className="w-4 h-4" /> Total quoted
           </div>
           <div className="text-xl font-bold text-brand-navy">{formatCurrency(totalQuoted)}</div>
-        </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm">
+        </Link>
+        <Link href="/proposals?scope=all" className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition block">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
             <FileText className="w-4 h-4" /> Proposals
           </div>
           <div className="text-xl font-bold text-brand-navy">{inRange.length}</div>
           <div className="text-xs text-gray-400">avg {formatCurrency(avgValue)}</div>
-        </div>
+        </Link>
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
             <Clock className="w-4 h-4" /> Draft generated in
@@ -180,20 +180,20 @@ export default async function DashboardPage({
             {avgGenSeconds === null ? "—" : `${avgGenSeconds}s avg`}
           </div>
         </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm">
+        <Link href="/proposals?scope=all&status=SENT" className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition block">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
             <FileText className="w-4 h-4" /> Sent
           </div>
           <div className="text-xl font-bold text-brand-navy">{sentCount}</div>
-        </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm">
+        </Link>
+        <Link href="/proposals?scope=all&status=DEPOSIT_PAID" className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition block">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
             <TrendingUp className="w-4 h-4 text-brand-green" /> Deposits collected
           </div>
           <div className="text-xl font-bold text-emerald-600">{formatCurrency(depositsTotal)}</div>
           <div className="text-xs text-gray-400">{depositsPaid.length} paid</div>
-        </div>
-        <div className="bg-white rounded-xl p-4 shadow-sm">
+        </Link>
+        <Link href="/proposals?scope=all&status=WON" className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition block">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
             <TrendingUp className="w-4 h-4 text-brand-green" /> Won / Lost
           </div>
@@ -204,7 +204,7 @@ export default async function DashboardPage({
             {" / "}
             <span className="text-red-500">{byStatus("LOST").length}</span>
           </div>
-        </div>
+        </Link>
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
