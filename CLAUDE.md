@@ -58,8 +58,10 @@ by the hosting contractor — the deployed app does not read the local `.env`.
 | `GOOGLE_MAPS_API_KEY` | geocode, imagery, autocomplete | ✅ set |
 | `WHAT3WORDS_API_KEY` | w3w address | ✅ key `FKJ7G3FG` set and **verified working** (convert-to-3wa returns results). Earlier key `2QDI2U3F` was QuotaExceeded — replaced |
 | `RESEND_API_KEY` | email sending | ✅ **already set on Vercel (~2026-07-19) and works.** Local `.env` is empty (fine — local dev only). The real past blocker was the unverified sender domain, NOT the key |
-| `EMAIL_FROM` | verified sender | ✅ **already set on Vercel (~2026-07-19)** + local (`LBC Clean <proposals@lbcclean.co.uk>`). Just confirm the Vercel value is a sender on the now-verified `lbcclean.co.uk` |
+| `EMAIL_FROM` | verified sender | ✅ set on Vercel (was **empty** → send failed; fixed 2026-07-22 to `LBC Clean <proposals@lbcclean.co.uk>`). Resend domain `lbcclean.co.uk` verified 2026-07-22. Sending works. |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob storage | ✅ set on Vercel (prod uploads use Blob) |
+| `WHAT3WORDS_API_KEY` (Vercel) | what3words | ✅ added to Vercel 2026-07-22 (`FKJ7G3FG`) |
+| `PUBLIC_BASE_URL` | client-facing link domain | ✅ set on Vercel = `https://survai-pro.vercel.app` (used by proposal/invite/pay links via `lib/public-url.ts`). ⚠️ `app.survaipro.com` has NO DNS — don't point here. Branded option: `proposals.lbcclean.co.uk` (added to Vercel; needs a CNAME `proposals → cname.vercel-dns.com` at Cloudflare, then switch this var). |
 | `STRIPE_SECRET_KEY` | deposits | ✅ test key |
 
 ## Known gotchas / decisions
@@ -87,6 +89,16 @@ All typecheck-clean AND `next build` passes (exit 0). Commits on `master`: b3ce3
 
 **Deploy path (IMPORTANT — no git remote here):** this working copy has NO git remote; the app is linked to Vercel via `.vercel/project.json` (CLI). To ship: run `npx vercel --prod` from the repo (needs an interactive Vercel login — must be done by Conan/hosting), and run the schema migration against the **production** DB (`selectedOptionalIds`, `agreedTotal`). `npm run db:push` locally handles the local DB only.
 - **Clipboard fix (done 2026-07-21)** — proposal Share now shows a copyable box + Copy/native-Share buttons (iOS Safari lost the user gesture after the async link creation and silently failed while claiming success). Same bug pattern still present in `app/(app)/settings/page.tsx:102` (team-invite copy).
+
+## Session 2026-07-22/23 (overnight) — all shipped to prod
+
+Big batch, all deployed + prod DB migrated. Schema additions this session (all live on Neon prod): `SiteSurvey.what3words`; `Proposal.selectedOptionalIds`, `Proposal.agreedTotal`; `User.gmailAddress`, `User.gmailRefreshToken`; `Folder` model + `SiteSurvey.folderId`; `Organization.membersViewAll`, `Organization.showCoordinatesOnProposal`, `Organization.referralCode` (unique) + `Organization.referredByCode`; `ProposalView` model + `Proposal.views`.
+
+Shipped: send-email fixed (empty EMAIL_FROM + Resend domain verify); branded proposal cover (`org.brandColor`, contrast-aware); live cover (title/client/address) + live photos (survey "In proposal" set, no snapshot); what3words populated + labelled + org toggle to show/hide; editable survey title; GPS/w3w shown on survey; folders + move-to-folder + filter; customers view; Mine/Everyone + creator labels (owner/`membersViewAll` gated); clickable dashboard tiles → filtered proposals; bottom Preview button; Add text/Add photos; shorter links (3-word slug + 16-byte token); personal/plain proposal email + plain-text (Primary inbox); Tier 2 Gmail send (needs Google Cloud setup — [[gmail-send-tier2]]); read-analytics (`ReadTracker` → `/api/p/[token]/track` → editor "Client engagement" panel); aerial zoom +/- controls; referral link + tracking (reward needs billing).
+
+**Outstanding:** #19 share-as-PDF (deferred — reliable PDF-file generation needs a headless renderer + testing; the editor's `window.print()` "PDF" button works as interim). #20 per-tenant custom domains (Vercel side done; **needs Conan to add the Cloudflare CNAME** `proposals → cname.vercel-dns.com`, then flip `PUBLIC_BASE_URL`). #24 best-fix is Tier 2 Gmail (needs the Google Cloud config). True pinch-to-zoom (interactive map lib, e.g. Leaflet) deferred — only zoom buttons shipped.
+
+**Deploy process note:** the overnight deploys used `<vercel token>` and `<prod DATABASE_URL>` pasted in chat — Conan should rotate both. ⚠️ **Migrate prod FIRST, verify, THEN deploy** — a combined `db push; ... vercel` (joined by `;`) once deployed code ahead of a failed migration (unique-constraint "data loss" false alarm) and briefly broke authed pages until `--accept-data-loss` was applied. For additive nullable + unique columns, `--accept-data-loss` is safe.
 
 ## Conventions
 
