@@ -34,7 +34,7 @@ export async function GET(
         select: { name: true, signOffName: true, headshotUrl: true, signatureImageUrl: true },
       },
       views: {
-        select: { totalSeconds: true, sections: true, createdAt: true },
+        select: { totalSeconds: true, sections: true, createdAt: true, updatedAt: true },
         orderBy: { updatedAt: "desc" },
       },
     },

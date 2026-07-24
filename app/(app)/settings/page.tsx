@@ -377,7 +377,13 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-brand-navy">Settings</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-brand-navy">Settings</h1>
+        <a href="/onboarding/branding"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-blue hover:underline">
+          <Sparkles className="w-4 h-4" /> Run the guided setup
+        </a>
+      </div>
 
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
         <h2 className="font-semibold text-brand-navy">Company & branding</h2>

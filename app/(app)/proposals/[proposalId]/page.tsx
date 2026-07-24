@@ -63,7 +63,7 @@ type ProposalData = {
     website: string | null
     showCoordinatesOnProposal: boolean
   }
-  views: { totalSeconds: number; sections: string | null; createdAt: string }[]
+  views: { totalSeconds: number; sections: string | null; createdAt: string; updatedAt: string }[]
 }
 
 const STATUSES = ["DRAFT", "READY", "SENT", "SIGNED", "DEPOSIT_PAID", "WON", "LOST"] as const
@@ -459,13 +459,28 @@ export default function ProposalEditorPage() {
         }
         const top = Object.entries(secByTitle).sort((a, b) => b[1] - a[1]).slice(0, 5)
         const fmt = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`)
+        const firstOpened = new Date(Math.min(...proposal.views.map((v) => new Date(v.createdAt).getTime())))
+        const lastOpened = new Date(Math.max(...proposal.views.map((v) => new Date(v.updatedAt).getTime())))
+        const rel = (d: Date) => {
+          const mins = Math.round((Date.now() - d.getTime()) / 60000)
+          if (mins < 1) return "just now"
+          if (mins < 60) return `${mins}m ago`
+          const hrs = Math.round(mins / 60)
+          if (hrs < 24) return `${hrs}h ago`
+          return `${Math.round(hrs / 24)}d ago`
+        }
+        const dt = (d: Date) => d.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
         return (
           <div className="no-print bg-white rounded-xl shadow-sm p-4 text-sm">
             <div className="font-semibold text-brand-navy mb-2">Client engagement</div>
-            <div className="flex flex-wrap gap-4 text-gray-600 mb-3">
+            <div className="flex flex-wrap gap-4 text-gray-600 mb-2">
               <span><strong>{viewCount}</strong> read{viewCount > 1 ? "s" : ""}</span>
               <span>Total time <strong>{fmt(totalRead)}</strong></span>
               <span>Avg <strong>{fmt(avg)}</strong></span>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mb-3">
+              <span>First opened <strong className="text-gray-700">{dt(firstOpened)}</strong></span>
+              <span>Last opened <strong className="text-gray-700">{rel(lastOpened)}</strong></span>
             </div>
             {top.length > 0 && (
               <div className="space-y-1">

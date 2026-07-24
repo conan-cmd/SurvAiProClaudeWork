@@ -7,6 +7,15 @@ import { formatCurrency, formatDate, calculateProposalTotals } from "@/lib/utils
 import { ItemActions } from "@/components/item-actions"
 import { ProposalStatus } from "@prisma/client"
 
+function relTime(d: Date | string): string {
+  const mins = Math.round((Date.now() - new Date(d).getTime()) / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.round(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.round(hrs / 24)}d ago`
+}
+
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-600",
   READY: "bg-blue-100 text-blue-700",
@@ -58,6 +67,7 @@ export default async function ProposalsPage({
         survey: { select: { title: true } },
         createdBy: { select: { name: true, email: true } },
         _count: { select: { views: true } },
+        views: { select: { updatedAt: true }, orderBy: { updatedAt: "desc" }, take: 1 },
       },
     }),
   ])
@@ -124,7 +134,7 @@ export default async function ProposalsPage({
                   {p._count.views > 0 && (
                     <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700"
                       title={`Opened by the client${p._count.views > 1 ? ` — ${p._count.views} times` : ""}`}>
-                      <Eye className="w-3.5 h-3.5" /> Viewed
+                      <Eye className="w-3.5 h-3.5" /> Viewed{p.views[0] ? ` ${relTime(p.views[0].updatedAt)}` : ""}
                     </span>
                   )}
                   <span className={`whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[p.status]}`}>
