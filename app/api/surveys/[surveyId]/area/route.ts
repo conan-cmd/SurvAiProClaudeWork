@@ -14,6 +14,7 @@ const schema = z.object({
   })).max(50),
   zoom: z.number().int().min(15).max(21).optional(),
   showOnProposal: z.boolean().optional(),
+  renderedImage: z.string().startsWith("data:image/").max(8_000_000).optional(),
 })
 
 // Saves the site markup (areas, lines, annotations), computes the totals
@@ -68,6 +69,7 @@ export async function POST(
       zoom,
       measurements,
       include: showOnProposal,
+      renderedImage: parsed.data.renderedImage,
     })
   } catch (err) {
     console.error("Measurement imagery failed:", err)

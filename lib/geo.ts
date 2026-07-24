@@ -185,9 +185,12 @@ export async function attachMeasurementImagery(params: {
   zoom?: number
   measurements: Measurement[]
   include: boolean
+  // A client-rendered PNG/JPEG data URL with annotation text drawn on the image.
+  // When present it's stored as-is (no Google Static Map fetch).
+  renderedImage?: string
 }): Promise<void> {
   const key = KEY()
-  const { surveyId, organizationId, lat, lng, zoom, measurements, include } = params
+  const { surveyId, organizationId, lat, lng, zoom, measurements, include, renderedImage } = params
 
   const prior = await db.surveyPhoto.findMany({ where: { surveyId, fileName: "measured-area.jpg" } })
   for (const p of prior) {
@@ -198,25 +201,33 @@ export async function attachMeasurementImagery(params: {
   const areas = measurements.filter((m) => m.type === "area" && m.points.length >= 3)
   const lines = measurements.filter((m) => m.type === "line" && m.points.length >= 2)
   const notes = measurements.filter((m) => m.type === "note" && m.points.length >= 1)
-  if (!key || (!areas.length && !lines.length && !notes.length)) return
+  if (!areas.length && !lines.length && !notes.length) return
 
-  const z = Math.min(21, Math.max(15, zoom || 20))
-  const parts = [`center=${lat},${lng}`, `zoom=${z}`, `scale=2`, `size=640x480`, `maptype=hybrid`]
-  const fmt = (p: LatLng) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`
-  for (const a of areas) {
-    const pts = [...a.points, a.points[0]].map(fmt).join("|")
-    parts.push(`path=${encodeURIComponent(`fillcolor:0xFFEB0033|color:0xFFEB00FF|weight:3|${pts}`)}`)
+  // Prefer the client-rendered image (has real annotation text); else fall back to
+  // a Google Static Map with lettered markers.
+  let buf: Uint8Array | null = null
+  if (renderedImage && renderedImage.startsWith("data:image/")) {
+    try { buf = new Uint8Array(Buffer.from(renderedImage.split(",")[1] || "", "base64")) } catch { buf = null }
   }
-  for (const l of lines) {
-    parts.push(`path=${encodeURIComponent(`color:0x00B7FFFF|weight:4|${l.points.map(fmt).join("|")}`)}`)
+  if (!buf) {
+    if (!key) return
+    const z = Math.min(21, Math.max(15, zoom || 20))
+    const parts = [`center=${lat},${lng}`, `zoom=${z}`, `scale=2`, `size=640x480`, `maptype=hybrid`]
+    const fmt = (p: LatLng) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`
+    for (const a of areas) {
+      const pts = [...a.points, a.points[0]].map(fmt).join("|")
+      parts.push(`path=${encodeURIComponent(`fillcolor:0xFFEB0033|color:0xFFEB00FF|weight:3|${pts}`)}`)
+    }
+    for (const l of lines) {
+      parts.push(`path=${encodeURIComponent(`color:0x00B7FFFF|weight:4|${l.points.map(fmt).join("|")}`)}`)
+    }
+    notes.forEach((n, i) => {
+      const letter = String.fromCharCode(65 + (i % 26))
+      parts.push(`markers=${encodeURIComponent(`color:red|label:${letter}|${fmt(n.points[0])}`)}`)
+    })
+    const url = `https://maps.googleapis.com/maps/api/staticmap?${parts.join("&")}&key=${key}`
+    buf = await fetchImage(url)
   }
-  notes.forEach((n, i) => {
-    const letter = String.fromCharCode(65 + (i % 26))
-    parts.push(`markers=${encodeURIComponent(`color:red|label:${letter}|${fmt(n.points[0])}`)}`)
-  })
-
-  const url = `https://maps.googleapis.com/maps/api/staticmap?${parts.join("&")}&key=${key}`
-  const buf = await fetchImage(url)
   if (!buf) return
 
   const totalArea = areas.reduce((s, a) => s + polygonAreaSqm(a.points), 0)

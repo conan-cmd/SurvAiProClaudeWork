@@ -124,6 +124,63 @@ export function AreaMeasure({
   const totalArea = items.filter((m) => m.type === "area").reduce((s, m) => s + areaSqm(m.points), 0)
   const totalLen = items.filter((m) => m.type === "line").reduce((s, m) => s + lineMeters(m.points), 0)
 
+  // Composite the aerial + measurements + annotation TEXT onto a canvas and return
+  // a JPEG data URL. Same-origin image, so the canvas isn't tainted. Null on failure.
+  const renderAnnotatedImage = async (list: Measurement[]): Promise<string | null> => {
+    try {
+      const S = 2
+      const W = LOGICAL_W * S, H = LOGICAL_H * S
+      const canvas = document.createElement("canvas")
+      canvas.width = W; canvas.height = H
+      const ctx = canvas.getContext("2d")
+      if (!ctx) return null
+      const img = new Image()
+      const ok = await new Promise<boolean>((res) => {
+        img.onload = () => res(true)
+        img.onerror = () => res(false)
+        img.src = aerialSrc
+      })
+      if (!ok) return null
+      ctx.drawImage(img, 0, 0, W, H)
+      const P = (p: LatLng) => { const xy = toXY(p); return { x: xy.x * S, y: xy.y * S } }
+      const label = (text: string, x: number, y: number, align: CanvasTextAlign = "center") => {
+        ctx.font = "bold 24px -apple-system, 'Segoe UI', Arial"
+        ctx.textAlign = align; ctx.textBaseline = "middle"
+        ctx.lineJoin = "round"; ctx.lineWidth = 6; ctx.strokeStyle = "rgba(0,0,0,0.85)"; ctx.strokeText(text, x, y)
+        ctx.fillStyle = "#fff"; ctx.fillText(text, x, y)
+      }
+      list.filter((m) => m.type === "area" && m.points.length >= 3).forEach((m) => {
+        const pts = m.points.map(P)
+        ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.closePath()
+        ctx.fillStyle = "rgba(255,235,0,0.25)"; ctx.fill()
+        ctx.strokeStyle = "#FFEB00"; ctx.lineWidth = 6; ctx.stroke()
+        const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length
+        const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length
+        label(`${Math.round(areaSqm(m.points)).toLocaleString()} m²`, cx, cy)
+      })
+      list.filter((m) => m.type === "line" && m.points.length >= 2).forEach((m) => {
+        const pts = m.points.map(P)
+        ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)))
+        ctx.strokeStyle = "#00B7FF"; ctx.lineWidth = 8; ctx.lineCap = "round"; ctx.stroke()
+        const mid = pts[Math.floor(pts.length / 2)]
+        label(`${Math.round(lineMeters(m.points)).toLocaleString()} m`, mid.x, mid.y - 18)
+      })
+      const localNotes = list.filter((m) => m.type === "note" && m.points.length >= 1)
+      localNotes.forEach((m, idx) => {
+        const p = P(m.points[0])
+        const letter = String.fromCharCode(65 + (idx % 26))
+        ctx.beginPath(); ctx.arc(p.x, p.y, 18, 0, Math.PI * 2)
+        ctx.fillStyle = "#EF4444"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = "#fff"; ctx.stroke()
+        ctx.fillStyle = "#fff"; ctx.font = "bold 20px -apple-system, 'Segoe UI', Arial"
+        ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(letter, p.x, p.y + 1)
+        if (m.label) label(m.label, p.x + 28, p.y, "left")
+      })
+      return canvas.toDataURL("image/jpeg", 0.9)
+    } catch {
+      return null
+    }
+  }
+
   const save = async () => {
     let toSave = items
     // Auto-commit a valid in-progress shape so nothing is lost.
@@ -138,10 +195,11 @@ export function AreaMeasure({
     }
     setSaving(true)
     try {
+      const renderedImage = await renderAnnotatedImage(toSave)
       const res = await fetch(`/api/surveys/${surveyId}/area`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ measurements: toSave, zoom, showOnProposal }),
+        body: JSON.stringify({ measurements: toSave, zoom, showOnProposal, renderedImage: renderedImage || undefined }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Save failed")
