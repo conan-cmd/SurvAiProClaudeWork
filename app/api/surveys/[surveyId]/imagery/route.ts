@@ -10,6 +10,7 @@ const schema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
   heading: z.number().min(0).max(360).optional(),
+  zoom: z.number().int().min(1).max(22).optional(),
 })
 
 export async function POST(
@@ -36,6 +37,8 @@ export async function POST(
       latitude: parsed.data.latitude,
       longitude: parsed.data.longitude,
       what3words: words,
+      streetViewHeading: parsed.data.heading ?? null,
+      aerialZoom: parsed.data.zoom ?? null,
     },
   })
 

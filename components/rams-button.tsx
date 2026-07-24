@@ -33,7 +33,7 @@ export function RamsButton({ surveyId, className }: { surveyId: string; classNam
   return (
     <button onClick={open} disabled={loading} className={className}>
       {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldAlert className="w-4 h-4" />}
-      RAMS
+      Create RAMS
     </button>
   )
 }

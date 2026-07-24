@@ -4,6 +4,7 @@ import { Plus, TrendingUp, Clock, FileText, ClipboardList } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { formatCurrency, formatDate, calculateProposalTotals } from "@/lib/utils"
+import { OnboardingNudge } from "@/components/onboarding-nudge"
 
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-600",
@@ -40,6 +41,15 @@ export default async function DashboardPage({
   if (!user) redirect("/auth/login")
 
   const range = rangeFromParams(searchParams)
+
+  // Show the setup nudge only to businesses that haven't finished setup AND look
+  // unconfigured — so established orgs are never nagged.
+  const org = await db.organization.findUnique({
+    where: { id: user.organizationId },
+    select: { onboardingComplete: true, logoUrl: true, mainServices: true },
+  })
+  const hasBasics = Boolean(org?.logoUrl) || Boolean(org?.mainServices && org.mainServices.replace(/[[\]\s]/g, "").length > 0)
+  const showNudge = !!org && !org.onboardingComplete && !hasBasics
 
   const teamMembers = await db.user.findMany({
     where: { organizationId: user.organizationId },
@@ -97,6 +107,8 @@ export default async function DashboardPage({
 
   return (
     <div className="space-y-6 overflow-x-hidden">
+      {showNudge && <OnboardingNudge />}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-brand-navy">Dashboard</h1>

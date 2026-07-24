@@ -35,6 +35,8 @@ export async function sendEmail(params: {
   replyTo?: string | null
   // Plain-text alternative — improves deliverability and inbox placement.
   text?: string
+  // File attachments (Resend fetches each `path` URL). Not sent on the Gmail path yet.
+  attachments?: { filename: string; path: string }[]
   // When set, and that user has connected their Gmail, the email is sent from
   // their own address via the Gmail API instead of the shared Resend sender.
   fromUserId?: string
@@ -91,6 +93,7 @@ export async function sendEmail(params: {
       subject: params.subject,
       html: params.html,
       ...(params.text ? { text: params.text } : {}),
+      ...(params.attachments?.length ? { attachments: params.attachments } : {}),
     }),
     signal: AbortSignal.timeout(15000),
   })

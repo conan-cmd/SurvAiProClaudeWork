@@ -33,11 +33,21 @@ export async function POST(request: Request) {
       messages: [
         {
           role: "system",
-          content: `You draft proposal terms and conditions for UK trades and service businesses. Plain English, one term per line (no numbering, no headings), British English. Cover: quotation validity; one continuous site visit assumption with demobilisation fee for interruptions caused by others; client-provided access, water and electricity; welfare/storage/waste/parking responsibilities; local authority permissions by others; discrepancy between quoted survey and site conditions may incur re-pricing; weather delays; pre-existing defects (e.g. loose pointing, fragile surfaces) not our liability; deposit and payment terms (payment due within 14 days of completion; interest on overdue invoices at 8% over Bank of England base rate per the Late Payment of Commercial Debts Act); title to materials until paid; variations must be agreed in writing; defects notified promptly and we get opportunity to remedy; insurance held; client cancellation rights notice for consumers (14-day cooling-off under Consumer Contracts Regulations where applicable); governing law England and Wales. End with a line advising this is a general template and the business should have terms reviewed professionally.`,
+          content: `You draft proposal terms and conditions for UK trades and service businesses. Plain English, one term per line (no numbering, no headings), British English.
+
+Most importantly, TAILOR the terms to the SPECIFIC trade(s) the business provides — include the clauses a competent firm in THAT trade would carry, and leave out ones that don't apply. Examples of trade-specific clauses:
+- Roofing / roof repairs / re-roofing: working at height and scaffold/access; tile & slate matching cannot be guaranteed for discontinued/weathered types; pre-existing defects in felt/underlay, battens, flashings, chimneys or structural timber excluded unless quoted; weather-tightness guaranteed only where re-covering is quoted; workmanship guarantee period.
+- Roof / render / exterior cleaning & softwashing: risk to already-defective, lifting or previously-painted coatings; efflorescence and natural colour variation; surfaces cleaned to the best achievable result, not "as new"; moss/algae removal may expose existing damage; runoff and protection of adjacent surfaces/planting.
+- Gutter / hopper clearance: work limited to accessible outlets; blockages within downpipes or underground drains excluded; existing leaks or joint failures reported, not repaired, unless quoted.
+- Window cleaning: pre-existing scratches or hard-water staining not removable; frames/sills cleaned only where quoted.
+- Driveway / patio / paving: jointing sand replacement, weed regrowth over time, and natural colour variation; sealant results depend on surface condition.
+Only include the ones relevant to the listed services, and invent sensible equivalents for any other trade.
+
+Always also cover the commercial/legal base: quotation validity; one continuous site visit assumption with a demobilisation fee for interruptions caused by others; client-provided access, water and electricity; welfare/storage/waste/parking responsibilities; local-authority permissions by others; re-pricing where site conditions differ from the survey; weather delays; pre-existing defects not our liability; deposit and payment terms (payment due within 14 days of completion; interest on overdue invoices at 8% over Bank of England base rate per the Late Payment of Commercial Debts Act); title to materials until paid; variations agreed in writing; defects notified promptly with opportunity to remedy; insurance held; consumer 14-day cooling-off under the Consumer Contracts Regulations where applicable; governing law England and Wales. End with a line advising this is a general template and the business should have its terms reviewed professionally.`,
         },
         {
           role: "user",
-          content: `Draft 15-20 concise terms for ${org.name}, providing ${services} in the UK. ${typeGuidance}`,
+          content: `Draft 15-20 concise terms for ${org.name}, whose services are: ${services} (UK). Prioritise clauses specific to those services, then the standard commercial/legal terms. ${typeGuidance}`,
         },
       ],
       temperature: 0.4,

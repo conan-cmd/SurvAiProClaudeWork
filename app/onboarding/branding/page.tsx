@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowRight, ArrowLeft, Sparkles, Loader2, Globe } from "lucide-react"
+import { ArrowRight, ArrowLeft, Sparkles, Loader2, Globe, Clock } from "lucide-react"
 
 const TONES = [
   { value: "FRIENDLY", label: "Friendly", desc: "Warm and approachable" },
@@ -11,6 +11,8 @@ const TONES = [
   { value: "PREMIUM", label: "Premium", desc: "Polished and high-end" },
   { value: "TECHNICAL", label: "Technical", desc: "Detailed and precise" },
 ]
+
+const STEP_TITLES = ["Company details", "Brand & positioning", "Review sections"]
 
 type Sections = {
   aboutUsSection: string
@@ -21,7 +23,7 @@ type Sections = {
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState(0)
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -163,7 +165,7 @@ export default function OnboardingPage() {
       const res = await fetch("/api/organization", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sections),
+        body: JSON.stringify({ ...sections, onboardingComplete: true }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
       toast.success("Setup complete!")
@@ -175,6 +177,9 @@ export default function OnboardingPage() {
     }
   }
 
+  // Leave setup for later — the dashboard keeps a gentle reminder to finish.
+  const skip = () => router.push("/dashboard")
+
   const inputCls =
     "w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue text-base"
   const labelCls = "block text-sm font-medium text-gray-700 mb-1"
@@ -182,17 +187,55 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-brand-gray p-4 pb-24">
       <div className="max-w-2xl mx-auto pt-8">
-        {/* Progress */}
-        <div className="flex items-center gap-2 mb-8">
-          {[1, 2, 3].map((s) => (
-            <div
-              key={s}
-              className={`h-2 flex-1 rounded-full transition ${
-                s <= step ? "bg-brand-blue" : "bg-gray-200"
-              }`}
-            />
-          ))}
-        </div>
+        {/* Progress + skip (hidden on the welcome screen) */}
+        {step >= 1 && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-brand-navy">
+                Step {step} of 3 · <span className="font-medium text-gray-500">{STEP_TITLES[step - 1]}</span>
+              </span>
+              <button onClick={skip} className="text-sm text-gray-400 hover:text-gray-600 font-medium">
+                Skip for now
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              {[1, 2, 3].map((s) => (
+                <div key={s}
+                  className={`h-2 flex-1 rounded-full transition ${s <= step ? "bg-brand-blue" : "bg-gray-200"}`} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {step === 0 && (
+          <div className="bg-white rounded-xl shadow-sm p-8 md:p-10 text-center animate-fadeIn">
+            <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-blue-50 flex items-center justify-center">
+              <Sparkles className="w-8 h-8 text-brand-blue" />
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold text-brand-navy mb-3">Welcome to SurvAIPro 🎉</h1>
+            <p className="text-gray-600 mb-2 max-w-md mx-auto">
+              Let&apos;s take two minutes to add your company details, branding and services.
+            </p>
+            <p className="text-gray-500 text-sm mb-5 max-w-md mx-auto">
+              It means your very first proposal comes out polished and on-brand — no digging through
+              settings later. You can change anything at any time.
+            </p>
+            <div className="inline-flex items-center gap-2 text-sm font-medium text-brand-blue bg-blue-50 rounded-full px-4 py-1.5 mb-8">
+              <Clock className="w-4 h-4" /> Just 3 quick steps · about 2 minutes
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button onClick={() => setStep(1)}
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-brand-blue text-white rounded-lg font-semibold hover:bg-blue-700">
+                Set up my account <ArrowRight className="w-4 h-4" />
+              </button>
+              <button onClick={skip}
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg border font-medium text-gray-600 hover:bg-gray-50">
+                Skip — I&apos;ll jump straight in
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-5">You can finish setup any time from your dashboard.</p>
+          </div>
+        )}
 
         {step === 1 && (
           <div className="bg-white rounded-xl shadow-sm p-6 md:p-8 animate-fadeIn">
@@ -374,6 +417,7 @@ export default function OnboardingPage() {
         )}
 
         {/* Nav buttons */}
+        {step >= 1 && (
         <div className="flex justify-between mt-6">
           {step > 1 ? (
             <button onClick={() => setStep(step - 1)}
@@ -396,6 +440,7 @@ export default function OnboardingPage() {
             </button>
           )}
         </div>
+        )}
       </div>
     </div>
   )

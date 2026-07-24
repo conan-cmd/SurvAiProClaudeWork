@@ -10,6 +10,7 @@ import { publicBaseUrl } from "@/lib/public-url"
 const sendSchema = z.object({
   to: z.string().email("Enter a valid email address"),
   message: z.string().max(2000).optional(),
+  documentIds: z.array(z.string()).max(20).optional(),
 })
 
 // Emails the client a secure link to the proposal and marks it Sent.
@@ -75,12 +76,22 @@ export async function POST(
   ].join("\n")
 
   try {
+    // Attach any selected library documents (insurance, certs).
+    let attachments: { filename: string; path: string }[] | undefined
+    if (parsed.data.documentIds?.length) {
+      const docs = await db.orgDocument.findMany({
+        where: { id: { in: parsed.data.documentIds }, organizationId: user.organizationId },
+      })
+      attachments = docs.map((d) => ({ filename: d.name, path: d.fileUrl }))
+    }
+
     await sendEmail({
       to,
       replyTo: org.email || user.email,
       subject: `Your proposal from ${org.name}`,
       html,
       text,
+      attachments,
       fromUserId: user.id,
     })
 

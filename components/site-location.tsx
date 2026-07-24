@@ -31,17 +31,22 @@ export function SiteLocation({
   surveyId,
   latitude,
   longitude,
+  savedHeading,
+  savedZoom,
   onPhotosChange,
 }: {
   surveyId: string
   latitude: number | null
   longitude: number | null
+  savedHeading?: number | null
+  savedZoom?: number | null
   onPhotosChange: (photos: Photo[]) => void
 }) {
   const [lat, setLat] = useState<number | null>(latitude)
   const [lng, setLng] = useState<number | null>(longitude)
-  const [heading, setHeading] = useState(0)
-  const [zoom, setZoom] = useState(DEFAULT_ZOOM)
+  // Restore the last-saved fine-tuning so the position isn't lost on return.
+  const [heading, setHeading] = useState(savedHeading ?? 0)
+  const [zoom, setZoom] = useState(savedZoom ?? DEFAULT_ZOOM)
   const [saving, setSaving] = useState(false)
 
   if (lat == null || lng == null) {
@@ -53,7 +58,9 @@ export function SiteLocation({
     )
   }
 
-  const moved = lat !== latitude || lng !== longitude || heading !== 0
+  const baseHeading = savedHeading ?? 0
+  const baseZoom = savedZoom ?? DEFAULT_ZOOM
+  const moved = lat !== latitude || lng !== longitude || heading !== baseHeading || zoom !== baseZoom
   const aerialSrc = `/api/geo/static?type=aerial&lat=${lat}&lng=${lng}&zoom=${zoom}`
   const streetSrc = `/api/geo/static?type=streetview&lat=${lat}&lng=${lng}&heading=${heading}`
 
@@ -75,7 +82,7 @@ export function SiteLocation({
       const res = await fetch(`/api/surveys/${surveyId}/imagery`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latitude: lat, longitude: lng, heading }),
+        body: JSON.stringify({ latitude: lat, longitude: lng, heading, zoom }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Update failed")
@@ -91,7 +98,8 @@ export function SiteLocation({
   const reset = () => {
     setLat(latitude)
     setLng(longitude)
-    setHeading(0)
+    setHeading(baseHeading)
+    setZoom(baseZoom)
   }
 
   return (

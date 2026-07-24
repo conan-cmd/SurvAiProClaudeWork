@@ -8,6 +8,7 @@ import { PhotoManager, Photo } from "@/components/photo-manager"
 import { VoiceNotes, VoiceNoteWithTranscript } from "@/components/voice-notes"
 import { DictateButton } from "@/components/dictate-button"
 import { SiteLocation } from "@/components/site-location"
+import { AreaMeasure } from "@/components/area-measure"
 import { RamsButton } from "@/components/rams-button"
 
 type Survey = {
@@ -28,6 +29,13 @@ type Survey = {
   latitude: number | null
   longitude: number | null
   what3words: string | null
+  streetViewHeading: number | null
+  aerialZoom: number | null
+  areaPolygon: string | null
+  areaSqm: number | null
+  mapMeasurements: string | null
+  linearMeters: number | null
+  showMeasurementsOnProposal: boolean
   photos: Photo[]
   voiceNotes: VoiceNoteWithTranscript[]
   proposal: { id: string; status: string } | null
@@ -246,9 +254,35 @@ export default function SurveyDetailPage() {
           surveyId={survey.id}
           latitude={survey.latitude}
           longitude={survey.longitude}
+          savedHeading={survey.streetViewHeading}
+          savedZoom={survey.aerialZoom}
           onPhotosChange={(photos) => setSurvey((s) => (s ? { ...s, photos } : s))}
         />
       </section>
+
+      {survey.latitude != null && survey.longitude != null && (
+        <section className="bg-white rounded-xl shadow-sm p-5">
+          <h2 className="font-semibold text-brand-navy mb-4">
+            Measure &amp; annotate{survey.areaSqm ? ` — ${Math.round(survey.areaSqm).toLocaleString()} m²` : ""}{survey.linearMeters ? ` · ${Math.round(survey.linearMeters).toLocaleString()} m` : ""}
+          </h2>
+          <AreaMeasure
+            surveyId={survey.id}
+            latitude={survey.latitude}
+            longitude={survey.longitude}
+            savedZoom={survey.aerialZoom}
+            savedMeasurements={(() => {
+              try {
+                if (survey.mapMeasurements) return JSON.parse(survey.mapMeasurements)
+                // Back-compat: seed from the old single-polygon area.
+                if (survey.areaPolygon) return [{ id: "legacy", type: "area", points: JSON.parse(survey.areaPolygon) }]
+                return null
+              } catch { return null }
+            })()}
+            savedShowOnProposal={survey.showMeasurementsOnProposal}
+            onPhotosChange={(photos) => setSurvey((s) => (s ? { ...s, photos } : s))}
+          />
+        </section>
+      )}
 
       {/* Voice notes */}
       <section className="bg-white rounded-xl shadow-sm p-5">

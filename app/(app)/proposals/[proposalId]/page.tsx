@@ -37,6 +37,8 @@ type ProposalData = {
     latitude: number | null
     longitude: number | null
     what3words: string | null
+    areaSqm: number | null
+    linearMeters: number | null
     photos: {
       id: string
       fileUrl: string
@@ -227,28 +229,64 @@ export default function ProposalEditorPage() {
     }
   }
 
-  const [sending, setSending] = useState(false)
+  const [pdfBusy, setPdfBusy] = useState(false)
+  const pdfRef = useRef<HTMLDivElement>(null)
+  const downloadPdf = async () => {
+    if (!pdfRef.current || !proposal) return
+    setPdfBusy(true)
+    try {
+      const { exportAndShare } = await import("@/lib/pdf")
+      const base = (proposal.survey.title || "proposal").replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "")
+      await exportAndShare(pdfRef.current, `${base || "proposal"}.pdf`, proposal.survey.title || "Proposal")
+    } catch {
+      toast.error("Couldn't create the PDF — try Preview then your browser's print/share.")
+    } finally {
+      setPdfBusy(false)
+    }
+  }
 
-  const sendToClient = async () => {
+  const [sending, setSending] = useState(false)
+  const [sendOpen, setSendOpen] = useState(false)
+  const [sendTo, setSendTo] = useState("")
+  const [sendMessage, setSendMessage] = useState("")
+  const [sendDocIds, setSendDocIds] = useState<string[]>([])
+  const [orgDocs, setOrgDocs] = useState<{ id: string; name: string }[]>([])
+
+  const openSend = () => {
     if (!proposal) return
-    const to = prompt("Send proposal to:", proposal.clientEmail || "")
-    if (!to) return
-    const message = prompt(
-      "Add a short message (optional - a default will be used if blank):",
-      ""
-    )
-    if (message === null) return
+    setSendTo(proposal.clientEmail || "")
+    setSendMessage("")
+    setSendDocIds([])
+    setSendOpen(true)
+    if (!orgDocs.length) {
+      fetch("/api/documents")
+        .then((r) => r.json())
+        .then((d) => setOrgDocs(Array.isArray(d) ? d : []))
+        .catch(() => {})
+    }
+  }
+
+  const doSend = async () => {
+    if (!proposal || !sendTo.trim()) {
+      toast.error("Enter a recipient email")
+      return
+    }
     setSending(true)
     try {
       const res = await fetch(`/api/proposals/${proposalId}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, message: message || undefined }),
+        body: JSON.stringify({
+          to: sendTo.trim(),
+          message: sendMessage || undefined,
+          documentIds: sendDocIds,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setProposal({ ...proposal, status: "SENT", clientEmail: to })
-      toast.success(`Proposal emailed to ${to}`)
+      setProposal({ ...proposal, status: "SENT", clientEmail: sendTo.trim() })
+      setSendOpen(false)
+      toast.success(`Proposal emailed to ${sendTo.trim()}`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to send")
     } finally {
@@ -363,9 +401,9 @@ export default function ProposalEditorPage() {
             {mode === "edit" ? <Eye className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
             {mode === "edit" ? "Preview" : "Edit"}
           </button>
-          <button onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
-            <Printer className="w-4 h-4" /> PDF
+          <button onClick={downloadPdf} disabled={pdfBusy}
+            className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
+            {pdfBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />} PDF
           </button>
           <RamsButton surveyId={proposal.survey.id}
             className="inline-flex items-center gap-1.5 px-3 py-2 border border-amber-200 rounded-lg text-sm font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50" />
@@ -373,7 +411,7 @@ export default function ProposalEditorPage() {
             className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
             <Link2 className="w-4 h-4" /> Share
           </button>
-          <button onClick={sendToClient} disabled={sending}
+          <button onClick={openSend} disabled={sending}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             Send
@@ -497,6 +535,8 @@ export default function ProposalEditorPage() {
                 <PricingEditor
                   proposalId={proposal.id}
                   initialItems={proposal.pricingLineItems}
+                  measuredAreaSqm={proposal.survey.areaSqm}
+                  measuredLinearMeters={proposal.survey.linearMeters}
                   onItemsChange={(items) =>
                     setProposal((p) => (p ? { ...p, pricingLineItems: items } : p))
                   }
@@ -564,6 +604,59 @@ export default function ProposalEditorPage() {
           <ProposalDocument data={docData} />
         </div>
       )}
+
+      {/* Off-screen copy used to build the shareable PDF (any mode) */}
+      <div ref={pdfRef} className="hidden">
+        <ProposalDocument data={docData} />
+      </div>
+
+      {sendOpen && (
+        <div className="no-print fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4"
+          onClick={() => !sending && setSendOpen(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-bold text-brand-navy">Send proposal</h3>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+              <input type="email" value={sendTo} onChange={(e) => setSendTo(e.target.value)}
+                placeholder="client@email.com"
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Message (optional)</label>
+              <textarea rows={3} value={sendMessage} onChange={(e) => setSendMessage(e.target.value)}
+                placeholder="A short personal note…"
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+            </div>
+            {orgDocs.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Attach documents</label>
+                <div className="space-y-1 max-h-40 overflow-y-auto border rounded-lg p-2">
+                  {orgDocs.map((d) => (
+                    <label key={d.id} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                      <input type="checkbox" checked={sendDocIds.includes(d.id)}
+                        onChange={(e) =>
+                          setSendDocIds((ids) => e.target.checked ? [...ids, d.id] : ids.filter((x) => x !== d.id))
+                        }
+                        className="rounded accent-blue-600" />
+                      <span className="truncate">{d.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setSendOpen(false)} disabled={sending}
+                className="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
+              <button onClick={doSend} disabled={sending}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -610,23 +703,51 @@ function VideoPicker({
       : [...selected, video]
     updateSection(section.id, { content: JSON.stringify(next) })
   }
+  const removeSelected = (videoId: string) =>
+    updateSection(section.id, { content: JSON.stringify(selected.filter((v) => v.videoId !== videoId)) })
+
+  // Always-visible strip of the chosen videos, so on returning to a proposal it's
+  // clear which are selected — even ones not in the currently-loaded channel list.
+  const selectedStrip = selected.length > 0 && (
+    <div className="mb-3">
+      <p className="text-xs font-medium text-gray-500 mb-1.5">Selected for this proposal ({selected.length})</p>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {selected.map((v) => (
+          <div key={v.videoId} className="relative shrink-0 w-32">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={v.thumbnail} alt="" className="w-full aspect-video object-cover rounded-lg border-2 border-brand-blue" />
+            <button type="button" onClick={() => removeSelected(v.videoId)}
+              className="absolute -top-1.5 -right-1.5 bg-white border rounded-full p-0.5 text-gray-500 hover:text-red-600 shadow"
+              aria-label={`Remove ${v.title}`}>
+              <X className="w-3.5 h-3.5" />
+            </button>
+            <p className="text-[11px] text-gray-600 mt-1 leading-snug line-clamp-2">{v.title}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 
   if (error) {
-    return <p className="text-sm text-amber-600">{error}</p>
+    return <div>{selectedStrip}<p className="text-sm text-amber-600">{error}</p></div>
   }
   if (!videos) {
     return (
-      <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
-        <Loader2 className="w-4 h-4 animate-spin" /> Loading your channel videos…
+      <div>
+        {selectedStrip}
+        <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading your channel videos…
+        </div>
       </div>
     )
   }
   if (!videos.length) {
-    return <p className="text-sm text-gray-400">No videos found on your channel.</p>
+    return <div>{selectedStrip}<p className="text-sm text-gray-400">No videos found on your channel.</p></div>
   }
 
   return (
     <div>
+      {selectedStrip}
       <input
         value={query}
         onChange={(e) => setQuery(e.target.value)}

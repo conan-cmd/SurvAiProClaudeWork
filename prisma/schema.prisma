@@ -103,6 +103,9 @@ model Organization {
   headshotUrl           String?
   signatureImageUrl     String?
 
+  // True once the first-run setup wizard is finished (or dismissed for good).
+  onboardingComplete    Boolean         @default(false)
+
   users                 User[]
   invites               Invite[]
   surveys               SiteSurvey[]
@@ -165,6 +168,16 @@ model SiteSurvey {
   latitude              Float?
   longitude             Float?
   what3words            String? // 3-word address derived from lat/lng
+  // Saved fine-tuning of the site imagery so it restores on return (see SiteLocation).
+  streetViewHeading     Float?  // Street View compass rotation (degrees)
+  aerialZoom            Int?    // aerial static-map zoom level
+  // Aerial area measurement: the drawn polygon (JSON [{lat,lng}]) + its area in m².
+  areaPolygon           String?
+  areaSqm               Float?
+  // Multi-measurement markup: JSON [{ id, type:'area'|'line'|'note', points:[{lat,lng}], label? }].
+  mapMeasurements       String?
+  linearMeters          Float?  // total length of all 'line' measurements
+  showMeasurementsOnProposal Boolean @default(true)
 
   // Survey details
   title                 String
@@ -396,6 +409,14 @@ model Rams {
   methodStatement       String? // JSON: [step, step, ...]
   ppe                   String? // JSON: [string]
   siteInfo              String? // access / welfare / emergency notes (text)
+  // JSON: the extended RAMS sections that match LBC's real document format:
+  // { activity, scopeOfWorks, numOperatives, siteSupervisor, emergencyContacts,
+  //   descriptionOfWorks, responsibilities[], equipment[], environmentalControls[],
+  //   emergencyProcedures[], coshh[], competency[],
+  //   operatives: [{ id, name, phone, email, signatureImage?, signedAt? }] }
+  sections              String?
+  // Public token for the no-login operative view + signing link (WhatsApp/email).
+  publicToken           String?         @unique
 
   generationMs          Int?
   createdById           String?

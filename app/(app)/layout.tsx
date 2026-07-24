@@ -1,16 +1,20 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/session"
-import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings } from "lucide-react"
+import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings, ShieldAlert } from "lucide-react"
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/surveys", label: "Surveys", icon: ClipboardList },
   { href: "/proposals", label: "Proposals", icon: FileText },
+  { href: "/rams", label: "RAMS", icon: ShieldAlert },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/gallery", label: "Gallery", icon: Images },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
+
+// Mobile bottom bar keeps the six most-used tabs (Gallery stays in the top nav).
+const MOBILE_NAV = NAV.filter((n) => n.href !== "/gallery")
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser()
@@ -46,7 +50,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* Bottom tab bar (mobile) */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t z-40">
         <div className="grid grid-cols-6">
-          {NAV.map(({ href, label, icon: Icon }) => (
+          {MOBILE_NAV.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}

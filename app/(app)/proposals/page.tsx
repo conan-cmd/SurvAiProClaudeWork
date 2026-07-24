@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
+import { Eye } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { formatCurrency, formatDate, calculateProposalTotals } from "@/lib/utils"
@@ -56,6 +57,7 @@ export default async function ProposalsPage({
         pricingLineItems: true,
         survey: { select: { title: true } },
         createdBy: { select: { name: true, email: true } },
+        _count: { select: { views: true } },
       },
     }),
   ])
@@ -118,9 +120,17 @@ export default async function ProposalsPage({
                     {viewingAll && p.createdBy && ` · by ${p.createdBy.name || p.createdBy.email}`}
                   </div>
                 </div>
-                <span className={`shrink-0 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[p.status]}`}>
-                  {p.status}
-                </span>
+                <div className="shrink-0 flex items-center gap-1.5">
+                  {p._count.views > 0 && (
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700"
+                      title={`Opened by the client${p._count.views > 1 ? ` — ${p._count.views} times` : ""}`}>
+                      <Eye className="w-3.5 h-3.5" /> Viewed
+                    </span>
+                  )}
+                  <span className={`whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[p.status]}`}>
+                    {p.status}
+                  </span>
+                </div>
               </Link>
               <ItemActions kind="proposal" id={p.id} surveyId={p.surveyId} title={p.survey.title} />
             </div>

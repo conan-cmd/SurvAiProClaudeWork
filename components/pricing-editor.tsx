@@ -23,10 +23,15 @@ export function PricingEditor({
   proposalId,
   initialItems,
   onItemsChange,
+  measuredAreaSqm,
+  measuredLinearMeters,
 }: {
   proposalId: string
   initialItems: EditableLineItem[]
   onItemsChange?: (items: EditableLineItem[]) => void
+  // Measurements taken on the survey aerial, offered as one-tap line items.
+  measuredAreaSqm?: number | null
+  measuredLinearMeters?: number | null
 }) {
   const [items, setItems] = useState<EditableLineItem[]>(initialItems)
   const [showDiscount, setShowDiscount] = useState(initialItems.some((i) => i.discount > 0))
@@ -86,6 +91,26 @@ export function PricingEditor({
 
   const removeItem = (id: string) =>
     setItems((prev) => prev.filter((i) => i.id !== id))
+
+  // Insert a line item pre-filled with a measured quantity + unit (rate left to the user).
+  const addMeasuredItem = (quantity: number, unit: string) =>
+    setItems((prev) => [
+      ...prev,
+      {
+        id: `new-${Date.now()}`,
+        description: "",
+        quantity,
+        unit,
+        unitPrice: 0,
+        vat: 20,
+        discount: 0,
+        isOptional: false,
+        order: prev.length,
+      },
+    ])
+
+  const area = measuredAreaSqm ? Math.round(measuredAreaSqm) : 0
+  const length = measuredLinearMeters ? Math.round(measuredLinearMeters) : 0
 
   const totals = calculateProposalTotals(items)
   const num = (v: string) => (v === "" ? 0 : parseFloat(v) || 0)
@@ -171,10 +196,24 @@ export function PricingEditor({
         ))}
       </div>
 
-      <button type="button" onClick={addItem}
-        className="inline-flex items-center gap-2 text-sm font-semibold text-brand-blue hover:underline">
-        <Plus className="w-4 h-4" /> Add line item
-      </button>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <button type="button" onClick={addItem}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-brand-blue hover:underline">
+          <Plus className="w-4 h-4" /> Add line item
+        </button>
+        {area > 0 && (
+          <button type="button" onClick={() => addMeasuredItem(area, "m²")}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 hover:bg-emerald-100">
+            <Plus className="w-3.5 h-3.5" /> Use measured area ({area.toLocaleString()} m²)
+          </button>
+        )}
+        {length > 0 && (
+          <button type="button" onClick={() => addMeasuredItem(length, "m")}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 hover:bg-emerald-100">
+            <Plus className="w-3.5 h-3.5" /> Use measured length ({length.toLocaleString()} m)
+          </button>
+        )}
+      </div>
 
       <div className="border-t pt-3 space-y-1 text-sm">
         <div className="flex justify-between text-gray-500">

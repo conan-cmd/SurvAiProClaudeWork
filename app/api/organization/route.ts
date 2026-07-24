@@ -39,6 +39,7 @@ const updateOrgSchema = z.object({
   youtubeChannelUrl: z.string().optional(),
   depositRules: z.string().max(500).optional(),
   signOffName: z.string().max(100).optional(),
+  onboardingComplete: z.boolean().optional(),
 })
 
 export async function GET() {
