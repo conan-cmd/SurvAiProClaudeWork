@@ -123,6 +123,16 @@ RAMS upgraded to LBC's real format + operative signing. All deployed; prod DB mi
 - **First-run onboarding (DONE):** signup already redirected to the 3-step `/onboarding/branding` wizard; added a **welcome step 0** with "Set up my account" vs **"Skip — I'll jump straight in"**, a persistent "Skip for now" link, and `Organization.onboardingComplete Boolean @default(false)` (set true on Finish; org PATCH accepts it). Dashboard shows a dismissible `OnboardingNudge` banner when `!onboardingComplete && !hasBasics` (hasBasics = logo or non-empty mainServices), so skippers/Google-signups get reminded but established orgs (LBC) never are. Dismiss → PATCH complete=true.
 - **Deferred:** Gmail Tier-2 still needs Conan to whitelist redirect URI (see [[gmail-send-tier2]]); per-tenant custom domains (#20).
 
+## Deploy pipeline (current — 2026-07-25)
+
+**The repo is now on GitHub and auto-deploys via Vercel. Do NOT use the old `npx vercel --token=…` flow (those tokens were revoked).**
+- Remote: `origin` → `https://github.com/conan-cmd/SurvAiProClaudeWork.git`, production branch **`main`** (renamed from `master`).
+- Git credential is stored in this machine's Git Credential Manager (a GitHub classic PAT, `repo` scope). So `git push origin main` just works from the Bash tool — no token needed.
+- **To ship: commit → `git push origin main` → Vercel auto-builds & deploys.** Watch status in the Vercel dashboard (no CLI token to check it from here).
+- Vercel build = `npm run build` (`prisma generate && next build`). It does **NOT** run migrations.
+- **Schema changes still need a manual `prisma db push` against the prod Neon DB BEFORE the code deploys.** ⚠️ The prod `DATABASE_URL` pasted earlier in chat was flagged for rotation — if Conan reset the Neon password, that URL is stale and migrations need the new one. Ask before assuming it still works.
+- Node on the Bash tool PATH: `export PATH="/c/Program Files/nodejs:$PATH"`.
+
 ## Conventions
 
 - Match surrounding code style; comment density is light and purposeful.
