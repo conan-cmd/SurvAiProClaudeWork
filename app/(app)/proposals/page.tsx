@@ -37,10 +37,17 @@ export default async function ProposalsPage({
   const folderId = searchParams.folder
   const canViewAll = user.role === "OWNER" || user.organization.membersViewAll
   const viewingAll = searchParams.scope === "all" && canViewAll
+  // "won" is a pseudo-filter meaning any accepted deal (signed → deposit → won).
+  const wonFilter = searchParams.status === "won"
   const statusFilter =
     searchParams.status && searchParams.status in STATUS_STYLES
       ? (searchParams.status as ProposalStatus)
       : undefined
+  const statusWhere = wonFilter
+    ? { status: { in: ["SIGNED", "DEPOSIT_PAID", "WON"] as ProposalStatus[] } }
+    : statusFilter
+      ? { status: statusFilter }
+      : {}
   const buildLink = (folder?: string, all?: boolean) => {
     const p = new URLSearchParams()
     if (all) p.set("scope", "all")
@@ -59,7 +66,7 @@ export default async function ProposalsPage({
         organizationId: user.organizationId,
         ...(folderId ? { survey: { folderId } } : {}),
         ...(viewingAll ? {} : { createdById: user.id }),
-        ...(statusFilter ? { status: statusFilter } : {}),
+        ...statusWhere,
       },
       orderBy: { updatedAt: "desc" },
       include: {
@@ -104,10 +111,10 @@ export default async function ProposalsPage({
         </div>
       )}
 
-      {statusFilter && (
+      {(statusFilter || wonFilter) && (
         <div className="text-sm">
           <span className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-brand-blue font-medium">
-            Showing {statusFilter.replace(/_/g, " ")}
+            Showing {wonFilter ? "won deals (signed, deposit paid & won)" : statusFilter!.replace(/_/g, " ")}
             <Link href={buildLink(folderId, viewingAll)} className="text-gray-400 hover:text-gray-600" aria-label="Clear filter">✕</Link>
           </span>
         </div>

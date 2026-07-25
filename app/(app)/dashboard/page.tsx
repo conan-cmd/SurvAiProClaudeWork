@@ -205,13 +205,13 @@ export default async function DashboardPage({
           <div className="text-xl font-bold text-emerald-600">{formatCurrency(depositsTotal)}</div>
           <div className="text-xs text-gray-400">{depositsPaid.length} paid</div>
         </Link>
-        <Link href="/proposals?scope=all&status=WON" className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition block">
+        <Link href="/proposals?scope=all&status=won" className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition block">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
             <TrendingUp className="w-4 h-4 text-brand-green" /> Won / Lost
           </div>
           <div className="text-xl font-bold text-brand-navy">
             <span className="text-emerald-600">
-              {byStatus("WON").length + byStatus("DEPOSIT_PAID").length}
+              {byStatus("SIGNED").length + byStatus("DEPOSIT_PAID").length + byStatus("WON").length}
             </span>
             {" / "}
             <span className="text-red-500">{byStatus("LOST").length}</span>

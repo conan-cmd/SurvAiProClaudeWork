@@ -91,7 +91,9 @@ export function AcceptanceBlock({
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setState("done")
+      // Reload so the server re-renders the signed state and shows the deposit
+      // prompt (it's server-rendered and needs the fresh signedAt).
+      window.location.reload()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong - please try again")
       setState("idle")
