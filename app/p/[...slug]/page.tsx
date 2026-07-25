@@ -40,6 +40,7 @@ export default async function SharedProposalPage({
               name: true, logoUrl: true, brandColor: true, secondaryColor: true,
               email: true, phone: true, website: true, depositRules: true, showCoordinatesOnProposal: true,
               signOffName: true, headshotUrl: true, signatureImageUrl: true,
+              stripeAccountId: true, stripeChargesEnabled: true,
             },
           },
           createdBy: {
@@ -71,7 +72,11 @@ export default async function SharedProposalPage({
     !p.depositPaidAt
   ) {
     try {
-      const session = await retrieveCheckoutSession(searchParams.session_id)
+      const connectedAccountId =
+        p.organization.stripeChargesEnabled && p.organization.stripeAccountId
+          ? p.organization.stripeAccountId
+          : null
+      const session = await retrieveCheckoutSession(searchParams.session_id, connectedAccountId)
       if (session.payment_status === "paid") {
         p = {
           ...p,

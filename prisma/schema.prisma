@@ -106,6 +106,10 @@ model Organization {
   // True once the first-run setup wizard is finished (or dismissed for good).
   onboardingComplete    Boolean         @default(false)
 
+  // Stripe Connect: the firm's own connected account, so deposits pay them directly.
+  stripeAccountId       String?
+  stripeChargesEnabled  Boolean         @default(false)
+
   users                 User[]
   invites               Invite[]
   surveys               SiteSurvey[]

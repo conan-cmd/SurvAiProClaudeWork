@@ -13,12 +13,18 @@ function form(data: Record<string, string>): string {
     .join("&")
 }
 
-async function stripeFetch(path: string, body?: Record<string, string>) {
+// `stripeAccount` performs the request AS a connected account (direct charges).
+async function stripeFetch(
+  path: string,
+  body?: Record<string, string>,
+  stripeAccount?: string
+) {
   const res = await fetch(`${STRIPE_API}${path}`, {
     method: body ? "POST" : "GET",
     headers: {
       Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
       ...(body && { "Content-Type": "application/x-www-form-urlencoded" }),
+      ...(stripeAccount && { "Stripe-Account": stripeAccount }),
     },
     body: body ? form(body) : undefined,
     signal: AbortSignal.timeout(15000),
@@ -26,6 +32,37 @@ async function stripeFetch(path: string, body?: Record<string, string>) {
   const data = await res.json()
   if (!res.ok) throw new Error(data.error?.message || `Stripe ${res.status}`)
   return data
+}
+
+// --- Stripe Connect (Express) — a firm's own account so deposits pay them directly ---
+
+// Creates an Express connected account for a firm. Returns the account object.
+export async function createConnectedAccount(email: string | null): Promise<{ id: string }> {
+  return stripeFetch("/accounts", {
+    type: "express",
+    country: "GB",
+    "capabilities[card_payments][requested]": "true",
+    "capabilities[transfers][requested]": "true",
+    ...(email ? { email } : {}),
+    "business_type": "company",
+  })
+}
+
+// Onboarding/verification link the firm completes to enable payouts.
+export async function createAccountLink(accountId: string, refreshUrl: string, returnUrl: string): Promise<{ url: string }> {
+  return stripeFetch("/account_links", {
+    account: accountId,
+    refresh_url: refreshUrl,
+    return_url: returnUrl,
+    type: "account_onboarding",
+  })
+}
+
+// Current status of a connected account (charges_enabled once onboarding is done).
+export async function retrieveAccount(accountId: string): Promise<{
+  id: string; charges_enabled: boolean; details_submitted: boolean; payouts_enabled: boolean
+}> {
+  return stripeFetch(`/accounts/${encodeURIComponent(accountId)}`)
 }
 
 export async function createDepositCheckout(params: {
@@ -36,6 +73,9 @@ export async function createDepositCheckout(params: {
   successUrl: string
   cancelUrl: string
   customerEmail?: string | null
+  // When set, the charge is created directly on the firm's connected account, so
+  // the deposit settles in their Stripe balance and pays out to their bank.
+  connectedAccountId?: string | null
 }) {
   const body: Record<string, string> = {
     mode: "payment",
@@ -49,11 +89,12 @@ export async function createDepositCheckout(params: {
     "metadata[proposalId]": params.proposalId,
   }
   if (params.customerEmail) body.customer_email = params.customerEmail
-  return stripeFetch("/checkout/sessions", body)
+  return stripeFetch("/checkout/sessions", body, params.connectedAccountId || undefined)
 }
 
-export async function retrieveCheckoutSession(sessionId: string) {
-  return stripeFetch(`/checkout/sessions/${encodeURIComponent(sessionId)}`)
+// Pass the connected account id if the session was created on that account.
+export async function retrieveCheckoutSession(sessionId: string, connectedAccountId?: string | null) {
+  return stripeFetch(`/checkout/sessions/${encodeURIComponent(sessionId)}`, undefined, connectedAccountId || undefined)
 }
 
 export type DepositRule = { type: "PERCENT" | "FIXED" | "NONE"; value: number }

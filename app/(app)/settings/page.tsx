@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Loader2, Upload, Sparkles, Copy, Globe, Check, Trash2 } from "lucide-react"
+import { StripeConnect } from "@/components/stripe-connect"
 import { SignatureDraw } from "@/components/signature-draw"
 
 type Org = {
@@ -384,6 +385,8 @@ export default function SettingsPage() {
           <Sparkles className="w-4 h-4" /> Run the guided setup
         </a>
       </div>
+
+      <StripeConnect />
 
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
         <h2 className="font-semibold text-brand-navy">Company & branding</h2>

@@ -20,7 +20,7 @@ export async function POST(
         include: {
           pricingLineItems: true,
           survey: { select: { title: true, isResidential: true } },
-          organization: { select: { name: true, depositRules: true } },
+          organization: { select: { name: true, depositRules: true, stripeAccountId: true, stripeChargesEnabled: true } },
         },
       },
     },
@@ -49,6 +49,11 @@ export async function POST(
 
   const origin = publicBaseUrl(request.nextUrl.origin)
   try {
+    // Route the deposit to the firm's own Stripe account when they've connected one.
+    const connectedAccountId =
+      p.organization.stripeChargesEnabled && p.organization.stripeAccountId
+        ? p.organization.stripeAccountId
+        : null
     const session = await createDepositCheckout({
       amountPence: Math.round(deposit * 100),
       proposalTitle: p.survey.title,
@@ -57,6 +62,7 @@ export async function POST(
       successUrl: `${origin}/p/${params.token}?session_id={CHECKOUT_SESSION_ID}`,
       cancelUrl: `${origin}/p/${params.token}`,
       customerEmail: p.clientEmail,
+      connectedAccountId,
     })
 
     await db.proposal.update({
