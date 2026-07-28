@@ -120,6 +120,9 @@ model Organization {
   billingExempt         Boolean         @default(false)
   // One of the first 100 firms — £49/mo locked in for life (vs £99 standard).
   isFoundingMember      Boolean         @default(false)
+  // Retention: reason captured at cancel, and a paused-until date (pause vs cancel).
+  cancelReason          String?
+  subscriptionPausedUntil DateTime?
 
   users                 User[]
   invites               Invite[]

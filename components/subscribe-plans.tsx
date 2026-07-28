@@ -29,9 +29,41 @@ export function SubscribePlans({
   lapsed = false,
   founding = false,
   slotsLeft = 0,
-}: { lapsed?: boolean; founding?: boolean; slotsLeft?: number }) {
+  pausedUntil = null,
+}: { lapsed?: boolean; founding?: boolean; slotsLeft?: number; pausedUntil?: string | null }) {
   const [plan, setPlan] = useState<Plan>("annual")
   const [busy, setBusy] = useState(false)
+
+  const resume = async () => {
+    setBusy(true)
+    try {
+      const res = await fetch("/api/billing/resume", { method: "POST" })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      window.location.href = "/dashboard"
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't resume")
+      setBusy(false)
+    }
+  }
+
+  if (pausedUntil) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-brand-navy to-blue-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center">
+          <h1 className="text-2xl font-bold text-brand-navy mb-2">Your account is paused</h1>
+          <p className="text-gray-600 mb-6">
+            Billing is paused until {new Date(pausedUntil).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}.
+            Resume any time to pick up right where you left off — your data&apos;s all here.
+          </p>
+          <button onClick={resume} disabled={busy}
+            className="w-full inline-flex items-center justify-center gap-2 py-3 bg-brand-blue text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50">
+            {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : null} Resume my subscription
+          </button>
+        </div>
+      </div>
+    )
+  }
   const prices = founding ? PRICES.founding : PRICES.standard
   const PLANS: { key: Plan; name: string; price: string; sub: string; badge?: string }[] = [
     { key: "annual", ...prices.annual },

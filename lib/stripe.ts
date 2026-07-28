@@ -156,6 +156,27 @@ export async function retrieveSubscription(subscriptionId: string) {
   return stripeFetch(`/subscriptions/${encodeURIComponent(subscriptionId)}`)
 }
 
+// Cancels at the end of the paid period (they keep access until it runs out).
+export async function cancelSubscriptionAtPeriodEnd(subscriptionId: string) {
+  return stripeFetch(`/subscriptions/${encodeURIComponent(subscriptionId)}`, { cancel_at_period_end: "true" })
+}
+
+// Pauses billing until `resumesAtUnix`. Access is blocked while paused.
+export async function pauseSubscription(subscriptionId: string, resumesAtUnix: number) {
+  return stripeFetch(`/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    "pause_collection[behavior]": "void",
+    "pause_collection[resumes_at]": String(resumesAtUnix),
+  })
+}
+
+// Clears any pause and any pending cancellation — back to active.
+export async function resumeSubscription(subscriptionId: string) {
+  return stripeFetch(`/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    pause_collection: "",
+    cancel_at_period_end: "false",
+  })
+}
+
 // Stripe-hosted portal so users manage/cancel/update card themselves.
 export async function createBillingPortal(customerId: string, returnUrl: string): Promise<{ url: string }> {
   return stripeFetch("/billing_portal/sessions", { customer: customerId, return_url: returnUrl })

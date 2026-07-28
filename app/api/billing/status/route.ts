@@ -15,6 +15,7 @@ export async function GET() {
       currentPeriodEnd: true,
       stripeCustomerId: true,
       isFoundingMember: true,
+      subscriptionPausedUntil: true,
     },
   })
   if (!org) return NextResponse.json({ error: "Not found" }, { status: 404 })
@@ -26,5 +27,6 @@ export async function GET() {
     currentPeriodEnd: org.currentPeriodEnd,
     hasCustomer: Boolean(org.stripeCustomerId),
     founding: org.isFoundingMember,
+    pausedUntil: org.subscriptionPausedUntil,
   })
 }
