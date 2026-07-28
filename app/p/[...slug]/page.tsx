@@ -9,6 +9,32 @@ import { ReadTracker } from "@/components/read-tracker"
 
 export const dynamic = "force-dynamic"
 
+// Best-effort "deposit received" email to the business when a client pays.
+async function notifyDepositPaid(p: {
+  id: string; clientName: string; depositAmount: number | null
+  creatorEmail: string | null; orgEmail: string | null; title: string
+}) {
+  const { emailEnabled, sendEmail } = await import("@/lib/email")
+  if (!emailEnabled()) return
+  const to = p.creatorEmail || p.orgEmail
+  if (!to) return
+  const { publicBaseUrl } = await import("@/lib/public-url")
+  const amount = p.depositAmount ? formatCurrency(p.depositAmount) : "The deposit"
+  const url = `${publicBaseUrl("")}/proposals/${p.id}`
+  const html = `
+    <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;max-width:520px">
+      <p>💰 <strong>${p.clientName}</strong> has just paid their deposit of <strong>${amount}</strong> for <strong>${p.title}</strong>.</p>
+      <p style="margin:18px 0"><a href="${url}" style="color:#2563EB;font-weight:600">Open the proposal &rarr;</a></p>
+      <p style="color:#6b7280;font-size:13px">Time to get them booked in.</p>
+    </div>`
+  await sendEmail({
+    to,
+    subject: `💰 ${p.clientName} paid their deposit`,
+    html,
+    text: `${p.clientName} paid their deposit (${amount}) for ${p.title}.\n\nOpen it: ${url}`,
+  })
+}
+
 export default async function SharedProposalPage({
   params,
   searchParams,
@@ -44,7 +70,7 @@ export default async function SharedProposalPage({
             },
           },
           createdBy: {
-            select: { name: true, signOffName: true, headshotUrl: true, signatureImageUrl: true },
+            select: { name: true, email: true, signOffName: true, headshotUrl: true, signatureImageUrl: true },
           },
         },
       },
@@ -85,6 +111,15 @@ export default async function SharedProposalPage({
             data: { depositPaidAt: new Date(), status: "DEPOSIT_PAID" },
           })),
         }
+        // Notify the business their deposit landed (best-effort, first time only).
+        notifyDepositPaid({
+          id: p.id,
+          clientName: p.clientName,
+          depositAmount: p.depositAmount,
+          creatorEmail: p.createdBy?.email ?? null,
+          orgEmail: p.organization.email,
+          title: p.survey.title,
+        }).catch(() => {})
       }
     } catch (err) {
       console.error("Deposit verification failed:", err)

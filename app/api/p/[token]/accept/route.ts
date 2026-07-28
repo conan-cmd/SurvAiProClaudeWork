@@ -25,6 +25,10 @@ export async function POST(
           id: true,
           status: true,
           signedAt: true,
+          clientName: true,
+          createdBy: { select: { email: true, name: true } },
+          organization: { select: { name: true, email: true } },
+          survey: { select: { title: true } },
           pricingLineItems: {
             select: {
               id: true, quantity: true, unitPrice: true,
@@ -72,5 +76,40 @@ export async function POST(
     },
   })
 
+  // Let the business know their proposal was just accepted (best-effort).
+  notifySigned(link.proposal, agreedTotal, request.nextUrl.origin).catch(() => {})
+
   return NextResponse.json({ success: true })
+}
+
+type SignedProposal = {
+  id: string
+  clientName: string
+  createdBy: { email: string; name: string | null } | null
+  organization: { name: string; email: string | null }
+  survey: { title: string }
+}
+
+async function notifySigned(p: SignedProposal, agreedTotal: number, origin: string) {
+  const { emailEnabled, sendEmail } = await import("@/lib/email")
+  if (!emailEnabled()) return
+  const to = p.createdBy?.email || p.organization.email
+  if (!to) return
+
+  const { publicBaseUrl } = await import("@/lib/public-url")
+  const { formatCurrency } = await import("@/lib/utils")
+  const url = `${publicBaseUrl(origin)}/proposals/${p.id}`
+  const html = `
+    <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;max-width:520px">
+      <p>🎉 <strong>${p.clientName}</strong> has just accepted your proposal for <strong>${p.survey.title}</strong>.</p>
+      <p>Agreed total: <strong>${formatCurrency(agreedTotal)}</strong></p>
+      <p style="margin:18px 0"><a href="${url}" style="color:#2563EB;font-weight:600">Open the proposal &rarr;</a></p>
+      <p style="color:#6b7280;font-size:13px">If a deposit is due, the client is now being prompted to pay it.</p>
+    </div>`
+  await sendEmail({
+    to,
+    subject: `✅ ${p.clientName} accepted your proposal`,
+    html,
+    text: `${p.clientName} has accepted your proposal for ${p.survey.title}. Agreed total: ${formatCurrency(agreedTotal)}.\n\nOpen it: ${url}`,
+  })
 }
