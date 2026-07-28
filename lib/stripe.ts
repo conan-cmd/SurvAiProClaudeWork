@@ -99,33 +99,48 @@ export async function retrieveCheckoutSession(sessionId: string, connectedAccoun
 
 // --- Platform subscription billing (SurvAIPro charges the firm) ---
 
-export const PLANS = {
-  monthly: { label: "Monthly", interval: "month", amountPence: 4900, priceLabel: "£49/mo" },
-  annual: { label: "Annual", interval: "year", amountPence: 49900, priceLabel: "£499/yr", note: "Save ~15%" },
+export type PlanKey = "monthly" | "annual"
+
+// First 100 firms get founding pricing (£49/mo · £499/yr), locked in for life.
+// Everyone after pays standard (£99/mo · £990/yr).
+export const FOUNDING_LIMIT = 100
+export const PRICING = {
+  founding: {
+    monthly: { amountPence: 4900, price: "£49", sub: "per month" },
+    annual: { amountPence: 49900, price: "£499", sub: "per year (£41.58/mo)" },
+  },
+  standard: {
+    monthly: { amountPence: 9900, price: "£99", sub: "per month" },
+    annual: { amountPence: 99000, price: "£990", sub: "per year (£82.50/mo)" },
+  },
 } as const
-export type PlanKey = keyof typeof PLANS
 
 // Checkout for a subscription with a 14-day trial. Card is collected up front
-// (Checkout subscription mode) so it auto-converts unless cancelled.
+// (Checkout subscription mode) so it auto-converts unless cancelled. The exact
+// price is passed in (founding vs standard) and Stripe locks it for that sub.
 export async function createSubscriptionCheckout(params: {
   plan: PlanKey
+  amountPence: number
+  founding: boolean
   organizationId: string
   customerId?: string | null
   customerEmail?: string | null
   successUrl: string
   cancelUrl: string
 }) {
-  const plan = PLANS[params.plan]
+  const interval = params.plan === "annual" ? "year" : "month"
+  const name = `SurvAIPro — ${params.founding ? "Founding " : ""}${params.plan === "annual" ? "Annual" : "Monthly"}`
   const body: Record<string, string> = {
     mode: "subscription",
     "line_items[0][price_data][currency]": "gbp",
-    "line_items[0][price_data][recurring][interval]": plan.interval,
-    "line_items[0][price_data][unit_amount]": String(plan.amountPence),
-    "line_items[0][price_data][product_data][name]": `SurvAIPro — ${plan.label}`,
+    "line_items[0][price_data][recurring][interval]": interval,
+    "line_items[0][price_data][unit_amount]": String(params.amountPence),
+    "line_items[0][price_data][product_data][name]": name,
     "line_items[0][quantity]": "1",
     "subscription_data[trial_period_days]": "14",
     "subscription_data[metadata][organizationId]": params.organizationId,
     "subscription_data[metadata][plan]": params.plan,
+    "subscription_data[metadata][founding]": params.founding ? "true" : "false",
     "metadata[organizationId]": params.organizationId,
     payment_method_collection: "always",
     allow_promotion_codes: "true",

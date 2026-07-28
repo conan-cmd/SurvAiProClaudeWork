@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/session"
 import { db } from "@/lib/db"
-import { retrieveCheckoutSession, retrieveSubscription } from "@/lib/stripe"
+import { retrieveCheckoutSession, retrieveSubscription, FOUNDING_LIMIT } from "@/lib/stripe"
 import { hasActiveAccess, applySubscription } from "@/lib/billing"
 import { SubscribePlans } from "@/components/subscribe-plans"
 
@@ -37,5 +37,14 @@ export default async function SubscribePage({
   // Already have access → no need for the paywall.
   if (org && hasActiveAccess(org)) redirect("/dashboard")
 
-  return <SubscribePlans lapsed={org?.subscriptionStatus === "canceled" || org?.subscriptionStatus === "unpaid"} />
+  const foundingUsed = await db.organization.count({ where: { isFoundingMember: true } })
+  const founding = foundingUsed < FOUNDING_LIMIT
+
+  return (
+    <SubscribePlans
+      founding={founding}
+      slotsLeft={Math.max(0, FOUNDING_LIMIT - foundingUsed)}
+      lapsed={org?.subscriptionStatus === "canceled" || org?.subscriptionStatus === "unpaid"}
+    />
+  )
 }

@@ -118,6 +118,8 @@ model Organization {
   currentPeriodEnd      DateTime?
   // Existing/comped accounts skip the paywall (backfilled true for all current orgs).
   billingExempt         Boolean         @default(false)
+  // One of the first 100 firms — £49/mo locked in for life (vs £99 standard).
+  isFoundingMember      Boolean         @default(false)
 
   users                 User[]
   invites               Invite[]

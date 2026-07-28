@@ -17,7 +17,7 @@ export async function applySubscription(sub: {
   status?: string
   current_period_end?: number
   customer?: string
-  metadata?: { organizationId?: string; plan?: string }
+  metadata?: { organizationId?: string; plan?: string; founding?: string }
 }): Promise<void> {
   const orgId = sub.metadata?.organizationId
   const where = orgId ? { id: orgId } : sub.customer ? { stripeCustomerId: sub.customer } : null
@@ -31,6 +31,8 @@ export async function applySubscription(sub: {
       subscriptionPlan: sub.metadata?.plan ?? undefined,
       currentPeriodEnd: sub.current_period_end ? new Date(sub.current_period_end * 1000) : undefined,
       ...(sub.customer ? { stripeCustomerId: sub.customer } : {}),
+      // Lock in founding status the first time we see it true (never demote).
+      ...(sub.metadata?.founding === "true" ? { isFoundingMember: true } : {}),
     },
   })
 }

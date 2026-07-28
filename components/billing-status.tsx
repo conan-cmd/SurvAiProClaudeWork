@@ -10,6 +10,7 @@ type Status = {
   plan: string | null
   currentPeriodEnd: string | null
   hasCustomer: boolean
+  founding: boolean
 }
 
 const LABELS: Record<string, string> = {
@@ -60,7 +61,13 @@ export function BillingStatus() {
             <span className="inline-flex items-center gap-1.5 font-medium text-emerald-700">
               {LABELS[s.status] || s.status}
             </span>
-            {s.plan && <span className="text-gray-400"> · {s.plan === "annual" ? "Annual (£499/yr)" : "Monthly (£49/mo)"}</span>}
+            {s.plan && (
+              <span className="text-gray-400"> · {
+                s.founding
+                  ? (s.plan === "annual" ? "Founding Annual (£499/yr)" : "Founding Monthly (£49/mo)")
+                  : (s.plan === "annual" ? "Annual (£990/yr)" : "Monthly (£99/mo)")
+              }</span>
+            )}
             {s.currentPeriodEnd && (
               <div className="text-xs text-gray-400 mt-0.5">
                 {s.status === "trialing" ? "Trial ends " : "Renews "}{dt(s.currentPeriodEnd)}

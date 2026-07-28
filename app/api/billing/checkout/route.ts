@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
-import { stripeEnabled, createSubscriptionCheckout } from "@/lib/stripe"
+import { stripeEnabled, createSubscriptionCheckout, PRICING, FOUNDING_LIMIT } from "@/lib/stripe"
 import { publicBaseUrl } from "@/lib/public-url"
 
 const schema = z.object({ plan: z.enum(["monthly", "annual"]) })
@@ -22,10 +22,17 @@ export async function POST(request: NextRequest) {
   })
   if (!org) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
+  // Founding pricing while fewer than 100 firms have claimed it.
+  const foundingUsed = await db.organization.count({ where: { isFoundingMember: true } })
+  const founding = foundingUsed < FOUNDING_LIMIT
+  const tier = founding ? PRICING.founding : PRICING.standard
+
   const origin = publicBaseUrl(request.nextUrl.origin)
   try {
     const session = await createSubscriptionCheckout({
       plan: parsed.data.plan,
+      amountPence: tier[parsed.data.plan].amountPence,
+      founding,
       organizationId: org.id,
       customerId: org.stripeCustomerId,
       customerEmail: org.email || user.email,

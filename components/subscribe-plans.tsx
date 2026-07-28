@@ -6,10 +6,16 @@ import { Loader2, Check } from "lucide-react"
 
 type Plan = "monthly" | "annual"
 
-const PLANS: { key: Plan; name: string; price: string; sub: string; badge?: string }[] = [
-  { key: "annual", name: "Annual", price: "£499", sub: "per year (£41.58/mo)", badge: "Save 15%" },
-  { key: "monthly", name: "Monthly", price: "£49", sub: "per month" },
-]
+const PRICES = {
+  founding: {
+    annual: { name: "Annual", price: "£499", sub: "per year (£41.58/mo)", badge: "Save 15%" },
+    monthly: { name: "Monthly", price: "£49", sub: "per month" },
+  },
+  standard: {
+    annual: { name: "Annual", price: "£990", sub: "per year (£82.50/mo)", badge: "Save 15%" },
+    monthly: { name: "Monthly", price: "£99", sub: "per month" },
+  },
+}
 
 const FEATURES = [
   "AI-drafted proposals from a quick site survey",
@@ -19,9 +25,18 @@ const FEATURES = [
   "Client read-tracking & win notifications",
 ]
 
-export function SubscribePlans({ lapsed = false }: { lapsed?: boolean }) {
+export function SubscribePlans({
+  lapsed = false,
+  founding = false,
+  slotsLeft = 0,
+}: { lapsed?: boolean; founding?: boolean; slotsLeft?: number }) {
   const [plan, setPlan] = useState<Plan>("annual")
   const [busy, setBusy] = useState(false)
+  const prices = founding ? PRICES.founding : PRICES.standard
+  const PLANS: { key: Plan; name: string; price: string; sub: string; badge?: string }[] = [
+    { key: "annual", ...prices.annual },
+    { key: "monthly", ...prices.monthly },
+  ]
 
   const start = async () => {
     setBusy(true)
@@ -46,11 +61,18 @@ export function SubscribePlans({ lapsed = false }: { lapsed?: boolean }) {
         <h1 className="text-2xl font-bold text-brand-navy mb-1">
           {lapsed ? "Reactivate your subscription" : "Start your 14-day free trial"}
         </h1>
-        <p className="text-gray-600 mb-6">
+        <p className="text-gray-600 mb-4">
           {lapsed
             ? "Your subscription has ended — choose a plan to get back in."
             : "Full access to everything. Cancel anytime before day 14 and you won't be charged."}
         </p>
+
+        {founding && (
+          <div className="mb-5 rounded-xl bg-brand-navy text-white p-3 text-sm">
+            🚀 <strong>Founding member pricing</strong> — only <strong>{slotsLeft} of 100</strong> spots left.
+            Lock in £49/mo <span className="opacity-80">(vs £99 later)</span> for life.
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3 mb-6">
           {PLANS.map((p) => (
