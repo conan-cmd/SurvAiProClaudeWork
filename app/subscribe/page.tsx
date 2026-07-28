@@ -1,0 +1,41 @@
+import { redirect } from "next/navigation"
+import { getCurrentUser } from "@/lib/session"
+import { db } from "@/lib/db"
+import { retrieveCheckoutSession, retrieveSubscription } from "@/lib/stripe"
+import { hasActiveAccess, applySubscription } from "@/lib/billing"
+import { SubscribePlans } from "@/components/subscribe-plans"
+
+export const dynamic = "force-dynamic"
+
+export default async function SubscribePage({
+  searchParams,
+}: {
+  searchParams: { session_id?: string }
+}) {
+  const user = await getCurrentUser()
+  if (!user) redirect("/auth/login")
+
+  // Returning from Stripe Checkout — record the subscription immediately so
+  // access is granted without waiting for the webhook.
+  if (searchParams.session_id) {
+    try {
+      const session = await retrieveCheckoutSession(searchParams.session_id)
+      if (session.subscription) {
+        const sub = await retrieveSubscription(session.subscription as string)
+        await applySubscription(sub)
+      }
+    } catch (e) {
+      console.error("Subscribe verify failed:", e)
+    }
+    redirect("/onboarding/branding")
+  }
+
+  const org = await db.organization.findUnique({
+    where: { id: user.organizationId },
+    select: { billingExempt: true, subscriptionStatus: true },
+  })
+  // Already have access → no need for the paywall.
+  if (org && hasActiveAccess(org)) redirect("/dashboard")
+
+  return <SubscribePlans lapsed={org?.subscriptionStatus === "canceled" || org?.subscriptionStatus === "unpaid"} />
+}

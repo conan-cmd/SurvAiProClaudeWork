@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/session"
+import { hasActiveAccess } from "@/lib/billing"
 import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings, ShieldAlert } from "lucide-react"
 
 const NAV = [
@@ -19,6 +20,8 @@ const MOBILE_NAV = NAV.filter((n) => n.href !== "/gallery")
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
+  // No active subscription (and not exempt) → send to the paywall.
+  if (!hasActiveAccess(user.organization)) redirect("/subscribe")
 
   return (
     <div className="min-h-screen bg-brand-gray">

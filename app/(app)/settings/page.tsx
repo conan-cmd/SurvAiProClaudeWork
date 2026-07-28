@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Loader2, Upload, Sparkles, Copy, Globe, Check, Trash2 } from "lucide-react"
 import { StripeConnect } from "@/components/stripe-connect"
+import { BillingStatus } from "@/components/billing-status"
 import { SignatureDraw } from "@/components/signature-draw"
 
 type Org = {
@@ -385,6 +386,8 @@ export default function SettingsPage() {
           <Sparkles className="w-4 h-4" /> Run the guided setup
         </a>
       </div>
+
+      <BillingStatus />
 
       <StripeConnect />
 

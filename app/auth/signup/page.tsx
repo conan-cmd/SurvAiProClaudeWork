@@ -80,8 +80,8 @@ export default function SignupPage() {
         return
       }
 
-      toast.success("Account created! Let's set up your branding.")
-      router.push("/onboarding/branding")
+      toast.success("Account created! Start your free trial.")
+      router.push("/subscribe")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Signup failed")
     } finally {

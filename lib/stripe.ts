@@ -97,6 +97,77 @@ export async function retrieveCheckoutSession(sessionId: string, connectedAccoun
   return stripeFetch(`/checkout/sessions/${encodeURIComponent(sessionId)}`, undefined, connectedAccountId || undefined)
 }
 
+// --- Platform subscription billing (SurvAIPro charges the firm) ---
+
+export const PLANS = {
+  monthly: { label: "Monthly", interval: "month", amountPence: 4900, priceLabel: "£49/mo" },
+  annual: { label: "Annual", interval: "year", amountPence: 49900, priceLabel: "£499/yr", note: "Save ~15%" },
+} as const
+export type PlanKey = keyof typeof PLANS
+
+// Checkout for a subscription with a 14-day trial. Card is collected up front
+// (Checkout subscription mode) so it auto-converts unless cancelled.
+export async function createSubscriptionCheckout(params: {
+  plan: PlanKey
+  organizationId: string
+  customerId?: string | null
+  customerEmail?: string | null
+  successUrl: string
+  cancelUrl: string
+}) {
+  const plan = PLANS[params.plan]
+  const body: Record<string, string> = {
+    mode: "subscription",
+    "line_items[0][price_data][currency]": "gbp",
+    "line_items[0][price_data][recurring][interval]": plan.interval,
+    "line_items[0][price_data][unit_amount]": String(plan.amountPence),
+    "line_items[0][price_data][product_data][name]": `SurvAIPro — ${plan.label}`,
+    "line_items[0][quantity]": "1",
+    "subscription_data[trial_period_days]": "14",
+    "subscription_data[metadata][organizationId]": params.organizationId,
+    "subscription_data[metadata][plan]": params.plan,
+    "metadata[organizationId]": params.organizationId,
+    payment_method_collection: "always",
+    allow_promotion_codes: "true",
+    success_url: params.successUrl,
+    cancel_url: params.cancelUrl,
+  }
+  if (params.customerId) body.customer = params.customerId
+  else if (params.customerEmail) body.customer_email = params.customerEmail
+  return stripeFetch("/checkout/sessions", body)
+}
+
+export async function retrieveSubscription(subscriptionId: string) {
+  return stripeFetch(`/subscriptions/${encodeURIComponent(subscriptionId)}`)
+}
+
+// Stripe-hosted portal so users manage/cancel/update card themselves.
+export async function createBillingPortal(customerId: string, returnUrl: string): Promise<{ url: string }> {
+  return stripeFetch("/billing_portal/sessions", { customer: customerId, return_url: returnUrl })
+}
+
+// Verifies a Stripe webhook signature (t=..,v1=..) without the SDK. Returns the
+// parsed event on success, or null if the signature doesn't check out.
+export async function verifyWebhook(payload: string, sigHeader: string | null, secret: string): Promise<Record<string, unknown> | null> {
+  if (!sigHeader) return null
+  const parts = Object.fromEntries(sigHeader.split(",").map((kv) => kv.split("=")))
+  const t = parts["t"]
+  const v1 = parts["v1"]
+  if (!t || !v1) return null
+  const { createHmac, timingSafeEqual } = await import("crypto")
+  const expected = createHmac("sha256", secret).update(`${t}.${payload}`).digest("hex")
+  try {
+    if (!timingSafeEqual(Buffer.from(expected), Buffer.from(v1))) return null
+  } catch {
+    return null
+  }
+  try {
+    return JSON.parse(payload)
+  } catch {
+    return null
+  }
+}
+
 export type DepositRule = { type: "PERCENT" | "FIXED" | "NONE"; value: number }
 
 export function computeDeposit(

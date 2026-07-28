@@ -110,6 +110,15 @@ model Organization {
   stripeAccountId       String?
   stripeChargesEnabled  Boolean         @default(false)
 
+  // Platform subscription billing (SurvAIPro charging the firm).
+  stripeCustomerId      String?
+  subscriptionId        String?
+  subscriptionStatus    String?  // trialing | active | past_due | canceled | unpaid | incomplete...
+  subscriptionPlan      String?  // "monthly" | "annual"
+  currentPeriodEnd      DateTime?
+  // Existing/comped accounts skip the paywall (backfilled true for all current orgs).
+  billingExempt         Boolean         @default(false)
+
   users                 User[]
   invites               Invite[]
   surveys               SiteSurvey[]
