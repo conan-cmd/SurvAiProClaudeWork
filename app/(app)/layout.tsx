@@ -2,6 +2,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/session"
 import { hasActiveAccess } from "@/lib/billing"
+import { FeedbackButton } from "@/components/feedback-button"
 import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings, ShieldAlert } from "lucide-react"
 
 const NAV = [
@@ -49,6 +50,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-6 pb-24 md:pb-10">{children}</main>
+
+      <FeedbackButton founding={user.organization.isFoundingMember} />
 
       {/* Bottom tab bar (mobile) */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t z-40">

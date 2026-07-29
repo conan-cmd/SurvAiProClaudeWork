@@ -491,3 +491,18 @@ model PricingLineItem {
 
   @@index([proposalId])
 }
+
+// In-app beta feedback from users (stored + emailed to the SurvAIPro team).
+model Feedback {
+  id                    String          @id @default(cuid())
+  organizationId        String
+  userId                String?
+  userEmail             String?
+  companyName           String?
+  isFoundingMember      Boolean         @default(false)
+  message               String
+  context               String?         // page path the feedback was sent from
+  createdAt             DateTime        @default(now())
+
+  @@index([organizationId])
+}
