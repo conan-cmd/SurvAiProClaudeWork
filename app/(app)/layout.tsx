@@ -53,6 +53,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </header>
 
+      {user.organization.subscriptionStatus === "trialing" && user.organization.currentPeriodEnd && (() => {
+        const days = Math.max(0, Math.ceil((user.organization.currentPeriodEnd.getTime() - Date.now()) / 86400000))
+        const price = user.organization.isFoundingMember ? "£79/mo" : "£149/mo"
+        return (
+          <div className="no-print bg-amber-50 border-b border-amber-200 text-amber-800 text-sm text-center py-2 px-4">
+            ⏳ <strong>{days} day{days !== 1 ? "s" : ""} left</strong> in your free trial — then {price}
+            {user.organization.isFoundingMember ? " (founding price, locked for life)" : ""}.{" "}
+            <Link href="/settings" className="underline font-medium">Manage</Link>
+          </div>
+        )
+      })()}
+
       <main className="max-w-6xl mx-auto px-4 py-6 pb-24 md:pb-10">{children}</main>
 
       <FeedbackButton founding={user.organization.isFoundingMember} />
