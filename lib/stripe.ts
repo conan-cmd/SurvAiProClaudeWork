@@ -65,6 +65,10 @@ export async function retrieveAccount(accountId: string): Promise<{
   return stripeFetch(`/accounts/${encodeURIComponent(accountId)}`)
 }
 
+// SurvAIPro's platform fee on deposits processed through a firm's connected
+// account (goes to the platform's Stripe balance). 0.01 = 1%.
+export const DEPOSIT_FEE_RATE = 0.01
+
 export async function createDepositCheckout(params: {
   amountPence: number
   proposalTitle: string
@@ -89,6 +93,11 @@ export async function createDepositCheckout(params: {
     "metadata[proposalId]": params.proposalId,
   }
   if (params.customerEmail) body.customer_email = params.customerEmail
+  // Take the platform fee only on direct charges (i.e. via a connected account).
+  if (params.connectedAccountId) {
+    const fee = Math.round(params.amountPence * DEPOSIT_FEE_RATE)
+    if (fee > 0) body["payment_intent_data[application_fee_amount]"] = String(fee)
+  }
   return stripeFetch("/checkout/sessions", body, params.connectedAccountId || undefined)
 }
 
