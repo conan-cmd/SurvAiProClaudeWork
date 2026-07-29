@@ -6,11 +6,14 @@ import { stripeEnabled } from "./stripe"
 // or if the org is exempt (existing/comped). Billing off entirely → open access.
 export function hasActiveAccess(org: {
   billingExempt: boolean
+  freeAccess?: boolean
   subscriptionStatus: string | null
   subscriptionPausedUntil?: Date | null
 }): boolean {
   if (!stripeEnabled()) return true
   if (org.billingExempt) return true
+  // Comp/tester free access via an access code (revocable).
+  if (org.freeAccess) return true
   // Paused (billing suspended) → no access until they resume.
   if (org.subscriptionPausedUntil && org.subscriptionPausedUntil.getTime() > Date.now()) return false
   return ["trialing", "active", "past_due"].includes(org.subscriptionStatus || "")

@@ -32,7 +32,7 @@ export default async function SubscribePage({
 
   const org = await db.organization.findUnique({
     where: { id: user.organizationId },
-    select: { billingExempt: true, subscriptionStatus: true, subscriptionPausedUntil: true },
+    select: { billingExempt: true, freeAccess: true, subscriptionStatus: true, subscriptionPausedUntil: true },
   })
   // Already have access → no need for the paywall.
   if (org && hasActiveAccess(org)) redirect("/dashboard")

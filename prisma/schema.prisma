@@ -118,6 +118,9 @@ model Organization {
   currentPeriodEnd      DateTime?
   // Existing/comped accounts skip the paywall (backfilled true for all current orgs).
   billingExempt         Boolean         @default(false)
+  // Free access granted by an access code (revocable). accessCodeId = which code.
+  freeAccess            Boolean         @default(false)
+  accessCodeId          String?
   // One of the first 100 firms — £49/mo locked in for life (vs £99 standard).
   isFoundingMember      Boolean         @default(false)
   // Retention: reason captured at cancel, and a paused-until date (pause vs cancel).
@@ -505,4 +508,15 @@ model Feedback {
   createdAt             DateTime        @default(now())
 
   @@index([organizationId])
+}
+
+// One-off (or limited-use) free-access codes issued by the platform for testers.
+model AccessCode {
+  id                    String          @id @default(cuid())
+  code                  String          @unique
+  label                 String?         // who it's for / note
+  active                Boolean         @default(true)
+  maxUses               Int             @default(1)
+  uses                  Int             @default(0)
+  createdAt             DateTime        @default(now())
 }

@@ -33,6 +33,26 @@ export function SubscribePlans({
 }: { lapsed?: boolean; founding?: boolean; slotsLeft?: number; pausedUntil?: string | null }) {
   const [plan, setPlan] = useState<Plan>("annual")
   const [busy, setBusy] = useState(false)
+  const [code, setCode] = useState("")
+  const [redeeming, setRedeeming] = useState(false)
+
+  const redeem = async () => {
+    if (!code.trim()) return
+    setRedeeming(true)
+    try {
+      const res = await fetch("/api/redeem-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code.trim() }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      window.location.href = "/dashboard"
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't redeem that code")
+      setRedeeming(false)
+    }
+  }
 
   const resume = async () => {
     setBusy(true)
@@ -142,6 +162,20 @@ export function SubscribePlans({
             ? "Secure payment by Stripe."
             : "14 days free, then billed automatically. Card required. Cancel anytime in Settings."}
         </p>
+
+        {/* Tester / partner access code */}
+        <div className="mt-5 pt-4 border-t">
+          <label className="block text-xs font-medium text-gray-500 mb-1.5">Got an access code?</label>
+          <div className="flex gap-2">
+            <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="SURV-XXXXXX"
+              className="flex-1 px-3 py-2 border rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+            <button onClick={redeem} disabled={redeeming || !code.trim()}
+              className="px-4 py-2 border rounded-lg text-sm font-semibold hover:bg-gray-50 disabled:opacity-50">
+              {redeeming ? <Loader2 className="w-4 h-4 animate-spin" /> : "Redeem"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
