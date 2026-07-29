@@ -110,17 +110,17 @@ export async function retrieveCheckoutSession(sessionId: string, connectedAccoun
 
 export type PlanKey = "monthly" | "annual"
 
-// First 100 firms get founding pricing (£49/mo · £499/yr), locked in for life.
-// Everyone after pays standard (£99/mo · £990/yr).
+// First 100 firms get founding pricing (£79/mo · £790/yr), locked in for life.
+// Everyone after pays standard (£149/mo · £1,490/yr).
 export const FOUNDING_LIMIT = 100
 export const PRICING = {
   founding: {
-    monthly: { amountPence: 4900, price: "£49", sub: "per month" },
-    annual: { amountPence: 49900, price: "£499", sub: "per year (£41.58/mo)" },
+    monthly: { amountPence: 7900, price: "£79", sub: "per month" },
+    annual: { amountPence: 79000, price: "£790", sub: "per year (£65.83/mo)" },
   },
   standard: {
-    monthly: { amountPence: 9900, price: "£99", sub: "per month" },
-    annual: { amountPence: 99000, price: "£990", sub: "per year (£82.50/mo)" },
+    monthly: { amountPence: 14900, price: "£149", sub: "per month" },
+    annual: { amountPence: 149000, price: "£1,490", sub: "per year (£124.17/mo)" },
   },
 } as const
 

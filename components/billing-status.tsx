@@ -130,8 +130,8 @@ export function BillingStatus() {
             {s.plan && (
               <span className="text-gray-400"> · {
                 s.founding
-                  ? (s.plan === "annual" ? "Founding Annual (£499/yr)" : "Founding Monthly (£49/mo)")
-                  : (s.plan === "annual" ? "Annual (£990/yr)" : "Monthly (£99/mo)")
+                  ? (s.plan === "annual" ? "Founding Annual (£790/yr)" : "Founding Monthly (£79/mo)")
+                  : (s.plan === "annual" ? "Annual (£1,490/yr)" : "Monthly (£149/mo)")
               }</span>
             )}
             {s.currentPeriodEnd && (

@@ -8,12 +8,12 @@ type Plan = "monthly" | "annual"
 
 const PRICES = {
   founding: {
-    annual: { name: "Annual", price: "£499", sub: "per year (£41.58/mo)", badge: "Save 15%" },
-    monthly: { name: "Monthly", price: "£49", sub: "per month" },
+    annual: { name: "Annual", price: "£790", sub: "per year (£65.83/mo)", badge: "2 months free" },
+    monthly: { name: "Monthly", price: "£79", sub: "per month" },
   },
   standard: {
-    annual: { name: "Annual", price: "£990", sub: "per year (£82.50/mo)", badge: "Save 15%" },
-    monthly: { name: "Monthly", price: "£99", sub: "per month" },
+    annual: { name: "Annual", price: "£1,490", sub: "per year (£124.17/mo)", badge: "2 months free" },
+    monthly: { name: "Monthly", price: "£149", sub: "per month" },
   },
 }
 
@@ -102,7 +102,7 @@ export function SubscribePlans({
         {founding && (
           <div className="mb-5 rounded-xl bg-brand-navy text-white p-3 text-sm">
             🚀 <strong>Founding member pricing</strong> — only <strong>{slotsLeft} of 100</strong> spots left.
-            Lock in £49/mo <span className="opacity-80">(vs £99 later)</span> for life.
+            Lock in £79/mo <span className="opacity-80">(vs £149 later)</span> for life.
           </div>
         )}
 
