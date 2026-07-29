@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { Loader2, Upload, Sparkles, Copy, Globe, Check, Trash2 } from "lucide-react"
 import { StripeConnect } from "@/components/stripe-connect"
 import { BillingStatus } from "@/components/billing-status"
+import { SignOutButton } from "@/components/sign-out-button"
 import { SignatureDraw } from "@/components/signature-draw"
 
 type Org = {
@@ -769,6 +770,11 @@ export default function SettingsPage() {
         className="w-full sm:w-auto px-6 py-3 bg-brand-blue text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50">
         {saving ? "Saving…" : "Save settings"}
       </button>
+
+      <div className="border-t pt-5 flex items-center justify-between">
+        <span className="text-sm text-gray-500 truncate">{org.name}</span>
+        <SignOutButton />
+      </div>
     </div>
   )
 }

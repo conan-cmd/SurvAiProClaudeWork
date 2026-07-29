@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/session"
 import { hasActiveAccess } from "@/lib/billing"
 import { FeedbackButton } from "@/components/feedback-button"
+import { SignOutButton } from "@/components/sign-out-button"
 import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings, ShieldAlert } from "lucide-react"
 
 const NAV = [
@@ -43,8 +44,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </Link>
             ))}
           </nav>
-          <div className="text-sm text-gray-300 truncate max-w-[140px]">
-            {user.organization.name}
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm text-gray-300 truncate max-w-[110px] md:max-w-[140px]">
+              {user.organization.name}
+            </span>
+            <SignOutButton iconOnly />
           </div>
         </div>
       </header>
