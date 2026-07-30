@@ -39,6 +39,7 @@ type ProposalData = {
     what3words: string | null
     areaSqm: number | null
     linearMeters: number | null
+    isResidential: boolean
     photos: {
       id: string
       fileUrl: string
@@ -226,6 +227,34 @@ export default function ProposalEditorPage() {
     if (!res.ok) {
       setProposal({ ...proposal, status: prev })
       toast.error("Failed to update status")
+    }
+  }
+
+  const [draftingTerms, setDraftingTerms] = useState(false)
+  const draftTerms = async (sectionId: string) => {
+    if (!proposal) return
+    setDraftingTerms(true)
+    try {
+      const type = proposal.survey.isResidential ? "residential" : "commercial"
+      const res = await fetch("/api/organization/generate-terms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      updateSection(sectionId, { content: d.terms })
+      // Also save as the org's standard terms so future proposals get them.
+      fetch("/api/organization", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(type === "commercial" ? { termsCommercial: d.terms } : { termsAndConditions: d.terms }),
+      }).catch(() => {})
+      toast.success("Terms drafted — review & edit. Saved as your standard too.")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't draft terms")
+    } finally {
+      setDraftingTerms(false)
     }
   }
 
@@ -572,12 +601,24 @@ export default function ProposalEditorPage() {
                   The cover is generated from the survey details and your branding. See Preview.
                 </p>
               ) : (
-                <textarea
-                  value={section.content}
-                  onChange={(e) => updateSection(section.id, { content: e.target.value })}
-                  rows={Math.min(14, Math.max(4, section.content.split("\n").length + 2))}
-                  className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue leading-relaxed"
-                />
+                <div>
+                  {section.type === "terms" && (
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <button onClick={() => draftTerms(section.id)} disabled={draftingTerms}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 text-brand-blue rounded-lg text-sm font-semibold hover:bg-blue-100 disabled:opacity-50">
+                        {draftingTerms ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                        {section.content.includes("MISSING") ? "Draft terms with AI" : "Re-draft terms with AI"}
+                      </button>
+                      <span className="text-xs text-gray-400">Tailored to your services — review before sending. Saved for future proposals too.</span>
+                    </div>
+                  )}
+                  <textarea
+                    value={section.content}
+                    onChange={(e) => updateSection(section.id, { content: e.target.value })}
+                    rows={Math.min(14, Math.max(4, section.content.split("\n").length + 2))}
+                    className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue leading-relaxed"
+                  />
+                </div>
               )}
               {section.content.includes("MISSING") && section.type !== "cover" && (
                 <p className="text-xs text-amber-600 mt-2 font-medium">
