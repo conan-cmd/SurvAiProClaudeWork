@@ -9,7 +9,6 @@ import { VoiceNotes, VoiceNoteWithTranscript } from "@/components/voice-notes"
 import { DictateButton } from "@/components/dictate-button"
 import { SiteLocation } from "@/components/site-location"
 import { AreaMeasure } from "@/components/area-measure"
-import { RamsButton } from "@/components/rams-button"
 
 type Survey = {
   id: string
@@ -175,8 +174,8 @@ export default function SurveyDetailPage() {
           </p>
           {survey.latitude != null && survey.longitude != null && (
             <p className="text-xs text-gray-400 mt-0.5">
-              GPS {survey.latitude.toFixed(5)}, {survey.longitude.toFixed(5)}
-              {survey.what3words ? ` · ///${survey.what3words}` : ""}
+              <span className="text-gray-500">GPS:</span> {survey.latitude.toFixed(5)}, {survey.longitude.toFixed(5)}
+              {survey.what3words ? <> · <span className="text-gray-500">what3words:</span> ///{survey.what3words}</> : ""}
             </p>
           )}
         </div>
@@ -190,18 +189,14 @@ export default function SurveyDetailPage() {
         </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {survey.proposal && (
-          <button
-            onClick={() => router.push(`/proposals/${survey.proposal!.id}`)}
-            className="flex items-center justify-center gap-2 py-3 bg-blue-50 border border-blue-200 text-brand-blue rounded-xl font-semibold hover:bg-blue-100"
-          >
-            <FileText className="w-4 h-4" /> Open proposal ({survey.proposal.status})
-          </button>
-        )}
-        <RamsButton surveyId={survey.id}
-          className="flex items-center justify-center gap-2 py-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl font-semibold hover:bg-amber-100 disabled:opacity-60" />
-      </div>
+      {survey.proposal && (
+        <button
+          onClick={() => router.push(`/proposals/${survey.proposal!.id}`)}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-blue-50 border border-blue-200 text-brand-blue rounded-xl font-semibold hover:bg-blue-100"
+        >
+          <FileText className="w-4 h-4" /> Open proposal ({survey.proposal.status})
+        </button>
+      )}
 
       {/* Survey notes */}
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">

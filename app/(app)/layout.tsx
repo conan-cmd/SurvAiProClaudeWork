@@ -70,16 +70,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <FeedbackButton founding={user.organization.isFoundingMember} />
 
       {/* Bottom tab bar (mobile) */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t z-40">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t z-40 overflow-hidden">
         <div className="grid grid-cols-6">
           {MOBILE_NAV.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
-              className="flex flex-col items-center gap-0.5 py-2.5 text-gray-500 hover:text-brand-blue"
+              className="flex flex-col items-center gap-0.5 py-2.5 px-0.5 min-w-0 text-gray-500 hover:text-brand-blue"
             >
-              <Icon className="w-5 h-5" />
-              <span className="text-[11px] font-medium">{label}</span>
+              <Icon className="w-5 h-5 shrink-0" />
+              <span className="text-[10px] font-medium leading-none truncate max-w-full">{label}</span>
             </Link>
           ))}
         </div>
