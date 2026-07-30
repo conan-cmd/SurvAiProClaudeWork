@@ -45,27 +45,37 @@ function extractMeta(html: string, name: string): string | null {
   return null
 }
 
+const isPlaceholder = (u: string) =>
+  u.startsWith("data:") || /placeholder|blank|spacer|1x1|pixel\.(gif|png)/i.test(u)
+
 function extractLogo(html: string, base: URL): string | null {
   const candidates: string[] = []
 
-  // <img> tags that look like logos
+  // <img> tags that look like logos. Prefer lazy-load attributes (data-src,
+  // srcset) over `src`, which is often a tiny transparent placeholder.
   const imgRe = /<img[^>]+>/gi
   let m: RegExpExecArray | null
-  while ((m = imgRe.exec(html)) !== null && candidates.length < 5) {
+  while ((m = imgRe.exec(html)) !== null && candidates.length < 8) {
     const tag = m[0]
-    if (/logo/i.test(tag)) {
-      const src = tag.match(/src=["']([^"']+)["']/i)
-      if (src && !src[1].startsWith("data:")) candidates.push(src[1])
+    if (!/logo/i.test(tag)) continue
+    for (const attr of ["data-src", "data-lazy-src", "data-original", "src"]) {
+      const mm = tag.match(new RegExp(`${attr}=["']([^"']+)["']`, "i"))
+      if (mm && !isPlaceholder(mm[1])) { candidates.push(mm[1]); break }
+    }
+    const ss = tag.match(/srcset=["']([^"']+)["']/i)
+    if (ss) {
+      const urls = ss[1].split(",").map((s) => s.trim().split(/\s+/)[0]).filter((u) => u && !isPlaceholder(u))
+      if (urls.length) candidates.push(urls[urls.length - 1]) // largest
     }
   }
 
   // og:image and touch icons as fallbacks
   const ogImage = extractMeta(html, "og:image")
-  if (ogImage) candidates.push(ogImage)
+  if (ogImage && !isPlaceholder(ogImage)) candidates.push(ogImage)
   const touchIcon = html.match(
     /<link[^>]+rel=["']apple-touch-icon[^"']*["'][^>]+href=["']([^"']+)["']/i
   )
-  if (touchIcon) candidates.push(touchIcon[1])
+  if (touchIcon && !isPlaceholder(touchIcon[1])) candidates.push(touchIcon[1])
 
   for (const c of candidates) {
     try {
@@ -75,6 +85,26 @@ function extractLogo(html: string, base: URL): string | null {
     }
   }
   return null
+}
+
+// Downloads the logo and stores it on our own domain, so it renders reliably
+// (no hotlink/CORS issues) and persists. Returns null on any problem.
+async function storeLogo(logoUrl: string): Promise<string | null> {
+  try {
+    const res = await fetch(logoUrl, { signal: AbortSignal.timeout(8000) })
+    if (!res.ok) return null
+    const ct = res.headers.get("content-type") || ""
+    if (!ct.startsWith("image/")) return null
+    const buf = new Uint8Array(await res.arrayBuffer())
+    if (buf.length < 500) return null // skip tiny placeholders
+    const ext = ct.includes("png") ? "png" : ct.includes("svg") ? "svg" : ct.includes("webp") ? "webp" : "jpg"
+    const { randomBytes } = await import("crypto")
+    const { uploadFile } = await import("@/lib/storage")
+    const file = new File([buf], `logo.${ext}`, { type: ct })
+    return await uploadFile(file, `organizations/imports/${randomBytes(8).toString("hex")}.${ext}`)
+  } catch {
+    return null
+  }
 }
 
 function htmlToText(html: string): string {
@@ -134,7 +164,9 @@ export async function POST(request: NextRequest) {
   const siteName = extractMeta(html, "og:site_name")
   const description = extractMeta(html, "description") || extractMeta(html, "og:description")
   const themeColor = extractMeta(html, "theme-color")
-  const logoUrl = extractLogo(html, url)
+  const rawLogoUrl = extractLogo(html, url)
+  // Store on our domain so it renders reliably; fall back to the source URL.
+  const logoUrl = rawLogoUrl ? (await storeLogo(rawLogoUrl)) || rawLogoUrl : null
   const emailMatch = html.match(/mailto:([^"'?\s>]+)/i)
   const phoneMatch = html.match(/tel:([+\d()\s-]{7,20})["'\s>]/i)
   const youtubeMatch = html.match(

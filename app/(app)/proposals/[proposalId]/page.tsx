@@ -5,7 +5,7 @@ import { useParams } from "next/navigation"
 import { toast } from "sonner"
 import {
   Loader2, Sparkles, ChevronUp, ChevronDown, Trash2, Plus, Eye,
-  Pencil, Link2, Printer, Check, Send, Copy, Share2, X,
+  Pencil, Link2, Printer, Check, Send, Copy, Share2, X, MessageCircle, MessageSquare,
 } from "lucide-react"
 import { ProposalDocument } from "@/components/proposal-document"
 import { PricingEditor, EditableLineItem } from "@/components/pricing-editor"
@@ -460,6 +460,21 @@ export default function ProposalEditorPage() {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
             <Copy className="w-4 h-4" /> Copy
           </button>
+          {(() => {
+            const msg = `Hi ${proposal.clientName}, here's your proposal for ${proposal.survey.title}: ${shareUrl}`
+            return (
+              <>
+                <a href={`https://wa.me/?text=${encodeURIComponent(msg)}`} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-[#25D366] text-white hover:brightness-95">
+                  <MessageCircle className="w-4 h-4" /> WhatsApp
+                </a>
+                <a href={`sms:?&body=${encodeURIComponent(msg)}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+                  <MessageSquare className="w-4 h-4" /> Text
+                </a>
+              </>
+            )
+          })()}
           {canShare && (
             <button onClick={nativeShareUrl}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
