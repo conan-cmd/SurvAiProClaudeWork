@@ -70,6 +70,7 @@ export default function SurveyDetailPage() {
   const [survey, setSurvey] = useState<Survey | null>(null)
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle")
   const [generating, setGenerating] = useState(false)
+  const [organising, setOrganising] = useState(false)
   const [template, setTemplate] = useState<string | null>(null)
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -148,6 +149,24 @@ export default function SurveyDetailPage() {
   const inputCls =
     "w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue text-base"
 
+  // "Say it once" — AI splits the written description (+ voice notes) into the
+  // structured survey fields, which stay fully editable.
+  const organiseNotes = async () => {
+    if (!survey) return
+    setOrganising(true)
+    try {
+      const res = await fetch(`/api/surveys/${survey.id}/organise-notes`, { method: "POST" })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      setSurvey((s) => (s ? { ...s, ...d } : s))
+      toast.success("Organised into sections — review & tweak below")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't organise the notes")
+    } finally {
+      setOrganising(false)
+    }
+  }
+
   // Appends dictated speech to a field's current value
   const dictateInto = (field: keyof Survey) => (text: string) =>
     updateField(field, (((survey[field] as string) || "") + " " + text).trim())
@@ -200,11 +219,20 @@ export default function SurveyDetailPage() {
 
       {/* Survey notes */}
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
-        <h2 className="font-semibold text-brand-navy">Survey notes</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-brand-navy">Survey notes</h2>
+          <button onClick={organiseNotes} disabled={organising}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 text-brand-blue rounded-lg text-sm font-semibold hover:bg-blue-100 disabled:opacity-50">
+            {organising ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            Organise into sections
+          </button>
+        </div>
         <div>
-          <FieldLabel label="Written description" field="writtenDescription" />
+          <FieldLabel label="Describe the whole job (type or dictate)" field="writtenDescription" />
           <textarea rows={4} className={inputCls} value={survey.writtenDescription || ""}
+            placeholder="Just describe everything about the job here — sizes, what's included/excluded, access, what the client wants. Then tap 'Organise into sections' and AI sorts it out."
             onChange={(e) => updateField("writtenDescription", e.target.value)} />
+          <p className="text-xs text-gray-400 mt-1">Say it once — AI fills the fields below, which you can then tweak.</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
