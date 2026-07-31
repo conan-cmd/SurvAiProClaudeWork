@@ -9,6 +9,7 @@ import { VoiceNotes, VoiceNoteWithTranscript } from "@/components/voice-notes"
 import { DictateButton } from "@/components/dictate-button"
 import { SiteLocation } from "@/components/site-location"
 import { AreaMeasure } from "@/components/area-measure"
+import { SiteMap } from "@/components/site-map"
 
 type Survey = {
   id: string
@@ -270,42 +271,69 @@ export default function SurveyDetailPage() {
         />
       </section>
 
-      {/* Site location & imagery */}
-      <section className="bg-white rounded-xl shadow-sm p-5">
-        <h2 className="font-semibold text-brand-navy mb-4">Site location &amp; imagery</h2>
-        <SiteLocation
-          surveyId={survey.id}
-          latitude={survey.latitude}
-          longitude={survey.longitude}
-          savedHeading={survey.streetViewHeading}
-          savedZoom={survey.aerialZoom}
-          onPhotosChange={(photos) => setSurvey((s) => (s ? { ...s, photos } : s))}
-        />
-      </section>
+      {/* Site location, imagery & measurements */}
+      {survey.latitude != null && survey.longitude != null && (() => {
+        const savedMeasurements = (() => {
+          try {
+            if (survey.mapMeasurements) return JSON.parse(survey.mapMeasurements)
+            // Back-compat: seed from the old single-polygon area.
+            if (survey.areaPolygon) return [{ id: "legacy", type: "area", points: JSON.parse(survey.areaPolygon) }]
+            return null
+          } catch { return null }
+        })()
+        const onPhotosChange = (photos: Survey["photos"]) => setSurvey((s) => (s ? { ...s, photos } : s))
 
-      {survey.latitude != null && survey.longitude != null && (
-        <section className="bg-white rounded-xl shadow-sm p-5">
-          <h2 className="font-semibold text-brand-navy mb-4">
-            Measure &amp; annotate{survey.areaSqm ? ` — ${Math.round(survey.areaSqm).toLocaleString()} m²` : ""}{survey.linearMeters ? ` · ${Math.round(survey.linearMeters).toLocaleString()} m` : ""}
-          </h2>
-          <AreaMeasure
-            surveyId={survey.id}
-            latitude={survey.latitude}
-            longitude={survey.longitude}
-            savedZoom={survey.aerialZoom}
-            savedMeasurements={(() => {
-              try {
-                if (survey.mapMeasurements) return JSON.parse(survey.mapMeasurements)
-                // Back-compat: seed from the old single-polygon area.
-                if (survey.areaPolygon) return [{ id: "legacy", type: "area", points: JSON.parse(survey.areaPolygon) }]
-                return null
-              } catch { return null }
-            })()}
-            savedShowOnProposal={survey.showMeasurementsOnProposal}
-            onPhotosChange={(photos) => setSurvey((s) => (s ? { ...s, photos } : s))}
-          />
-        </section>
-      )}
+        // Interactive Google-Earth-style aerial when the browser Maps key is set;
+        // otherwise fall back to the static location + measure components.
+        if (process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
+          return (
+            <section className="bg-white rounded-xl shadow-sm p-5">
+              <h2 className="font-semibold text-brand-navy mb-4">
+                Site map{survey.areaSqm ? ` — ${Math.round(survey.areaSqm).toLocaleString()} m²` : ""}{survey.linearMeters ? ` · ${Math.round(survey.linearMeters).toLocaleString()} m` : ""}
+              </h2>
+              <SiteMap
+                surveyId={survey.id}
+                latitude={survey.latitude}
+                longitude={survey.longitude}
+                savedMeasurements={savedMeasurements}
+                savedShowOnProposal={survey.showMeasurementsOnProposal}
+                onPhotosChange={onPhotosChange}
+              />
+            </section>
+          )
+        }
+
+        return (
+          <>
+            <section className="bg-white rounded-xl shadow-sm p-5">
+              <h2 className="font-semibold text-brand-navy mb-4">Site location &amp; imagery</h2>
+              <SiteLocation
+                surveyId={survey.id}
+                latitude={survey.latitude}
+                longitude={survey.longitude}
+                savedHeading={survey.streetViewHeading}
+                savedZoom={survey.aerialZoom}
+                onPhotosChange={onPhotosChange}
+              />
+            </section>
+
+            <section className="bg-white rounded-xl shadow-sm p-5">
+              <h2 className="font-semibold text-brand-navy mb-4">
+                Measure &amp; annotate{survey.areaSqm ? ` — ${Math.round(survey.areaSqm).toLocaleString()} m²` : ""}{survey.linearMeters ? ` · ${Math.round(survey.linearMeters).toLocaleString()} m` : ""}
+              </h2>
+              <AreaMeasure
+                surveyId={survey.id}
+                latitude={survey.latitude}
+                longitude={survey.longitude}
+                savedZoom={survey.aerialZoom}
+                savedMeasurements={savedMeasurements}
+                savedShowOnProposal={survey.showMeasurementsOnProposal}
+                onPhotosChange={onPhotosChange}
+              />
+            </section>
+          </>
+        )
+      })()}
 
       {/* Voice notes */}
       <section className="bg-white rounded-xl shadow-sm p-5">
