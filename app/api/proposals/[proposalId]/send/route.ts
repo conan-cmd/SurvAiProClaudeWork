@@ -4,6 +4,7 @@ import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { canSend, sendEmail } from "@/lib/email"
+import { canSendProposal } from "@/lib/permissions"
 import { slugify } from "@/lib/utils"
 import { publicBaseUrl } from "@/lib/public-url"
 
@@ -33,6 +34,14 @@ export async function POST(
     include: { organization: true, survey: { select: { title: true } } },
   })
   if (!proposal) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
+  // Draft-only users must have the proposal signed off before it can be sent.
+  if (!canSendProposal(user, proposal)) {
+    return NextResponse.json(
+      { error: "This proposal needs to be signed off by an approver before it can be sent. Use “Submit for review”." },
+      { status: 403 }
+    )
+  }
 
   const parsed = sendSchema.safeParse(await request.json())
   if (!parsed.success) {

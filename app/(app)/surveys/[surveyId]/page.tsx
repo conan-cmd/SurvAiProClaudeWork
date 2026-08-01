@@ -25,6 +25,8 @@ type Survey = {
   accessNotes: string | null
   measurements: string | null
   exclusions: string | null
+  chemicalsRequired: string | null
+  waterSupply: string | null
   writtenDescription: string | null
   latitude: number | null
   longitude: number | null
@@ -255,6 +257,18 @@ export default function SurveyDetailPage() {
             <FieldLabel label="Exclusions" field="exclusions" />
             <textarea rows={2} className={inputCls} value={survey.exclusions || ""}
               onChange={(e) => updateField("exclusions", e.target.value)} />
+          </div>
+          <div>
+            <FieldLabel label="Chemicals required" field="chemicalsRequired" />
+            <textarea rows={2} className={inputCls} value={survey.chemicalsRequired || ""}
+              placeholder="e.g. sodium hypochlorite 5%, biocide, softwash mix"
+              onChange={(e) => updateField("chemicalsRequired", e.target.value)} />
+          </div>
+          <div>
+            <FieldLabel label="Water supply" field="waterSupply" />
+            <textarea rows={2} className={inputCls} value={survey.waterSupply || ""}
+              placeholder="e.g. outside tap on-site / bring bowser / low pressure"
+              onChange={(e) => updateField("waterSupply", e.target.value)} />
           </div>
         </div>
       </section>

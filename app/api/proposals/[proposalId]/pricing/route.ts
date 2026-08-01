@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
+import { resetApprovalIfEdited } from "@/lib/permissions"
 
 const lineItemSchema = z.object({
   id: z.string().optional(), // present = update, absent = create
@@ -58,6 +59,8 @@ export async function PUT(
       orderBy: { order: "asc" },
     })
   })
+
+  await resetApprovalIfEdited(proposal.id, user, proposal)
 
   return NextResponse.json(items)
 }

@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import {
   Loader2, Sparkles, ChevronUp, ChevronDown, Trash2, Plus, Eye,
   Pencil, Link2, Printer, Check, Send, Copy, Share2, X, MessageCircle, MessageSquare,
+  ShieldCheck, ClipboardCheck, Clock, AlertTriangle,
 } from "lucide-react"
 import { ProposalDocument } from "@/components/proposal-document"
 import { PricingEditor, EditableLineItem } from "@/components/pricing-editor"
@@ -65,6 +66,9 @@ type ProposalData = {
     showCoordinatesOnProposal: boolean
   }
   views: { totalSeconds: number; sections: string | null; createdAt: string; updatedAt: string }[]
+  approvalStatus: "NONE" | "PENDING" | "APPROVED" | "CHANGES_REQUESTED"
+  reviewNote: string | null
+  me: { canSend: boolean; isApprover: boolean; id: string }
 }
 
 const STATUSES = ["DRAFT", "READY", "SENT", "SIGNED", "DEPOSIT_PAID", "WON", "LOST"] as const
@@ -323,6 +327,53 @@ export default function ProposalEditorPage() {
     }
   }
 
+  const [reviewBusy, setReviewBusy] = useState(false)
+
+  const submitForReview = async () => {
+    if (!proposal) return
+    setReviewBusy(true)
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/submit-review`, { method: "POST" })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      setProposal({ ...proposal, approvalStatus: "PENDING", reviewNote: null })
+      toast.success("Sent for review — an approver will sign it off")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't submit for review")
+    } finally {
+      setReviewBusy(false)
+    }
+  }
+
+  const review = async (decision: "approve" | "changes") => {
+    if (!proposal) return
+    let note: string | undefined
+    if (decision === "changes") {
+      note = window.prompt("What needs changing? (the drafter will see this note)") || undefined
+      if (note === undefined) return // cancelled
+    }
+    setReviewBusy(true)
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ decision, note }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      setProposal({
+        ...proposal,
+        approvalStatus: decision === "approve" ? "APPROVED" : "CHANGES_REQUESTED",
+        reviewNote: decision === "approve" ? null : (note || null),
+      })
+      toast.success(decision === "approve" ? "Approved — ready to send" : "Sent back with your notes")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't complete the review")
+    } finally {
+      setReviewBusy(false)
+    }
+  }
+
   const createShareLink = async () => {
     setSharing(true)
     try {
@@ -440,13 +491,61 @@ export default function ProposalEditorPage() {
             className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
             <Link2 className="w-4 h-4" /> Share
           </button>
-          <button onClick={openSend} disabled={sending}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
-            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            Send
-          </button>
+          {/* Approver actions when a proposal is waiting on sign-off */}
+          {proposal.me.isApprover && proposal.approvalStatus === "PENDING" && (
+            <>
+              <button onClick={() => review("approve")} disabled={reviewBusy}
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50">
+                {reviewBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} Approve
+              </button>
+              <button onClick={() => review("changes")} disabled={reviewBusy}
+                className="inline-flex items-center gap-1.5 px-3 py-2 border border-amber-300 text-amber-700 bg-amber-50 rounded-lg text-sm font-medium hover:bg-amber-100 disabled:opacity-50">
+                Request changes
+              </button>
+            </>
+          )}
+
+          {(proposal.me.canSend || proposal.approvalStatus === "APPROVED") ? (
+            <button onClick={openSend} disabled={sending}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Send
+            </button>
+          ) : proposal.approvalStatus === "PENDING" ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-500">
+              <Clock className="w-4 h-4" /> Awaiting review
+            </span>
+          ) : (
+            <button onClick={submitForReview} disabled={reviewBusy}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+              {reviewBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardCheck className="w-4 h-4" />}
+              Submit for review
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Approval-state banners */}
+      {proposal.approvalStatus === "PENDING" && (
+        <div className="no-print flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-800">
+          <Clock className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>{proposal.me.isApprover ? "This proposal is waiting for your sign-off. Approve it or request changes above." : "Submitted for review — you'll be able to send it once an approver signs it off."}</span>
+        </div>
+      )}
+      {proposal.approvalStatus === "CHANGES_REQUESTED" && (
+        <div className="no-print flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>
+            <strong>Changes requested.</strong>{proposal.reviewNote ? ` ${proposal.reviewNote}` : ""} Make your edits, then submit for review again.
+          </span>
+        </div>
+      )}
+      {proposal.approvalStatus === "APPROVED" && (
+        <div className="no-print flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
+          <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>Signed off and ready to send.</span>
+        </div>
+      )}
 
       {shareUrl && (
         <div className="no-print flex flex-wrap items-center gap-2 rounded-lg border border-brand-blue/30 bg-blue-50 px-3 py-2">

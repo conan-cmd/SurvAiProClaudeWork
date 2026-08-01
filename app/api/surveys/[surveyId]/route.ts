@@ -46,6 +46,7 @@ export async function PATCH(
       "clientName", "clientCompany", "clientEmail", "clientPhone", "clientAddress",
       "title", "serviceType", "isResidential", "clientPriorities", "accessNotes",
       "measurements", "exclusions", "writtenDescription", "status", "folderId",
+      "chemicalsRequired", "waterSupply",
     ]
     const data: Record<string, unknown> = {}
     for (const key of allowed) {

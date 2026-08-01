@@ -64,7 +64,7 @@ type Me = {
 }
 
 type TeamData = {
-  users: { id: string; name: string | null; email: string; role: string; headshotUrl: string | null }[]
+  users: { id: string; name: string | null; email: string; role: string; headshotUrl: string | null; canSendProposals?: boolean }[]
   invites: { id: string; email: string; token: string }[]
 }
 
@@ -590,7 +590,10 @@ export default function SettingsPage() {
           Everyone here shares this organisation&apos;s surveys, proposals and settings.
         </p>
         <div className="space-y-2">
-          {team?.users.map((u) => (
+          {team?.users.map((u) => {
+            const canManage = (me?.role === "OWNER" || me?.role === "ADMIN") && u.role !== "OWNER" && u.id !== me?.id
+            const draftOnly = u.canSendProposals === false
+            return (
             <div key={u.id} className="flex items-center gap-3">
               {u.headshotUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -600,12 +603,33 @@ export default function SettingsPage() {
                   {(u.name || u.email)[0].toUpperCase()}
                 </div>
               )}
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium truncate">{u.name || u.email}</div>
-                <div className="text-xs text-gray-400 truncate">{u.email} · {u.role.toLowerCase()}</div>
+                <div className="text-xs text-gray-400 truncate">
+                  {u.email} · {u.role.toLowerCase()}
+                  {u.role !== "OWNER" && (draftOnly ? " · draft only" : " · can send")}
+                </div>
               </div>
+              {canManage && (
+                <label className="shrink-0 flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer" title="If off, this person must have their proposals signed off before sending">
+                  <input type="checkbox" checked={!draftOnly}
+                    onChange={async (e) => {
+                      const canSend = e.target.checked
+                      setTeam((t) => t ? { ...t, users: t.users.map((x) => x.id === u.id ? { ...x, canSendProposals: canSend } : x) } : t)
+                      const res = await fetch(`/api/team/${u.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ canSendProposals: canSend }),
+                      })
+                      if (res.ok) toast.success(canSend ? "Can send proposals" : "Set to draft only — proposals need sign-off")
+                      else toast.error("Couldn't update")
+                    }}
+                    className="rounded accent-blue-600" />
+                  Can send
+                </label>
+              )}
             </div>
-          ))}
+          )})}
           {team?.invites.map((i) => (
             <div key={i.id} className="flex items-center gap-3 opacity-60">
               <div className="w-8 h-8 rounded-full border-2 border-dashed" />

@@ -34,7 +34,7 @@ export async function POST(
       messages: [
         {
           role: "system",
-          content: `You organise a tradesperson's rough site-survey notes into structured fields for a proposal tool. Use ONLY what's in the notes — never invent. If something isn't mentioned, return an empty string for it. Keep each field concise and factual, in British English. Respond with JSON only: {"measurements": string, "exclusions": string, "clientPriorities": string, "accessNotes": string, "writtenDescription": string}. "writtenDescription" = a tidied one-paragraph summary of the works; the others pull out the relevant specifics (sizes/areas; what's NOT included; what the client cares about; access/parking/welfare/hazards).`,
+          content: `You organise a tradesperson's rough site-survey notes into structured fields for a proposal tool. Use ONLY what's in the notes — never invent. If something isn't mentioned, return an empty string for it. Keep each field concise and factual, in British English. Respond with JSON only: {"measurements": string, "exclusions": string, "clientPriorities": string, "accessNotes": string, "chemicalsRequired": string, "waterSupply": string, "writtenDescription": string}. "writtenDescription" = a tidied one-paragraph summary of the works; the others pull out the relevant specifics (sizes/areas; what's NOT included; what the client cares about; access/parking/welfare/hazards; "chemicalsRequired" = any cleaning chemicals/products mentioned e.g. sodium hypochlorite, biocide, softwash; "waterSupply" = on-site water availability e.g. outside tap, need a bowser, access/pressure).`,
         },
         {
           role: "user",
@@ -48,7 +48,7 @@ export async function POST(
     const str = (v: unknown) => (typeof v === "string" ? v.trim() : "")
 
     const data: Record<string, string> = {}
-    for (const f of ["measurements", "exclusions", "clientPriorities", "accessNotes", "writtenDescription"] as const) {
+    for (const f of ["measurements", "exclusions", "clientPriorities", "accessNotes", "chemicalsRequired", "waterSupply", "writtenDescription"] as const) {
       if (str(d[f])) data[f] = str(d[f])
     }
     if (Object.keys(data).length === 0) {

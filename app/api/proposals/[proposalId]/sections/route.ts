@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
+import { resetApprovalIfEdited } from "@/lib/permissions"
 
 const createSectionSchema = z.object({
   type: z.string().default("custom"),
@@ -38,6 +39,7 @@ export async function POST(
   const section = await db.proposalSection.create({
     data: { ...parsed.data, proposalId: proposal.id },
   })
+  await resetApprovalIfEdited(proposal.id, user, proposal)
 
   return NextResponse.json(section, { status: 201 })
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
+import { resetApprovalIfEdited } from "@/lib/permissions"
 import { regenerateSection, friendlyAIError } from "@/lib/ai"
 
 const updateSectionSchema = z.object({
@@ -41,6 +42,9 @@ export async function PATCH(
     },
   })
 
+  const p = await db.proposal.findUnique({ where: { id: params.proposalId }, select: { approvalStatus: true } })
+  if (p) await resetApprovalIfEdited(params.proposalId, user, p)
+
   return NextResponse.json(updated)
 }
 
@@ -55,6 +59,8 @@ export async function DELETE(
   if (!section) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
   await db.proposalSection.delete({ where: { id: params.sectionId } })
+  const p = await db.proposal.findUnique({ where: { id: params.proposalId }, select: { approvalStatus: true } })
+  if (p) await resetApprovalIfEdited(params.proposalId, user, p)
   return NextResponse.json({ success: true })
 }
 
@@ -88,6 +94,8 @@ Client priorities: ${s.clientPriorities || "none"}
 Access notes: ${s.accessNotes || "none"}
 Measurements: ${s.measurements || "none"}
 Exclusions: ${s.exclusions || "none"}
+Chemicals required: ${s.chemicalsRequired || "none"}
+Water supply: ${s.waterSupply || "none"}
 Approved transcripts: ${s.transcripts.map((t) => t.text).join(" | ") || "none"}`
 
   try {

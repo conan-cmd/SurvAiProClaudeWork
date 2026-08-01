@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
+import { userCanSend, isApprover } from "@/lib/permissions"
 
 const updateProposalSchema = z.object({
   status: z.enum(["DRAFT", "READY", "SENT", "SIGNED", "DEPOSIT_PAID", "WON", "LOST"]).optional(),
@@ -41,7 +42,9 @@ export async function GET(
   })
 
   if (!proposal) return NextResponse.json({ error: "Not found" }, { status: 404 })
-  return NextResponse.json(proposal)
+  // Expose the caller's permissions so the editor can show the right controls.
+  const me = { canSend: userCanSend(user), isApprover: isApprover(user), id: user.id }
+  return NextResponse.json({ ...proposal, me })
 }
 
 export async function PATCH(

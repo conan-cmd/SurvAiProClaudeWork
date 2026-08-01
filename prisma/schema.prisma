@@ -20,6 +20,10 @@ model User {
 
   role                  UserRole        @default(MEMBER)
 
+  // When false, this user can draft proposals but must have them signed off by an
+  // approver (OWNER/ADMIN) before they can be sent. Owners/admins always can send.
+  canSendProposals      Boolean         @default(true)
+
   // Personal sign-off for proposals this user creates
   signOffName           String?
   headshotUrl           String?
@@ -57,6 +61,14 @@ enum UserRole {
   OWNER
   ADMIN
   MEMBER
+}
+
+// Sign-off state for a proposal drafted by a restricted (draft-only) user.
+enum ApprovalStatus {
+  NONE               // no review needed / never submitted
+  PENDING            // submitted, waiting for an approver
+  APPROVED           // signed off — ready to send
+  CHANGES_REQUESTED  // approver asked for changes
 }
 
 model Organization {
@@ -208,6 +220,9 @@ model SiteSurvey {
   accessNotes           String?
   measurements          String?
   exclusions            String?
+  // Exterior-cleaning prompts for the surveyor
+  chemicalsRequired     String?  // e.g. sodium hypochlorite, biocide, softwash mix
+  waterSupply           String?  // on-site tap? bring bowser? access/pressure notes
 
   // Content
   writtenDescription    String?
@@ -354,6 +369,14 @@ model Proposal {
   // Metadata
   status                ProposalStatus  @default(DRAFT)
   sentAt                DateTime?
+
+  // Sign-off workflow (for draft-only surveyors — see User.canSendProposals)
+  approvalStatus        ApprovalStatus  @default(NONE)
+  submittedById         String?         // who sent it for review
+  submittedAt           DateTime?
+  reviewedById          String?         // approver who approved / requested changes
+  reviewedAt            DateTime?
+  reviewNote            String?         // approver's note when requesting changes
 
   generationMs          Int? // how long the AI draft took - proves the tagline
 
