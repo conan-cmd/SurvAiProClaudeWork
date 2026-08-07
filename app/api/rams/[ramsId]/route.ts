@@ -18,6 +18,7 @@ export async function GET(
           id: true,
           title: true,
           clientName: true,
+          clientEmail: true,
           clientAddress: true,
           serviceType: true,
           proposal: { select: { id: true } },

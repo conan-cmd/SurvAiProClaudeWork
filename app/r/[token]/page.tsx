@@ -45,6 +45,8 @@ export default function PublicRamsPage() {
   const [data, setData] = useState<Data | null>(null)
   const [notFound, setNotFound] = useState(false)
 
+  // Clients receive a ?client=1 link — a read-only copy with no sign-off section.
+  const [clientView, setClientView] = useState(false)
   const [selectedId, setSelectedId] = useState<string | "new" | null>(null)
   const [name, setName] = useState("")
   const [state, setState] = useState<"idle" | "submitting" | "done">("idle")
@@ -61,6 +63,9 @@ export default function PublicRamsPage() {
       .catch(() => setNotFound(true))
   }
   useEffect(load, [token])
+  useEffect(() => {
+    setClientView(new URLSearchParams(window.location.search).get("client") === "1")
+  }, [])
 
   const pos = (e: React.PointerEvent) => {
     const c = canvasRef.current!
@@ -213,8 +218,12 @@ export default function PublicRamsPage() {
         {list(s.coshh).length > 0 && <Section title="COSHH & hazardous substances"><Bullets items={list(s.coshh)} /></Section>}
         {list(s.competency).length > 0 && <Section title="Competency"><Bullets items={list(s.competency)} /></Section>}
 
-        {/* Sign block */}
-        {state === "done" ? (
+        {/* Sign block — hidden for the read-only client view */}
+        {clientView ? (
+          <div className="bg-white rounded-xl shadow-sm p-5 text-center text-sm text-gray-500">
+            This is a read-only copy of the Risk Assessment &amp; Method Statement, shared for your information.
+          </div>
+        ) : state === "done" ? (
           <div className="bg-white rounded-xl shadow-sm p-8 text-center" style={{ borderTop: `4px solid ${brand}` }}>
             <CheckCircle2 className="w-12 h-12 mx-auto mb-3" style={{ color: brand }} />
             <h3 className="text-xl font-bold text-gray-900 mb-1">Signed — thank you</h3>

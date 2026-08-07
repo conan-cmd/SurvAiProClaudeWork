@@ -6,23 +6,31 @@ import Link from "next/link"
 import { toast } from "sonner"
 import {
   Loader2, Sparkles, Plus, Trash2, Printer, ClipboardList, FileText,
-  AlertTriangle, Check, Send, MessageCircle, Copy, Link2,
+  AlertTriangle, Check, Send, MessageCircle, Copy, Link2, X,
+  Footprints, Shirt, Hand, Glasses, Umbrella, HardHat, Ear, Wind, LifeBuoy, Shield, ShieldCheck,
 } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 
 // Common PPE for exterior-cleaning / trade work, shown as a selectable icon grid.
-// Emoji render consistently on screen and in the printed PDF.
-const PPE_PRESETS: { label: string; icon: string }[] = [
-  { label: "Safety boots", icon: "🥾" },
-  { label: "Hi-vis clothing", icon: "🦺" },
-  { label: "Protective gloves", icon: "🧤" },
-  { label: "Eye protection / goggles", icon: "🥽" },
-  { label: "Waterproof clothing", icon: "🧥" },
-  { label: "Hard hat", icon: "⛑️" },
-  { label: "Ear protection", icon: "🎧" },
-  { label: "Dust mask / RPE", icon: "😷" },
-  { label: "Harness & fall protection", icon: "🪢" },
-  { label: "Face shield", icon: "🛡️" },
+// Uses inline SVG (lucide) icons — unlike emoji, these rasterise reliably in the
+// exported PDF (html2canvas frequently drops emoji glyphs).
+const PPE_PRESETS: { label: string; Icon: LucideIcon }[] = [
+  { label: "Safety boots", Icon: Footprints },
+  { label: "Hi-vis clothing", Icon: Shirt },
+  { label: "Protective gloves", Icon: Hand },
+  { label: "Eye protection / goggles", Icon: Glasses },
+  { label: "Waterproof clothing", Icon: Umbrella },
+  { label: "Hard hat", Icon: HardHat },
+  { label: "Ear protection", Icon: Ear },
+  { label: "Dust mask / RPE", Icon: Wind },
+  { label: "Harness & fall protection", Icon: LifeBuoy },
+  { label: "Face shield", Icon: Shield },
 ]
+// Best-match icon for any PPE label (presets + free-text extras).
+function ppeIconFor(label: string): LucideIcon {
+  const p = PPE_PRESETS.find((x) => x.label.trim().toLowerCase() === label.trim().toLowerCase())
+  return p ? p.Icon : ShieldCheck
+}
 
 type Hazard = {
   hazard: string; whoAtRisk: string; controls: string; ppe: string
@@ -89,6 +97,7 @@ type Rams = {
     id: string
     title: string
     clientName: string
+    clientEmail: string | null
     clientAddress: string
     serviceType: string
     proposal: { id: string } | null
@@ -117,6 +126,10 @@ export default function RamsPage() {
   const [sendingOps, setSendingOps] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [sendOpen, setSendOpen] = useState(false)
+  const [sendTo, setSendTo] = useState("")
+  const [sendMessage, setSendMessage] = useState("")
+  const [sending, setSending] = useState(false)
   const pdfRef = useRef<HTMLDivElement>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Accumulate concurrent field edits so a quick edit to one field never drops
@@ -291,6 +304,34 @@ export default function RamsPage() {
     }
   }
 
+  const openSend = () => {
+    setSendTo(rams?.survey.clientEmail || "")
+    setSendMessage("")
+    setSendOpen(true)
+  }
+  const doSend = async () => {
+    if (!sendTo.trim()) {
+      toast.error("Enter a recipient email")
+      return
+    }
+    setSending(true)
+    try {
+      const res = await fetch(`/api/rams/${ramsId}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: sendTo.trim(), message: sendMessage || undefined }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      setSendOpen(false)
+      toast.success(`RAMS sent to ${sendTo.trim()}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't send")
+    } finally {
+      setSending(false)
+    }
+  }
+
   const norm = (s: string) => s.trim().toLowerCase()
   const isPreset = (label: string) => PPE_PRESETS.some((p) => norm(p.label) === norm(label))
   const ppeHas = (label: string) => ppe.some((p) => norm(p) === norm(label))
@@ -363,6 +404,10 @@ export default function RamsPage() {
           <button onClick={downloadPdf} disabled={pdfBusy}
             className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
             {pdfBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />} PDF
+          </button>
+          <button onClick={openSend}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
+            <Send className="w-4 h-4" /> Send to client
           </button>
         </div>
       </div>
@@ -463,26 +508,35 @@ export default function RamsPage() {
           <h2 className="font-semibold text-brand-navy mb-1">5. PPE required</h2>
           <p className="no-print text-xs text-gray-400 mb-3">Tap to select the PPE for this job. Add anything else below.</p>
           <div className="no-print grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {PPE_PRESETS.map((p) => {
-              const on = ppeHas(p.label)
+            {PPE_PRESETS.map(({ label, Icon }) => {
+              const on = ppeHas(label)
               return (
-                <button key={p.label} type="button" onClick={() => togglePpe(p.label)}
+                <button key={label} type="button" onClick={() => togglePpe(label)}
                   aria-pressed={on}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm text-left transition ${
                     on ? "border-brand-blue bg-blue-50 text-brand-navy font-medium" : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
                   }`}>
-                  <span className="text-lg leading-none">{p.icon}</span>
-                  <span className="flex-1">{p.label}</span>
+                  <Icon className="w-5 h-5 shrink-0" />
+                  <span className="flex-1">{label}</span>
                   {on && <Check className="w-4 h-4 text-brand-blue shrink-0" />}
                 </button>
               )
             })}
           </div>
-          {/* Selected PPE — the record that prints in the PDF */}
+          {/* Selected PPE — the record that prints in the PDF, as icon chips so the
+              icons actually appear (unlike the old emoji, which html2canvas dropped). */}
           {ppe.filter((x) => x.trim()).length > 0 && (
-            <ul className="print:block list-disc pl-5 mt-3 text-sm text-gray-700 space-y-0.5 hidden">
-              {ppe.filter((x) => x.trim()).map((x, i) => <li key={i}>{x}</li>)}
-            </ul>
+            <div className="hidden print:block mt-3">
+              {ppe.filter((x) => x.trim()).map((label, i) => {
+                const Icon = ppeIconFor(label)
+                return (
+                  <span key={i} className="inline-flex items-center gap-1.5 mr-2 mb-2 px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-800 align-top">
+                    <Icon className="w-4 h-4 shrink-0" />
+                    {label}
+                  </span>
+                )
+              })}
+            </div>
           )}
           {/* Custom extras */}
           <label className="no-print block text-[11px] text-gray-400 mt-4 mb-1">Other PPE (one per line)</label>
@@ -764,6 +818,41 @@ export default function RamsPage() {
           </div>
         </section>
       </div>
+
+      {sendOpen && (
+        <div className="no-print fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4"
+          onClick={() => !sending && setSendOpen(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-brand-navy">Send RAMS to client</h3>
+              <button onClick={() => setSendOpen(false)} disabled={sending} aria-label="Close"
+                className="p-1 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+              <input type="text" inputMode="email" value={sendTo} onChange={(e) => setSendTo(e.target.value)}
+                placeholder="client@email.com, partner@email.com"
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+              <p className="text-xs text-gray-400 mt-1">Sending to more than one person? Separate each email with a comma.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Message (optional)</label>
+              <textarea rows={3} value={sendMessage} onChange={(e) => setSendMessage(e.target.value)}
+                placeholder="A short personal note…"
+                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+            </div>
+            <p className="text-xs text-gray-400">The client gets a link to a clean, read-only version of this RAMS (no operative sign-off section).</p>
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={() => setSendOpen(false)} disabled={sending}
+                className="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
+              <button onClick={doSend} disabled={sending}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
