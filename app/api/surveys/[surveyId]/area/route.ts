@@ -12,7 +12,11 @@ const schema = z.object({
     points: z.array(latlng),
     label: z.string().max(120).optional(),
   })).max(50),
-  zoom: z.number().int().min(15).max(21).optional(),
+  zoom: z.number().int().min(1).max(21).optional(),
+  // Optional viewport centre so the baked composite frames exactly what the user
+  // sees (defaults to the survey pin when absent).
+  centerLat: z.number().min(-90).max(90).optional(),
+  centerLng: z.number().min(-180).max(180).optional(),
   showOnProposal: z.boolean().optional(),
   renderedImage: z.string().startsWith("data:image/").max(8_000_000).optional(),
 })
@@ -64,8 +68,9 @@ export async function POST(
     await attachMeasurementImagery({
       surveyId: survey.id,
       organizationId: user.organizationId,
-      lat: survey.latitude,
-      lng: survey.longitude,
+      // Centre on the framed viewport when provided; else the survey pin.
+      lat: parsed.data.centerLat ?? survey.latitude,
+      lng: parsed.data.centerLng ?? survey.longitude,
       zoom,
       measurements,
       include: showOnProposal,

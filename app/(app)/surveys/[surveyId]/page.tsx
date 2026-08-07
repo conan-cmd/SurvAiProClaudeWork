@@ -10,6 +10,7 @@ import { DictateButton } from "@/components/dictate-button"
 import { SiteLocation } from "@/components/site-location"
 import { AreaMeasure } from "@/components/area-measure"
 import { SiteMap } from "@/components/site-map"
+import { SiteAddress, LocationUpdate } from "@/components/site-address"
 
 type Survey = {
   id: string
@@ -285,8 +286,26 @@ export default function SurveyDetailPage() {
         />
       </section>
 
-      {/* Site location, imagery & measurements */}
-      {survey.latitude != null && survey.longitude != null && (() => {
+      {/* Site address, location, imagery & measurements */}
+      {(() => {
+        const hasCoords = survey.latitude != null && survey.longitude != null
+        const onPhotosChange = (photos: Survey["photos"]) => setSurvey((s) => (s ? { ...s, photos } : s))
+        const onLocationUpdated = (data: LocationUpdate) =>
+          setSurvey((s) =>
+            s
+              ? {
+                  ...s,
+                  clientAddress: data.clientAddress,
+                  latitude: data.latitude,
+                  longitude: data.longitude,
+                  what3words: data.what3words,
+                  photos: data.photos,
+                  // Fresh location — old fine-tuning no longer applies.
+                  streetViewHeading: null,
+                  aerialZoom: null,
+                }
+              : s
+          )
         const savedMeasurements = (() => {
           try {
             if (survey.mapMeasurements) return JSON.parse(survey.mapMeasurements)
@@ -295,57 +314,63 @@ export default function SurveyDetailPage() {
             return null
           } catch { return null }
         })()
-        const onPhotosChange = (photos: Survey["photos"]) => setSurvey((s) => (s ? { ...s, photos } : s))
-
-        // Interactive Google-Earth-style aerial when the browser Maps key is set;
-        // otherwise fall back to the static location + measure components.
-        if (process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
-          return (
-            <section className="bg-white rounded-xl shadow-sm p-5">
-              <h2 className="font-semibold text-brand-navy mb-4">
-                Site map{survey.areaSqm ? ` — ${Math.round(survey.areaSqm).toLocaleString()} m²` : ""}{survey.linearMeters ? ` · ${Math.round(survey.linearMeters).toLocaleString()} m` : ""}
-              </h2>
-              <SiteMap
-                surveyId={survey.id}
-                latitude={survey.latitude}
-                longitude={survey.longitude}
-                savedMeasurements={savedMeasurements}
-                savedShowOnProposal={survey.showMeasurementsOnProposal}
-                onPhotosChange={onPhotosChange}
-              />
-            </section>
-          )
-        }
 
         return (
-          <>
-            <section className="bg-white rounded-xl shadow-sm p-5">
-              <h2 className="font-semibold text-brand-navy mb-4">Site location &amp; imagery</h2>
-              <SiteLocation
-                surveyId={survey.id}
-                latitude={survey.latitude}
-                longitude={survey.longitude}
-                savedHeading={survey.streetViewHeading}
-                savedZoom={survey.aerialZoom}
-                onPhotosChange={onPhotosChange}
-              />
-            </section>
+          <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+            <h2 className="font-semibold text-brand-navy">Site location</h2>
+            <SiteAddress
+              surveyId={survey.id}
+              address={survey.clientAddress}
+              hasCoords={hasCoords}
+              onUpdated={onLocationUpdated}
+            />
 
-            <section className="bg-white rounded-xl shadow-sm p-5">
-              <h2 className="font-semibold text-brand-navy mb-4">
-                Measure &amp; annotate{survey.areaSqm ? ` — ${Math.round(survey.areaSqm).toLocaleString()} m²` : ""}{survey.linearMeters ? ` · ${Math.round(survey.linearMeters).toLocaleString()} m` : ""}
-              </h2>
-              <AreaMeasure
-                surveyId={survey.id}
-                latitude={survey.latitude}
-                longitude={survey.longitude}
-                savedZoom={survey.aerialZoom}
-                savedMeasurements={savedMeasurements}
-                savedShowOnProposal={survey.showMeasurementsOnProposal}
-                onPhotosChange={onPhotosChange}
-              />
-            </section>
-          </>
+            {hasCoords && (
+              // Interactive Google-Earth-style aerial when the browser Maps key is set;
+              // otherwise fall back to the static location + measure components. Keyed on
+              // the coordinates so a corrected location cleanly recentres the map.
+              process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? (
+                <div key={`${survey.latitude},${survey.longitude}`}>
+                  <div className="text-sm font-medium text-gray-600 mb-2">
+                    Site map{survey.areaSqm ? ` — ${Math.round(survey.areaSqm).toLocaleString()} m²` : ""}{survey.linearMeters ? ` · ${Math.round(survey.linearMeters).toLocaleString()} m` : ""}
+                  </div>
+                  <SiteMap
+                    surveyId={survey.id}
+                    latitude={survey.latitude!}
+                    longitude={survey.longitude!}
+                    savedMeasurements={savedMeasurements}
+                    savedShowOnProposal={survey.showMeasurementsOnProposal}
+                    onPhotosChange={onPhotosChange}
+                  />
+                </div>
+              ) : (
+                <div key={`${survey.latitude},${survey.longitude}`} className="space-y-4">
+                  <SiteLocation
+                    surveyId={survey.id}
+                    latitude={survey.latitude}
+                    longitude={survey.longitude}
+                    savedHeading={survey.streetViewHeading}
+                    savedZoom={survey.aerialZoom}
+                    onPhotosChange={onPhotosChange}
+                  />
+                  <div>
+                    <div className="text-sm font-medium text-gray-600 mb-2">
+                      Measure &amp; annotate{survey.areaSqm ? ` — ${Math.round(survey.areaSqm).toLocaleString()} m²` : ""}{survey.linearMeters ? ` · ${Math.round(survey.linearMeters).toLocaleString()} m` : ""}
+                    </div>
+                    <AreaMeasure
+                      surveyId={survey.id}
+                      latitude={survey.latitude}
+                      longitude={survey.longitude}
+                      savedZoom={survey.aerialZoom}
+                      savedMeasurements={savedMeasurements}
+                      savedShowOnProposal={survey.showMeasurementsOnProposal}
+                      onPhotosChange={onPhotosChange}
+                    />
+                  </div>
+                </div>
+              )
+            )}
+          </section>
         )
       })()}
 

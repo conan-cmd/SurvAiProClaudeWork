@@ -439,6 +439,40 @@ export default function ProposalEditorPage() {
     )
   }
 
+  // Cover fields are editable inline so a wrong title or client can be fixed
+  // without going back to the survey. Title/company live on the survey; the
+  // client name lives on the proposal. Debounced via the shared save timers.
+  const saveCover = (key: string, url: string, payload: Record<string, unknown>) => {
+    setSaveState("saving")
+    if (saveTimers.current[key]) clearTimeout(saveTimers.current[key])
+    saveTimers.current[key] = setTimeout(async () => {
+      try {
+        const res = await fetch(url, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+        setSaveState(res.ok ? "saved" : "idle")
+        if (!res.ok) toast.error("Couldn't save the cover")
+      } catch {
+        setSaveState("idle")
+        toast.error("Couldn't save the cover")
+      }
+    }, 700)
+  }
+  const setCoverTitle = (v: string) => {
+    setProposal((p) => (p ? { ...p, survey: { ...p.survey, title: v } } : p))
+    saveCover("cover-title", `/api/surveys/${proposal.survey.id}`, { title: v })
+  }
+  const setCoverClient = (v: string) => {
+    setProposal((p) => (p ? { ...p, clientName: v } : p))
+    saveCover("cover-client", `/api/proposals/${proposalId}`, { clientName: v })
+  }
+  const setCoverCompany = (v: string) => {
+    setProposal((p) => (p ? { ...p, survey: { ...p.survey, clientCompany: v } } : p))
+    saveCover("cover-company", `/api/surveys/${proposal.survey.id}`, { clientCompany: v })
+  }
+
   const docData = {
     clientName: proposal.clientName,
     templateName: proposal.templateName,
@@ -711,9 +745,40 @@ export default function ProposalEditorPage() {
               ) : section.type === "gallery" ? (
                 <GalleryPicker section={section} updateSection={updateSection} />
               ) : section.type === "cover" ? (
-                <p className="text-sm text-gray-400">
-                  The cover is generated from the survey details and your branding. See Preview.
-                </p>
+                <div className="space-y-3">
+                  <p className="text-xs text-gray-400">
+                    The front page of the proposal. Fix the title or client here — no need to go back to the survey.
+                  </p>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Proposal title</label>
+                    <input
+                      value={proposal.survey.title}
+                      onChange={(e) => setCoverTitle(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Prepared for (client)</label>
+                      <input
+                        value={proposal.clientName}
+                        onChange={(e) => setCoverClient(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Company (optional)</label>
+                      <input
+                        value={proposal.survey.clientCompany || ""}
+                        onChange={(e) => setCoverCompany(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    The site address, GPS and branding come from the survey and your settings. See Preview for the full cover.
+                  </p>
+                </div>
               ) : (
                 <div>
                   {section.type === "terms" && (
@@ -898,57 +963,66 @@ function VideoPicker({
     </div>
   )
 
-  if (error) {
-    return <div>{selectedStrip}<p className="text-sm text-amber-600">{error}</p></div>
-  }
-  if (!videos) {
-    return (
-      <div>
-        {selectedStrip}
-        <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading your channel videos…
-        </div>
-      </div>
-    )
-  }
-  if (!videos.length) {
-    return <div>{selectedStrip}<p className="text-sm text-gray-400">No videos found on your channel.</p></div>
-  }
+  // The channel URL isn't set — searching can't work, so point to Settings instead.
+  const needsSetup = !!error && /channel url/i.test(error)
 
   return (
     <div>
       {selectedStrip}
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search your whole channel (e.g. canopy cleaning)…"
-        className="w-full mb-2 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-brand-blue"
-      />
-      <p className="text-xs text-gray-500 mb-2">
-        Tick the videos of similar jobs to show in this proposal ({selected.length} selected).
-      </p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto pr-1">
-        {videos.map((video) => {
-          const on = selected.some((v) => v.videoId === video.videoId)
-          return (
-            <button key={video.videoId} type="button" onClick={() => toggle(video)}
-              className={`text-left rounded-lg overflow-hidden border-2 transition ${
-                on ? "border-brand-blue" : "border-transparent opacity-60 hover:opacity-100"
-              }`}>
-              <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={video.thumbnail} alt="" className="w-full aspect-video object-cover" />
-                {on && (
-                  <span className="absolute top-1 right-1 bg-brand-blue text-white rounded-full p-0.5">
-                    <Check className="w-3 h-3" />
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-gray-600 p-1.5 leading-snug line-clamp-2">{video.title}</p>
-            </button>
-          )
-        })}
-      </div>
+      {needsSetup ? (
+        <p className="text-sm text-amber-600">
+          Add your YouTube channel URL in{" "}
+          <a href="/settings" className="font-semibold underline">Settings</a> to search your videos.
+        </p>
+      ) : (
+        <>
+          {/* Search box is ALWAYS available so the whole back-catalogue is reachable,
+              even when the default (latest-uploads) load comes back empty. */}
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search your whole channel (e.g. canopy cleaning)…"
+            className="w-full mb-2 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-brand-blue"
+          />
+          <p className="text-xs text-gray-500 mb-2">
+            Tick the videos of similar jobs to show in this proposal ({selected.length} selected).
+          </p>
+          {error ? (
+            <p className="text-sm text-amber-600">{error}</p>
+          ) : !videos ? (
+            <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading your channel videos…
+            </div>
+          ) : !videos.length ? (
+            <p className="text-sm text-gray-400">
+              {query.trim() ? "No matches — try another search term." : "No videos found on your channel yet."}
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto pr-1">
+              {videos.map((video) => {
+                const on = selected.some((v) => v.videoId === video.videoId)
+                return (
+                  <button key={video.videoId} type="button" onClick={() => toggle(video)}
+                    className={`text-left rounded-lg overflow-hidden border-2 transition ${
+                      on ? "border-brand-blue" : "border-transparent opacity-60 hover:opacity-100"
+                    }`}>
+                    <div className="relative">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={video.thumbnail} alt="" className="w-full aspect-video object-cover" />
+                      {on && (
+                        <span className="absolute top-1 right-1 bg-brand-blue text-white rounded-full p-0.5">
+                          <Check className="w-3 h-3" />
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-600 p-1.5 leading-snug line-clamp-2">{video.title}</p>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

@@ -211,7 +211,7 @@ export async function attachMeasurementImagery(params: {
   }
   if (!buf) {
     if (!key) return
-    const z = Math.min(21, Math.max(15, zoom || 20))
+    const z = Math.min(21, Math.max(1, zoom || 20))
     const parts = [`center=${lat},${lng}`, `zoom=${z}`, `scale=2`, `size=640x480`, `maptype=hybrid`]
     const fmt = (p: LatLng) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`
     for (const a of areas) {

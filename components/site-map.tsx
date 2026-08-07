@@ -13,6 +13,29 @@ type Measurement = { id: string; type: MType; points: LatLng[]; label?: string }
 
 const g = () => (window as any).google
 
+// The server bakes the composite aerial at this logical size (keep in sync with
+// lib/geo.attachMeasurementImagery). We use it to work out the zoom that fits the
+// on-screen view into the saved image.
+const BAKE_W = 640
+const BAKE_H = 480
+
+// Largest (fractional) Web-Mercator zoom at which a `wPx × hPx` image still
+// contains the given lat/lng bounds. Mirrors Google's own fit-bounds maths.
+function fitZoom(neLat: number, neLng: number, swLat: number, swLng: number, wPx: number, hPx: number): number {
+  const WORLD = 256
+  const latRad = (lat: number) => {
+    const s = Math.sin((lat * Math.PI) / 180)
+    return Math.log((1 + s) / (1 - s)) / 2
+  }
+  const latFraction = (latRad(neLat) - latRad(swLat)) / (2 * Math.PI)
+  let lngDiff = neLng - swLng
+  if (lngDiff < 0) lngDiff += 360
+  const lngFraction = lngDiff / 360
+  const latZoom = Math.log2(hPx / WORLD / Math.abs(latFraction || 1e-9))
+  const lngZoom = Math.log2(wPx / WORLD / Math.abs(lngFraction || 1e-9))
+  return Math.min(latZoom, lngZoom)
+}
+
 export function SiteMap({
   surveyId,
   latitude,
@@ -133,6 +156,26 @@ export function SiteMap({
   const removeItem = (id: string) => setItems((it) => it.filter((m) => m.id !== id))
   const setLabel = (id: string, label: string) => setItems((it) => it.map((m) => (m.id === id ? { ...m, label } : m)))
 
+  // Frame the baked composite on exactly what's on screen: centre on the current
+  // viewport and pick the zoom that fits the visible bounds into the 640×480 bake,
+  // so zooming out to capture a whole development is preserved (not cropped back in).
+  const bakeView = (): { zoom: number; centerLat?: number; centerLng?: number } => {
+    const map = mapRef.current
+    if (!map) return { zoom: 20 }
+    const c = map.getCenter?.()
+    const centerLat = c?.lat?.()
+    const centerLng = c?.lng?.()
+    let zoom = Math.floor(map.getZoom?.() ?? 20)
+    const b = map.getBounds?.()
+    if (b) {
+      const ne = b.getNorthEast()
+      const sw = b.getSouthWest()
+      const fit = fitZoom(ne.lat(), ne.lng(), sw.lat(), sw.lng(), BAKE_W, BAKE_H)
+      if (Number.isFinite(fit)) zoom = Math.floor(fit)
+    }
+    return { zoom: Math.min(21, Math.max(1, zoom)), centerLat, centerLng }
+  }
+
   const save = async () => {
     setSaving(true)
     try {
@@ -147,7 +190,7 @@ export function SiteMap({
       }
       const res = await fetch(`/api/surveys/${surveyId}/area`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ measurements: items, zoom: Math.round(mapRef.current?.getZoom?.() || 20), showOnProposal }),
+        body: JSON.stringify({ measurements: items, showOnProposal, ...bakeView() }),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || "Save failed")
