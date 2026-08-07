@@ -30,7 +30,8 @@ export function SubscribePlans({
   founding = false,
   slotsLeft = 0,
   pausedUntil = null,
-}: { lapsed?: boolean; founding?: boolean; slotsLeft?: number; pausedUntil?: string | null }) {
+  cryptoEnabled = false,
+}: { lapsed?: boolean; founding?: boolean; slotsLeft?: number; pausedUntil?: string | null; cryptoEnabled?: boolean }) {
   const [plan, setPlan] = useState<Plan>("annual")
   const [busy, setBusy] = useState(false)
   const [code, setCode] = useState("")
@@ -107,6 +108,20 @@ export function SubscribePlans({
     }
   }
 
+  // Bitcoin is annual-only (crypto can't auto-renew) — pay 12 months upfront.
+  const payBtc = async () => {
+    setBusy(true)
+    try {
+      const res = await fetch("/api/billing/crypto/charge", { method: "POST" })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      window.location.href = d.url
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't start the Bitcoin payment")
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-brand-navy to-blue-50 flex items-center justify-center p-4">
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl p-6 md:p-8">
@@ -162,6 +177,19 @@ export function SubscribePlans({
             ? "Secure payment by Stripe."
             : "14 days free, then billed automatically. Card required. Cancel anytime in Settings."}
         </p>
+
+        {cryptoEnabled && (
+          <div className="mt-4 pt-4 border-t">
+            <button onClick={payBtc} disabled={busy}
+              className="w-full inline-flex items-center justify-center gap-2 py-3 border-2 border-[#f7931a] text-[#b8690f] bg-orange-50 rounded-lg font-semibold hover:bg-orange-100 disabled:opacity-50">
+              {busy ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="text-lg leading-none">₿</span>}
+              Pay 1 year with Bitcoin — {prices.annual.price}
+            </button>
+            <p className="text-center text-xs text-gray-400 mt-2">
+              Annual, paid upfront in Bitcoin (no card, no auto-renew). We&apos;ll remind you before it lapses.
+            </p>
+          </div>
+        )}
 
         {/* Tester / partner access code */}
         <div className="mt-5 pt-4 border-t">

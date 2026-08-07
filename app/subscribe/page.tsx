@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/session"
 import { db } from "@/lib/db"
 import { retrieveCheckoutSession, retrieveSubscription, FOUNDING_LIMIT } from "@/lib/stripe"
+import { coinbaseEnabled } from "@/lib/coinbase"
 import { hasActiveAccess, applySubscription } from "@/lib/billing"
 import { SubscribePlans } from "@/components/subscribe-plans"
 
@@ -32,15 +33,20 @@ export default async function SubscribePage({
 
   const org = await db.organization.findUnique({
     where: { id: user.organizationId },
-    select: { billingExempt: true, freeAccess: true, subscriptionStatus: true, subscriptionPausedUntil: true },
+    select: {
+      billingExempt: true, freeAccess: true, subscriptionStatus: true,
+      subscriptionPausedUntil: true, cryptoAccessUntil: true,
+    },
   })
   // Already have access → no need for the paywall.
   if (org && hasActiveAccess(org)) redirect("/dashboard")
 
+  const cryptoEnabled = coinbaseEnabled()
+
   // Paused → offer to resume rather than re-subscribe.
   const paused = org?.subscriptionPausedUntil && org.subscriptionPausedUntil.getTime() > Date.now()
   if (paused) {
-    return <SubscribePlans pausedUntil={org!.subscriptionPausedUntil!.toISOString()} />
+    return <SubscribePlans pausedUntil={org!.subscriptionPausedUntil!.toISOString()} cryptoEnabled={cryptoEnabled} />
   }
 
   const foundingUsed = await db.organization.count({ where: { isFoundingMember: true } })
@@ -51,6 +57,7 @@ export default async function SubscribePage({
       founding={founding}
       slotsLeft={Math.max(0, FOUNDING_LIMIT - foundingUsed)}
       lapsed={org?.subscriptionStatus === "canceled" || org?.subscriptionStatus === "unpaid"}
+      cryptoEnabled={cryptoEnabled}
     />
   )
 }

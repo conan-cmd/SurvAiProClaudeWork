@@ -9,11 +9,15 @@ export function hasActiveAccess(org: {
   freeAccess?: boolean
   subscriptionStatus: string | null
   subscriptionPausedUntil?: Date | null
+  cryptoAccessUntil?: Date | null
 }): boolean {
   if (!stripeEnabled()) return true
   if (org.billingExempt) return true
   // Comp/tester free access via an access code (revocable).
   if (org.freeAccess) return true
+  // Paid ahead in Bitcoin (annual) — access until that window ends, regardless of
+  // Stripe state.
+  if (org.cryptoAccessUntil && org.cryptoAccessUntil.getTime() > Date.now()) return true
   // Paused (billing suspended) → no access until they resume.
   if (org.subscriptionPausedUntil && org.subscriptionPausedUntil.getTime() > Date.now()) return false
   return ["trialing", "active", "past_due"].includes(org.subscriptionStatus || "")

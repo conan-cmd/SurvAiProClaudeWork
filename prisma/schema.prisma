@@ -141,6 +141,11 @@ model Organization {
   accessCodeId          String?
   // One of the first 100 firms — £49/mo locked in for life (vs £99 standard).
   isFoundingMember      Boolean         @default(false)
+  // Bitcoin (Coinbase Commerce) annual payments — access is granted until this
+  // date, independent of the Stripe subscription. cryptoLastChargeId dedupes
+  // webhook retries so a paid year is never double-counted.
+  cryptoAccessUntil     DateTime?
+  cryptoLastChargeId    String?
   // Retention: reason captured at cancel, and a paused-until date (pause vs cancel).
   cancelReason          String?
   subscriptionPausedUntil DateTime?
