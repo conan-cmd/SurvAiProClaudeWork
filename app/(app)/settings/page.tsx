@@ -35,6 +35,8 @@ type Org = {
   signOffName: string | null
   headshotUrl: string | null
   signatureImageUrl: string | null
+  proposalIdentityMode: string
+  proposalIdentityUserId: string | null
   membersViewAll: boolean
   showCoordinatesOnProposal: boolean
 }
@@ -300,6 +302,8 @@ export default function SettingsPage() {
           youtubeChannelUrl: org.youtubeChannelUrl || "",
           depositRules: org.depositRules || "",
           signOffName: org.signOffName || "",
+          proposalIdentityMode: org.proposalIdentityMode,
+          proposalIdentityUserId: org.proposalIdentityMode === "USER" ? org.proposalIdentityUserId : null,
           membersViewAll: org.membersViewAll,
           showCoordinatesOnProposal: org.showCoordinatesOnProposal,
         }),
@@ -310,6 +314,24 @@ export default function SettingsPage() {
       toast.error(err instanceof Error ? err.message : "Failed to save")
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Default "who represents proposals" — saved immediately so it's not lost if the
+  // owner navigates away before hitting the big Save.
+  const saveIdentity = async (mode: string, userId: string | null) => {
+    set("proposalIdentityMode", mode)
+    set("proposalIdentityUserId", userId)
+    try {
+      const res = await fetch("/api/organization", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proposalIdentityMode: mode, proposalIdentityUserId: mode === "USER" ? userId : null }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error)
+      toast.success("Saved")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't save")
     }
   }
 
@@ -680,6 +702,50 @@ export default function SettingsPage() {
         )}
       </section>
 
+      {me?.role === "OWNER" && (
+        <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+          <h2 className="font-semibold text-brand-navy">Who represents your proposals</h2>
+          <p className="text-sm text-gray-500">
+            Choose whose name, email, headshot and signature appear on proposals — and who the client replies to. You can still override this on an individual proposal.
+          </p>
+          <div className="space-y-2">
+            {[
+              { v: "CREATOR", label: "The person who created it", desc: "Each proposal shows its author — good when team members want their own name on their work." },
+              { v: "USER", label: "One nominated person", desc: "Every proposal uses the same person (e.g. the business owner), whoever created it." },
+              { v: "ORG", label: "Business details", desc: "Use the organisation's contact email and sign-off, not an individual." },
+            ].map((opt) => (
+              <label key={opt.v}
+                className={`block p-3 rounded-lg border-2 cursor-pointer transition ${org.proposalIdentityMode === opt.v ? "border-brand-blue bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
+                <div className="flex items-start gap-2">
+                  <input type="radio" name="identity" checked={org.proposalIdentityMode === opt.v}
+                    onChange={() => saveIdentity(opt.v, opt.v === "USER" ? (org.proposalIdentityUserId || team?.users[0]?.id || null) : null)}
+                    className="mt-1 accent-blue-600" />
+                  <span>
+                    <span className="font-medium text-brand-navy">{opt.label}</span>
+                    <span className="block text-xs text-gray-500">{opt.desc}</span>
+                  </span>
+                </div>
+              </label>
+            ))}
+          </div>
+          {org.proposalIdentityMode === "USER" && (
+            <div>
+              <label className={labelCls}>Nominated person</label>
+              <select className={inputCls} value={org.proposalIdentityUserId || ""}
+                onChange={(e) => saveIdentity("USER", e.target.value || null)}>
+                <option value="">Select a team member…</option>
+                {team?.users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name || u.email}{u.role === "OWNER" ? " (owner)" : ""}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">
+                Their name, headshot and signature come from their own sign-off below. To send the client email from their address, they connect Gmail in Settings.
+              </p>
+            </div>
+          )}
+        </section>
+      )}
+
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
         <h2 className="font-semibold text-brand-navy">Your personal sign-off</h2>
         <p className="text-sm text-gray-500">
@@ -820,5 +886,7 @@ function normalizeOrg(o: Org): Org {
     ...o,
     mainServices: o.mainServices ? tryParse(o.mainServices).join(", ") : "",
     areasCovered: o.areasCovered ? tryParse(o.areasCovered).join(", ") : "",
+    proposalIdentityMode: o.proposalIdentityMode || "CREATOR",
+    proposalIdentityUserId: o.proposalIdentityUserId ?? null,
   }
 }

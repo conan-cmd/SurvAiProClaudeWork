@@ -1,9 +1,9 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
-  Camera, Trash2, Star, ChevronUp, ChevronDown, EyeOff, Loader2,
+  Camera, Trash2, Star, ChevronUp, ChevronDown, EyeOff, Loader2, Check,
 } from "lucide-react"
 import { uploadSurveyPhotos } from "@/lib/photo-upload"
 
@@ -62,6 +62,23 @@ export function PhotoManager({
       onChange(prev)
       toast.error("Failed to save photo change")
     }
+  }
+
+  // Returns whether the caption saved, so the field can show a "Saved" tick.
+  const saveCaption = async (photoId: string, caption: string): Promise<boolean> => {
+    const prev = photos
+    onChange(photos.map((p) => (p.id === photoId ? { ...p, caption } : p)))
+    const res = await fetch(`/api/surveys/${surveyId}/photos/${photoId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ caption }),
+    })
+    if (!res.ok) {
+      onChange(prev)
+      toast.error("Couldn't save the caption")
+      return false
+    }
+    return true
   }
 
   const remove = async (photoId: string) => {
@@ -145,15 +162,9 @@ export function PhotoManager({
               )}
             </div>
             <div className="p-3 space-y-2">
-              <input
-                defaultValue={photo.caption || ""}
-                placeholder="Add a caption…"
-                onBlur={(e) => {
-                  if (e.target.value !== (photo.caption || "")) {
-                    patch(photo.id, { caption: e.target.value })
-                  }
-                }}
-                className="w-full text-sm px-3 py-1.5 border rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-blue"
+              <CaptionField
+                initial={photo.caption || ""}
+                onSave={(v) => saveCaption(photo.id, v)}
               />
               <div className="flex items-center justify-between text-gray-500">
                 <div className="flex items-center gap-1">
@@ -195,6 +206,68 @@ export function PhotoManager({
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// Caption input that autosaves on blur/Enter but also shows an explicit Save
+// button while there are unsaved edits and a "Saved" tick once it persists — so
+// it's always clear whether the caption has stuck.
+function CaptionField({
+  initial,
+  onSave,
+}: {
+  initial: string
+  onSave: (value: string) => Promise<boolean>
+}) {
+  const [value, setValue] = useState(initial)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  // Keep in sync if the stored caption changes (e.g. a failed save reverts it).
+  useEffect(() => setValue(initial), [initial])
+
+  const dirty = value !== initial
+  const commit = async () => {
+    if (!dirty || saving) return
+    setSaving(true)
+    const ok = await onSave(value)
+    setSaving(false)
+    if (ok) {
+      setSaved(true)
+      setTimeout(() => setSaved(false), 1500)
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        value={value}
+        placeholder="Add a caption…"
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault()
+            e.currentTarget.blur()
+          }
+        }}
+        className="flex-1 min-w-0 text-sm px-3 py-1.5 border rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-blue"
+      />
+      {dirty ? (
+        <button
+          type="button"
+          onClick={commit}
+          disabled={saving}
+          className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-brand-blue text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save"}
+        </button>
+      ) : saved ? (
+        <span className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+          <Check className="w-3.5 h-3.5" /> Saved
+        </span>
+      ) : null}
     </div>
   )
 }

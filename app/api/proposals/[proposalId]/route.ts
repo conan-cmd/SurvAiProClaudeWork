@@ -3,12 +3,16 @@ import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { userCanSend, isApprover } from "@/lib/permissions"
+import { resolveProposalIdentity } from "@/lib/proposal-identity"
 
 const updateProposalSchema = z.object({
   status: z.enum(["DRAFT", "READY", "SENT", "SIGNED", "DEPOSIT_PAID", "WON", "LOST"]).optional(),
   templateName: z.string().optional(),
   clientName: z.string().optional(),
   clientEmail: z.string().email().optional().or(z.literal("")),
+  // Per-proposal identity override. null clears it (inherit the org default).
+  identityMode: z.enum(["CREATOR", "USER", "ORG"]).nullable().optional(),
+  identityUserId: z.string().nullable().optional(),
 })
 
 export async function GET(
@@ -26,13 +30,14 @@ export async function GET(
       survey: { include: { photos: { orderBy: { order: "asc" } } } },
       organization: {
         select: {
-          name: true, logoUrl: true, brandColor: true, secondaryColor: true,
+          id: true, name: true, logoUrl: true, brandColor: true, secondaryColor: true,
           email: true, phone: true, website: true, showCoordinatesOnProposal: true,
           signOffName: true, headshotUrl: true, signatureImageUrl: true,
+          proposalIdentityMode: true, proposalIdentityUserId: true,
         },
       },
       createdBy: {
-        select: { name: true, signOffName: true, headshotUrl: true, signatureImageUrl: true },
+        select: { id: true, name: true, email: true, signOffName: true, headshotUrl: true, signatureImageUrl: true },
       },
       views: {
         select: { totalSeconds: true, sections: true, createdAt: true, updatedAt: true },
@@ -44,7 +49,9 @@ export async function GET(
   if (!proposal) return NextResponse.json({ error: "Not found" }, { status: 404 })
   // Expose the caller's permissions so the editor can show the right controls.
   const me = { canSend: userCanSend(user), isApprover: isApprover(user), id: user.id }
-  return NextResponse.json({ ...proposal, me })
+  // The resolved "who represents this proposal" identity (email/headshot/signature).
+  const identity = await resolveProposalIdentity(proposal)
+  return NextResponse.json({ ...proposal, me, identity })
 }
 
 export async function PATCH(

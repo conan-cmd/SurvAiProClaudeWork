@@ -40,6 +40,9 @@ const updateOrgSchema = z.object({
   depositRules: z.string().max(500).optional(),
   signOffName: z.string().max(100).optional(),
   onboardingComplete: z.boolean().optional(),
+  // Default proposal identity (who represents proposals org-wide).
+  proposalIdentityMode: z.enum(["CREATOR", "USER", "ORG"]).optional(),
+  proposalIdentityUserId: z.string().nullable().optional(),
 })
 
 export async function GET() {

@@ -50,6 +50,9 @@ export type ProposalDocumentData = {
     headshotUrl?: string | null
     signatureImageUrl?: string | null
   } | null
+  // Contact email shown in the cover footer (the resolved proposal identity).
+  // Falls back to the org email when not provided.
+  contactEmail?: string | null
   // Site location from the survey - shown on the cover when geocoded.
   // what3words stays optional until the w3w integration is wired up.
   latitude?: number | null
@@ -137,7 +140,7 @@ function CoverSection({ section, data }: { section: Section; data: ProposalDocum
       <div className="px-10 py-6 text-sm flex flex-wrap gap-x-6 gap-y-1"
         style={{ backgroundColor: onDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)" }}>
         {org.phone && <span>{org.phone}</span>}
-        {org.email && <span>{org.email}</span>}
+        {(data.contactEmail || org.email) && <span>{data.contactEmail || org.email}</span>}
         {org.website && <span>{org.website}</span>}
       </div>
     </div>

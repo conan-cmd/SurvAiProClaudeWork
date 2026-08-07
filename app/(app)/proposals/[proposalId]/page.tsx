@@ -66,6 +66,11 @@ type ProposalData = {
     showCoordinatesOnProposal: boolean
   }
   views: { totalSeconds: number; sections: string | null; createdAt: string; updatedAt: string }[]
+  // Per-proposal identity override (null = inherit the org default) + the resolved
+  // identity used on the cover/sign-off/reply-to.
+  identityMode: "CREATOR" | "USER" | "ORG" | null
+  identityUserId: string | null
+  identity: { userId: string | null; name: string | null; email: string | null; headshotUrl: string | null; signatureImageUrl: string | null } | null
   approvalStatus: "NONE" | "PENDING" | "APPROVED" | "CHANGES_REQUESTED"
   reviewNote: string | null
   me: { canSend: boolean; isApprover: boolean; id: string }
@@ -88,6 +93,7 @@ export default function ProposalEditorPage() {
   const [canShare, setCanShare] = useState(false)
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle")
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const [members, setMembers] = useState<{ id: string; name: string | null; email: string; role: string }[]>([])
 
   useEffect(() => {
     fetch(`/api/proposals/${proposalId}`)
@@ -103,6 +109,11 @@ export default function ProposalEditorPage() {
   // after mount to avoid a server/client hydration mismatch on navigator.
   useEffect(() => {
     setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function")
+  }, [])
+
+  // Team members for the "who this proposal is from" override picker.
+  useEffect(() => {
+    fetch("/api/team").then((r) => r.json()).then((d) => setMembers(d.users || [])).catch(() => {})
   }, [])
 
   const updateSection = useCallback(
@@ -231,6 +242,26 @@ export default function ProposalEditorPage() {
     if (!res.ok) {
       setProposal({ ...proposal, status: prev })
       toast.error("Failed to update status")
+    }
+  }
+
+  // Per-proposal override of "who this proposal is from". null mode = inherit the
+  // org default. Re-fetches to pick up the freshly-resolved identity for the preview.
+  const setIdentityOverride = async (mode: "CREATOR" | "USER" | "ORG" | null, userId: string | null) => {
+    setProposal((p) => (p ? { ...p, identityMode: mode, identityUserId: userId } : p))
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identityMode: mode, identityUserId: mode === "USER" ? userId : null }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error)
+      const fresh = await fetch(`/api/proposals/${proposalId}`).then((r) => r.json())
+      setProposal((p) =>
+        p ? { ...p, identity: fresh.identity, identityMode: fresh.identityMode, identityUserId: fresh.identityUserId } : p
+      )
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update who it's from")
     }
   }
 
@@ -487,7 +518,15 @@ export default function ProposalEditorPage() {
     what3words: proposal.survey.what3words,
     showCoordinates: proposal.organization.showCoordinatesOnProposal,
     organization: proposal.organization,
-    preparer: proposal.createdBy,
+    preparer: proposal.identity
+      ? {
+          name: proposal.identity.name,
+          signOffName: proposal.identity.name,
+          headshotUrl: proposal.identity.headshotUrl,
+          signatureImageUrl: proposal.identity.signatureImageUrl,
+        }
+      : proposal.createdBy,
+    contactEmail: proposal.identity?.email ?? proposal.organization.email,
   }
 
   return (
@@ -775,6 +814,42 @@ export default function ProposalEditorPage() {
                       />
                     </div>
                   </div>
+                  <div className="pt-1 border-t">
+                    <label className="block text-sm font-medium text-gray-700 mb-1 mt-2">Who this proposal is from</label>
+                    <select
+                      value={proposal.identityMode ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        if (v === "") setIdentityOverride(null, null)
+                        else if (v === "USER") setIdentityOverride("USER", proposal.identityUserId || members[0]?.id || null)
+                        else setIdentityOverride(v as "CREATOR" | "ORG", null)
+                      }}
+                      className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                    >
+                      <option value="">Account default</option>
+                      <option value="CREATOR">The person who created it</option>
+                      <option value="USER">A specific person</option>
+                      <option value="ORG">Business details</option>
+                    </select>
+                    {proposal.identityMode === "USER" && (
+                      <select
+                        value={proposal.identityUserId || ""}
+                        onChange={(e) => setIdentityOverride("USER", e.target.value || null)}
+                        className="w-full mt-2 px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                      >
+                        <option value="">Select a team member…</option>
+                        {members.map((u) => (
+                          <option key={u.id} value={u.id}>{u.name || u.email}{u.role === "OWNER" ? " (owner)" : ""}</option>
+                        ))}
+                      </select>
+                    )}
+                    {proposal.identity && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Currently shown as <strong>{proposal.identity.name || "—"}</strong>
+                        {proposal.identity.email ? ` · ${proposal.identity.email}` : ""}. Change the org default in Settings.
+                      </p>
+                    )}
+                  </div>
                   <p className="text-xs text-gray-400">
                     The site address, GPS and branding come from the survey and your settings. See Preview for the full cover.
                   </p>
@@ -853,9 +928,12 @@ export default function ProposalEditorPage() {
             <h3 className="font-bold text-brand-navy">Send proposal</h3>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
-              <input type="email" value={sendTo} onChange={(e) => setSendTo(e.target.value)}
-                placeholder="client@email.com"
+              <input type="text" inputMode="email" value={sendTo} onChange={(e) => setSendTo(e.target.value)}
+                placeholder="client@email.com, partner@email.com"
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+              <p className="text-xs text-gray-400 mt-1">
+                Sending to more than one person? Separate each email with a comma.
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Message (optional)</label>

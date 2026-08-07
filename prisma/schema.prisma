@@ -115,6 +115,12 @@ model Organization {
   headshotUrl           String?
   signatureImageUrl     String?
 
+  // Which identity represents proposals by default: whose email/headshot/signature
+  // shows and who is the reply-to/sender. CREATOR (the drafter) | USER (a fixed
+  // person, e.g. the owner) | ORG (the organisation's own details).
+  proposalIdentityMode   String  @default("CREATOR")
+  proposalIdentityUserId String?
+
   // True once the first-run setup wizard is finished (or dismissed for good).
   onboardingComplete    Boolean         @default(false)
 
@@ -382,6 +388,11 @@ model Proposal {
 
   createdById           String?
   createdBy             User?           @relation("ProposalCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  // Per-proposal identity override (null = inherit the org default). See
+  // lib/proposal-identity.ts. Same values as Organization.proposalIdentityMode.
+  identityMode          String?
+  identityUserId        String?
 
   // Deposit
   depositAmount         Float?

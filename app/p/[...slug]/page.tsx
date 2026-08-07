@@ -63,14 +63,15 @@ export default async function SharedProposalPage({
           },
           organization: {
             select: {
-              name: true, logoUrl: true, brandColor: true, secondaryColor: true,
+              id: true, name: true, logoUrl: true, brandColor: true, secondaryColor: true,
               email: true, phone: true, website: true, depositRules: true, showCoordinatesOnProposal: true,
               signOffName: true, headshotUrl: true, signatureImageUrl: true,
+              proposalIdentityMode: true, proposalIdentityUserId: true,
               stripeAccountId: true, stripeChargesEnabled: true,
             },
           },
           createdBy: {
-            select: { name: true, email: true, signOffName: true, headshotUrl: true, signatureImageUrl: true },
+            select: { id: true, name: true, email: true, signOffName: true, headshotUrl: true, signatureImageUrl: true },
           },
         },
       },
@@ -134,6 +135,11 @@ export default async function SharedProposalPage({
     ? computeDeposit(p.organization.depositRules, p.survey.isResidential, agreedTotal)
     : 0
 
+  // Whose name/email/headshot/signature represents this proposal (org default
+  // or per-proposal override), resolved server-side.
+  const { resolveProposalIdentity } = await import("@/lib/proposal-identity")
+  const identity = await resolveProposalIdentity(p)
+
   return (
     <main className="min-h-screen bg-brand-gray py-6 px-3 md:py-10">
       <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-4 md:p-10">
@@ -152,7 +158,8 @@ export default async function SharedProposalPage({
             what3words: p.survey.what3words,
             showCoordinates: p.organization.showCoordinatesOnProposal,
             organization: p.organization,
-            preparer: p.createdBy,
+            preparer: { name: identity.name, signOffName: identity.name, headshotUrl: identity.headshotUrl, signatureImageUrl: identity.signatureImageUrl },
+            contactEmail: identity.email,
             hideOptionalExtras: true,
           }}
         />

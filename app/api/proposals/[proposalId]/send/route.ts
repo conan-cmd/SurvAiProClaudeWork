@@ -5,14 +5,21 @@ import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { canSend, sendEmail } from "@/lib/email"
 import { canSendProposal } from "@/lib/permissions"
+import { resolveProposalIdentity } from "@/lib/proposal-identity"
 import { slugify } from "@/lib/utils"
 import { publicBaseUrl } from "@/lib/public-url"
 
 const sendSchema = z.object({
-  to: z.string().email("Enter a valid email address"),
+  // One or more recipient emails, separated by commas, semicolons or spaces.
+  to: z.string().min(1, "Enter at least one recipient email"),
   message: z.string().max(2000).optional(),
   documentIds: z.array(z.string()).max(20).optional(),
 })
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+function parseRecipients(raw: string): string[] {
+  return Array.from(new Set(raw.split(/[,;\s]+/).map((s) => s.trim()).filter(Boolean)))
+}
 
 // Emails the client a secure link to the proposal and marks it Sent.
 export async function POST(
@@ -31,7 +38,13 @@ export async function POST(
 
   const proposal = await db.proposal.findFirst({
     where: { id: params.proposalId, organizationId: user.organizationId },
-    include: { organization: true, survey: { select: { title: true } } },
+    include: {
+      organization: true,
+      survey: { select: { title: true } },
+      createdBy: {
+        select: { id: true, name: true, email: true, signOffName: true, headshotUrl: true, signatureImageUrl: true },
+      },
+    },
   })
   if (!proposal) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
@@ -47,7 +60,21 @@ export async function POST(
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
   }
-  const { to, message } = parsed.data
+  const { message } = parsed.data
+  const recipients = parseRecipients(parsed.data.to)
+  if (!recipients.length) {
+    return NextResponse.json({ error: "Enter at least one recipient email" }, { status: 400 })
+  }
+  const invalid = recipients.filter((e) => !EMAIL_RE.test(e))
+  if (invalid.length) {
+    return NextResponse.json({ error: `Not a valid email: ${invalid.join(", ")}` }, { status: 400 })
+  }
+  if (recipients.length > 20) {
+    return NextResponse.json({ error: "Too many recipients (max 20)" }, { status: 400 })
+  }
+
+  // Who this proposal is sent as: the resolved identity (org default or override).
+  const identity = await resolveProposalIdentity(proposal)
 
   // Fresh secure link for this send
   const token = randomBytes(16).toString("base64url")
@@ -69,7 +96,7 @@ export async function POST(
       <p>${safeMsg}</p>
       <p style="margin:20px 0"><a href="${url}" style="color:#2563EB;font-weight:600">View your proposal &rarr;</a></p>
       <p>Any questions at all, just reply to this email.</p>
-      <p>Kind regards,<br/>${user.name || org.name}${org.phone ? `<br/>${org.phone}` : ""}</p>
+      <p>Kind regards,<br/>${identity.name || user.name || org.name}${org.phone ? `<br/>${org.phone}` : ""}</p>
     </div>`
   const text = [
     `Dear ${proposal.clientName},`,
@@ -81,7 +108,7 @@ export async function POST(
     "Any questions at all, just reply to this email.",
     "",
     "Kind regards,",
-    `${user.name || org.name}${org.phone ? `\n${org.phone}` : ""}`,
+    `${identity.name || user.name || org.name}${org.phone ? `\n${org.phone}` : ""}`,
   ].join("\n")
 
   try {
@@ -95,18 +122,20 @@ export async function POST(
     }
 
     await sendEmail({
-      to,
-      replyTo: org.email || user.email,
+      to: recipients,
+      // Reply-to and (when they've connected Gmail) the sender are the resolved
+      // identity — so a proposal can go out as the business owner, not the drafter.
+      replyTo: identity.email || org.email || user.email,
       subject: `Your proposal from ${org.name}`,
       html,
       text,
       attachments,
-      fromUserId: user.id,
+      fromUserId: identity.userId ?? user.id,
     })
 
     await db.proposal.update({
       where: { id: proposal.id },
-      data: { status: "SENT", sentAt: new Date(), clientEmail: to },
+      data: { status: "SENT", sentAt: new Date(), clientEmail: recipients[0] },
     })
 
     return NextResponse.json({ success: true, url })
