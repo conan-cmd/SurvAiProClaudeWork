@@ -37,7 +37,7 @@ export async function POST(
         select: { email: true },
       })
       const origin = publicBaseUrl(request.nextUrl.origin)
-      const link = `${origin}/reviews`
+      const link = `${origin}/proposals/${proposal.id}`
       for (const a of approvers) {
         await sendEmail({
           to: a.email,

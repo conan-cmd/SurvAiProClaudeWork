@@ -6,7 +6,7 @@ import { isApprover } from "@/lib/permissions"
 import { db } from "@/lib/db"
 import { FeedbackButton } from "@/components/feedback-button"
 import { SignOutButton } from "@/components/sign-out-button"
-import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings, ShieldAlert, ClipboardCheck } from "lucide-react"
+import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings, ShieldAlert } from "lucide-react"
 
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; badge?: number }
 
@@ -26,17 +26,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // No active subscription (and not exempt) → send to the paywall.
   if (!hasActiveAccess(user.organization)) redirect("/subscribe")
 
-  // Approvers get a Reviews tab with a count of proposals awaiting sign-off.
+  // Approvers see a badge on the Proposals tab with the count awaiting sign-off.
+  // Reviewing happens inside each proposal — no separate Reviews tab.
   const approver = isApprover(user)
   const pendingReviews = approver
     ? await db.proposal.count({ where: { organizationId: user.organizationId, approvalStatus: "PENDING" } })
     : 0
-  const NAV: NavItem[] = approver
-    ? [
-        ...BASE_NAV.slice(0, 3),
-        { href: "/reviews", label: "Reviews", icon: ClipboardCheck, badge: pendingReviews },
-        ...BASE_NAV.slice(3),
-      ]
+  const NAV: NavItem[] = pendingReviews
+    ? BASE_NAV.map((n) => (n.href === "/proposals" ? { ...n, badge: pendingReviews } : n))
     : BASE_NAV
   // Mobile bottom bar drops Gallery (stays in the top nav) to keep the bar compact.
   const MOBILE_NAV = NAV.filter((n) => n.href !== "/gallery")

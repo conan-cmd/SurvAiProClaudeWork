@@ -1,8 +1,9 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Eye } from "lucide-react"
+import { Eye, ShieldAlert, Clock, AlertTriangle, ShieldCheck } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
+import { isApprover } from "@/lib/permissions"
 import { formatCurrency, formatDate, calculateProposalTotals } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
 import { ProposalStatus } from "@prisma/client"
@@ -35,6 +36,7 @@ export default async function ProposalsPage({
   if (!user) redirect("/auth/login")
 
   const folderId = searchParams.folder
+  const approver = isApprover(user)
   const canViewAll = user.role === "OWNER" || user.organization.membersViewAll
   const viewingAll = searchParams.scope === "all" && canViewAll
   // "won" is a pseudo-filter meaning any accepted deal (signed → deposit → won).
@@ -138,6 +140,26 @@ export default async function ProposalsPage({
                   </div>
                 </div>
                 <div className="shrink-0 flex items-center gap-1.5">
+                  {/* Sign-off flag — only meaningful before a proposal is sent */}
+                  {["DRAFT", "READY"].includes(p.status) && p.approvalStatus === "PENDING" && (
+                    <span className={`inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${approver ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-700"}`}
+                      title={approver ? "Waiting for your sign-off — open to review" : "Submitted for review"}>
+                      {approver ? <ShieldAlert className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
+                      {approver ? "Needs review" : "In review"}
+                    </span>
+                  )}
+                  {["DRAFT", "READY"].includes(p.status) && p.approvalStatus === "CHANGES_REQUESTED" && (
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700"
+                      title="An approver asked for changes">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Changes requested
+                    </span>
+                  )}
+                  {["DRAFT", "READY"].includes(p.status) && p.approvalStatus === "APPROVED" && (
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700"
+                      title="Signed off — ready to send">
+                      <ShieldCheck className="w-3.5 h-3.5" /> Approved
+                    </span>
+                  )}
                   {p._count.views > 0 && (
                     <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700"
                       title={`Opened by the client${p._count.views > 1 ? ` — ${p._count.views} times` : ""}`}>
