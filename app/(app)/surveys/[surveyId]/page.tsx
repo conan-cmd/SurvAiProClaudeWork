@@ -62,6 +62,18 @@ const TEMPLATES = [
   },
 ] as const
 
+// Defined at module scope (not inside the page) so it's a stable component type —
+// otherwise every re-render would remount the Dictate button and kill an in-progress
+// recording when you tap any other control.
+function FieldLabel({ label, onText }: { label: string; onText: (text: string) => void }) {
+  return (
+    <div className="flex items-center justify-between mb-1">
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <DictateButton onText={onText} />
+    </div>
+  )
+}
+
 function recommend(survey: Survey): string {
   if (!survey.isResidential) return "AUTHORITY"
   if ((survey.writtenDescription || "").length > 600) return "CONSULTATIVE"
@@ -175,13 +187,6 @@ export default function SurveyDetailPage() {
   const dictateInto = (field: keyof Survey) => (text: string) =>
     updateField(field, (((survey[field] as string) || "") + " " + text).trim())
 
-  const FieldLabel = ({ label, field }: { label: string; field: keyof Survey }) => (
-    <div className="flex items-center justify-between mb-1">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
-      <DictateButton onText={dictateInto(field)} />
-    </div>
-  )
-
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-start justify-between gap-3">
@@ -232,7 +237,7 @@ export default function SurveyDetailPage() {
           </button>
         </div>
         <div>
-          <FieldLabel label="Describe the whole job (type or dictate)" field="writtenDescription" />
+          <FieldLabel label="Describe the whole job (type or dictate)" onText={dictateInto("writtenDescription")} />
           <textarea rows={4} className={inputCls} value={survey.writtenDescription || ""}
             placeholder="Just describe everything about the job here — sizes, what's included/excluded, access, what the client wants. Then tap 'Organise into sections' and AI sorts it out."
             onChange={(e) => updateField("writtenDescription", e.target.value)} />
@@ -240,33 +245,33 @@ export default function SurveyDetailPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <FieldLabel label="Client priorities" field="clientPriorities" />
+            <FieldLabel label="Client priorities" onText={dictateInto("clientPriorities")} />
             <textarea rows={2} className={inputCls} value={survey.clientPriorities || ""}
               onChange={(e) => updateField("clientPriorities", e.target.value)} />
           </div>
           <div>
-            <FieldLabel label="Access notes" field="accessNotes" />
+            <FieldLabel label="Access notes" onText={dictateInto("accessNotes")} />
             <textarea rows={2} className={inputCls} value={survey.accessNotes || ""}
               onChange={(e) => updateField("accessNotes", e.target.value)} />
           </div>
           <div>
-            <FieldLabel label="Measurements" field="measurements" />
+            <FieldLabel label="Measurements" onText={dictateInto("measurements")} />
             <textarea rows={2} className={inputCls} value={survey.measurements || ""}
               onChange={(e) => updateField("measurements", e.target.value)} />
           </div>
           <div>
-            <FieldLabel label="Exclusions" field="exclusions" />
+            <FieldLabel label="Exclusions" onText={dictateInto("exclusions")} />
             <textarea rows={2} className={inputCls} value={survey.exclusions || ""}
               onChange={(e) => updateField("exclusions", e.target.value)} />
           </div>
           <div>
-            <FieldLabel label="Chemicals required" field="chemicalsRequired" />
+            <FieldLabel label="Chemicals required" onText={dictateInto("chemicalsRequired")} />
             <textarea rows={2} className={inputCls} value={survey.chemicalsRequired || ""}
               placeholder="e.g. sodium hypochlorite 5%, biocide, softwash mix"
               onChange={(e) => updateField("chemicalsRequired", e.target.value)} />
           </div>
           <div>
-            <FieldLabel label="Water supply" field="waterSupply" />
+            <FieldLabel label="Water supply" onText={dictateInto("waterSupply")} />
             <textarea rows={2} className={inputCls} value={survey.waterSupply || ""}
               placeholder="e.g. outside tap on-site / bring bowser / low pressure"
               onChange={(e) => updateField("waterSupply", e.target.value)} />
