@@ -3,10 +3,11 @@ import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/session"
 import { hasActiveAccess } from "@/lib/billing"
 import { isApprover } from "@/lib/permissions"
+import { isPlatformAdmin } from "@/lib/admin"
 import { db } from "@/lib/db"
 import { FeedbackButton } from "@/components/feedback-button"
 import { SignOutButton } from "@/components/sign-out-button"
-import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings, ShieldAlert } from "lucide-react"
+import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings, ShieldAlert, KeyRound } from "lucide-react"
 
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; badge?: number }
 
@@ -29,6 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Approvers see a badge on the Proposals tab with the count awaiting sign-off.
   // Reviewing happens inside each proposal — no separate Reviews tab.
   const approver = isApprover(user)
+  const admin = isPlatformAdmin(user)
   const pendingReviews = approver
     ? await db.proposal.count({ where: { organizationId: user.organizationId, approvalStatus: "PENDING" } })
     : 0
@@ -66,6 +68,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <span className="text-sm text-gray-300 truncate max-w-[110px] md:max-w-[140px]">
               {user.organization.name}
             </span>
+            {admin && (
+              <Link href="/admin" title="Admin — free-access codes"
+                className="p-1.5 rounded-md text-gray-300 hover:bg-white/10 hover:text-white transition" aria-label="Admin">
+                <KeyRound className="w-4 h-4" />
+              </Link>
+            )}
             <SignOutButton iconOnly />
           </div>
         </div>
