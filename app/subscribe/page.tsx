@@ -24,6 +24,24 @@ export default async function SubscribePage({
       if (session.subscription) {
         const sub = await retrieveSubscription(session.subscription as string)
         await applySubscription(sub)
+        // Fire the GHL "trial started" lifecycle event (best-effort — never blocks).
+        try {
+          const { ghlEnabled, sendGhlEvent } = await import("@/lib/ghl")
+          if (ghlEnabled()) {
+            await sendGhlEvent({
+              event: "trial_started",
+              email: user.email,
+              name: user.name,
+              company: user.organization?.name,
+              phone: user.organization?.phone,
+              plan: (sub as { metadata?: { plan?: string } }).metadata?.plan || null,
+              organizationId: user.organizationId,
+              signedUpAt: new Date().toISOString(),
+            })
+          }
+        } catch (e) {
+          console.error("GHL trial_started failed:", e)
+        }
       }
     } catch (e) {
       console.error("Subscribe verify failed:", e)

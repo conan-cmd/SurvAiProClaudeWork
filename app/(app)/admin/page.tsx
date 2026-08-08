@@ -3,7 +3,9 @@ import Link from "next/link"
 import { BarChart3 } from "lucide-react"
 import { getCurrentUser } from "@/lib/session"
 import { isPlatformAdmin } from "@/lib/admin"
+import { ghlEnabled } from "@/lib/ghl"
 import { CodesManager } from "@/components/codes-manager"
+import { GhlTestButton } from "@/components/ghl-test-button"
 
 export const dynamic = "force-dynamic"
 
@@ -24,6 +26,7 @@ export default async function AdminPage() {
         </Link>
       </div>
       <CodesManager />
+      <GhlTestButton enabled={ghlEnabled()} />
     </div>
   )
 }
