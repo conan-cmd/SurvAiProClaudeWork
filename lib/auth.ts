@@ -87,6 +87,11 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.organizationId = (user as { organizationId?: string }).organizationId
+        // Record the login timestamp (best-effort; email is unique). `user` is only
+        // present on the initial sign-in, so this fires once per login, not on refresh.
+        if (user.email) {
+          await db.user.update({ where: { email: user.email }, data: { lastLoginAt: new Date() } }).catch(() => {})
+        }
       }
       // Social logins don't carry organizationId - resolve it from the DB once
       if (!token.organizationId && token.email) {

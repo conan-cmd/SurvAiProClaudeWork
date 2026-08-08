@@ -16,5 +16,13 @@ export async function getCurrentUser() {
     include: { organization: true },
   })
 
+  // Lightweight "last active" tracking for the admin usage view — throttled to at
+  // most one write per user per 5 minutes so it never adds cost to normal requests.
+  if (user && (!user.lastActiveAt || Date.now() - user.lastActiveAt.getTime() > 5 * 60 * 1000)) {
+    const now = new Date()
+    await db.user.update({ where: { id: user.id }, data: { lastActiveAt: now } }).catch(() => {})
+    user.lastActiveAt = now
+  }
+
   return user
 }

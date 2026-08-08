@@ -38,6 +38,10 @@ model User {
   proposalsCreated      Proposal[]      @relation("ProposalCreator")
   ramsCreated           Rams[]          @relation("RamsCreator")
 
+  // Usage analytics (admin view): last successful login and last app activity.
+  lastLoginAt           DateTime?
+  lastActiveAt          DateTime?
+
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 
