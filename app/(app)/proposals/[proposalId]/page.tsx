@@ -6,12 +6,13 @@ import { toast } from "sonner"
 import {
   Loader2, Sparkles, ChevronUp, ChevronDown, Trash2, Plus, Eye,
   Pencil, Link2, Printer, Check, Send, Copy, Share2, X, MessageCircle, MessageSquare,
-  ShieldCheck, ClipboardCheck, Clock, AlertTriangle,
+  ShieldCheck, ClipboardCheck, Clock, AlertTriangle, EyeOff,
 } from "lucide-react"
 import { ProposalDocument } from "@/components/proposal-document"
 import { PricingEditor, EditableLineItem } from "@/components/pricing-editor"
 import { uploadSurveyPhotos, type UploadedPhoto } from "@/lib/photo-upload"
 import { RamsButton } from "@/components/rams-button"
+import { applyMarkup, calculateProposalTotals, formatCurrency } from "@/lib/utils"
 
 type Section = {
   id: string
@@ -71,6 +72,8 @@ type ProposalData = {
   identityMode: "CREATOR" | "USER" | "ORG" | null
   identityUserId: string | null
   identity: { userId: string | null; name: string | null; email: string | null; headshotUrl: string | null; signatureImageUrl: string | null } | null
+  markupType: "NONE" | "PERCENT" | "FIXED"
+  markupValue: number | null
   approvalStatus: "NONE" | "PENDING" | "APPROVED" | "CHANGES_REQUESTED"
   reviewNote: string | null
   me: { canSend: boolean; isApprover: boolean; id: string }
@@ -228,6 +231,21 @@ export default function ProposalEditorPage() {
     } finally {
       setRegenerating(null)
     }
+  }
+
+  const setMarkup = (type: "NONE" | "PERCENT" | "FIXED", value: number | null) => {
+    setProposal((p) => (p ? { ...p, markupType: type, markupValue: value } : p))
+    setSaveState("saving")
+    if (saveTimers.current["markup"]) clearTimeout(saveTimers.current["markup"])
+    saveTimers.current["markup"] = setTimeout(async () => {
+      const res = await fetch(`/api/proposals/${proposalId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markupType: type, markupValue: type === "NONE" ? null : value }),
+      })
+      setSaveState(res.ok ? "saved" : "idle")
+      if (!res.ok) toast.error("Couldn't save the markup")
+    }, 600)
   }
 
   const setStatus = async (status: string) => {
@@ -511,7 +529,9 @@ export default function ProposalEditorPage() {
     clientCompany: proposal.survey.clientCompany,
     siteAddress: proposal.survey.clientAddress,
     sections: proposal.sections,
-    pricingLineItems: proposal.pricingLineItems,
+    // Preview & PDF show the client-facing (marked-up) prices — the markup itself
+    // never appears. The editor below always edits your own base prices.
+    pricingLineItems: applyMarkup(proposal.pricingLineItems, proposal.markupType, proposal.markupValue),
     photos: proposal.survey.photos.filter((p) => p.includeInProposal && !p.internalOnly),
     latitude: proposal.survey.latitude,
     longitude: proposal.survey.longitude,
@@ -763,15 +783,23 @@ export default function ProposalEditorPage() {
               </div>
 
               {section.type === "pricing" ? (
-                <PricingEditor
-                  proposalId={proposal.id}
-                  initialItems={proposal.pricingLineItems}
-                  measuredAreaSqm={proposal.survey.areaSqm}
-                  measuredLinearMeters={proposal.survey.linearMeters}
-                  onItemsChange={(items) =>
-                    setProposal((p) => (p ? { ...p, pricingLineItems: items } : p))
-                  }
-                />
+                <>
+                  <PricingEditor
+                    proposalId={proposal.id}
+                    initialItems={proposal.pricingLineItems}
+                    measuredAreaSqm={proposal.survey.areaSqm}
+                    measuredLinearMeters={proposal.survey.linearMeters}
+                    onItemsChange={(items) =>
+                      setProposal((p) => (p ? { ...p, pricingLineItems: items } : p))
+                    }
+                  />
+                  <MarkupEditor
+                    items={proposal.pricingLineItems}
+                    type={proposal.markupType}
+                    value={proposal.markupValue}
+                    onChange={setMarkup}
+                  />
+                </>
               ) : section.type === "photos" ? (
                 <PhotoPicker proposal={proposal} section={section} updateSection={updateSection}
                   onPhotosUploaded={(newPhotos) =>
@@ -970,6 +998,68 @@ export default function ProposalEditorPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Private contractor-markup control shown under the pricing editor. Your prices are
+// never changed; this only scales what the client sees, with no markup line visible.
+function MarkupEditor({
+  items,
+  type,
+  value,
+  onChange,
+}: {
+  items: EditableLineItem[]
+  type: "NONE" | "PERCENT" | "FIXED"
+  value: number | null
+  onChange: (type: "NONE" | "PERCENT" | "FIXED", value: number | null) => void
+}) {
+  const base = calculateProposalTotals(items).total
+  const client = calculateProposalTotals(applyMarkup(items, type, value)).total
+  const margin = client - base
+
+  return (
+    <div className="mt-4 rounded-xl border border-dashed border-amber-300 bg-amber-50/60 p-4 space-y-3">
+      <div className="flex items-center gap-1.5">
+        <EyeOff className="w-4 h-4 text-amber-600" />
+        <h3 className="text-sm font-semibold text-brand-navy">Contractor markup — private</h3>
+      </div>
+      <p className="text-xs text-gray-500">
+        Add a markup on top of your price for a client presenting this on. The client only ever sees the final price — the markup never appears on the proposal, PDF or share link. Your prices above stay untouched.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={type}
+          onChange={(e) => {
+            const t = e.target.value as "NONE" | "PERCENT" | "FIXED"
+            onChange(t, t === "NONE" ? null : value ?? 0)
+          }}
+          className="px-3 py-2 border rounded-lg text-sm bg-white"
+        >
+          <option value="NONE">No markup</option>
+          <option value="PERCENT">Percentage %</option>
+          <option value="FIXED">Fixed £</option>
+        </select>
+        {type !== "NONE" && (
+          <div className="relative">
+            {type === "FIXED" && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-gray-400">£</span>}
+            <input
+              type="number" min={0} step="0.01"
+              value={value ?? ""}
+              onChange={(e) => onChange(type, e.target.value === "" ? null : Number(e.target.value))}
+              placeholder={type === "PERCENT" ? "20" : "500"}
+              className={`w-28 py-2 border rounded-lg text-sm ${type === "FIXED" ? "pl-5 pr-2" : "px-3"}`}
+            />
+            {type === "PERCENT" && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-400">%</span>}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm pt-2 border-t border-amber-200">
+        <span className="text-gray-600">Your price: <strong className="text-gray-900">{formatCurrency(base)}</strong></span>
+        <span className="text-gray-600">Markup: <strong className="text-gray-900">{formatCurrency(margin)}</strong></span>
+        <span className="text-gray-600">Client price: <strong className="text-brand-navy">{formatCurrency(client)}</strong></span>
+      </div>
     </div>
   )
 }

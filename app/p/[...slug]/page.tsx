@@ -4,7 +4,7 @@ import { ProposalDocument } from "@/components/proposal-document"
 import { AcceptanceBlock } from "@/components/signature-pad"
 import { DepositCard } from "@/components/deposit-card"
 import { computeDeposit, retrieveCheckoutSession } from "@/lib/stripe"
-import { calculateProposalTotals, formatCurrency, lineGross } from "@/lib/utils"
+import { calculateProposalTotals, formatCurrency, lineGross, applyMarkup } from "@/lib/utils"
 import { ReadTracker } from "@/components/read-tracker"
 
 export const dynamic = "force-dynamic"
@@ -130,7 +130,10 @@ export default async function SharedProposalPage({
   // After signing, the deposit is based on the total the client actually agreed
   // to (base + any optional extras they selected), falling back to the base total
   // for proposals signed before optional-selection existed.
-  const agreedTotal = p.agreedTotal ?? calculateProposalTotals(p.pricingLineItems).total
+  // Apply any contractor markup so the client sees / signs / pays the marked-up
+  // prices — with no sign of the markup itself.
+  const markedItems = applyMarkup(p.pricingLineItems, p.markupType, p.markupValue)
+  const agreedTotal = p.agreedTotal ?? calculateProposalTotals(markedItems).total
   const depositDue = p.signedAt && !p.depositPaidAt
     ? computeDeposit(p.organization.depositRules, p.survey.isResidential, agreedTotal)
     : 0
@@ -151,7 +154,7 @@ export default async function SharedProposalPage({
             clientCompany: p.survey.clientCompany,
             siteAddress: p.survey.clientAddress,
             sections: p.sections,
-            pricingLineItems: p.pricingLineItems,
+            pricingLineItems: markedItems,
             photos: p.survey.photos,
             latitude: p.survey.latitude,
             longitude: p.survey.longitude,
@@ -184,7 +187,7 @@ export default async function SharedProposalPage({
               } catch {
                 ids = []
               }
-              const chosen = p.pricingLineItems.filter((i) => ids.includes(i.id))
+              const chosen = markedItems.filter((i) => ids.includes(i.id))
               if (!chosen.length && p.agreedTotal == null) return null
               return (
                 <div className="mt-4 pt-4 border-t">
@@ -216,8 +219,8 @@ export default async function SharedProposalPage({
             clientName={p.clientName}
             clientCompany={p.survey.clientCompany}
             brandColor={p.organization.brandColor}
-            baseTotal={calculateProposalTotals(p.pricingLineItems).total}
-            optionalItems={p.pricingLineItems
+            baseTotal={calculateProposalTotals(markedItems).total}
+            optionalItems={markedItems
               .filter((i) => i.isOptional)
               .map((i) => ({ id: i.id, description: i.description, amount: lineGross(i) }))}
           />

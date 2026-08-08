@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { db } from "@/lib/db"
-import { calculateProposalTotals, lineGross } from "@/lib/utils"
+import { calculateProposalTotals, lineGross, applyMarkup } from "@/lib/utils"
 
 const acceptSchema = z.object({
   name: z.string().min(2, "Please enter your full name"),
@@ -26,6 +26,8 @@ export async function POST(
           status: true,
           signedAt: true,
           clientName: true,
+          markupType: true,
+          markupValue: true,
           createdBy: { select: { email: true, name: true } },
           organization: { select: { name: true, email: true } },
           survey: { select: { title: true } },
@@ -52,8 +54,13 @@ export async function POST(
   }
 
   // Recompute the agreed total server-side - never trust a total from the client.
+  // Apply any contractor markup first so the client signs for the marked-up price.
   // Only optional items that actually belong to this proposal are honoured.
-  const items = link.proposal.pricingLineItems
+  const items = applyMarkup(
+    link.proposal.pricingLineItems,
+    link.proposal.markupType,
+    link.proposal.markupValue
+  )
   const requestedIds = new Set(parsed.data.selectedOptionalIds ?? [])
   const chosenOptional = items.filter((i) => i.isOptional && requestedIds.has(i.id))
   const base = calculateProposalTotals(items).total

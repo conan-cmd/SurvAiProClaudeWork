@@ -403,6 +403,11 @@ model Proposal {
   identityMode          String?
   identityUserId        String?
 
+  // Contractor markup added on top of the user's price (user-side only; invisible
+  // to the end client). NONE | PERCENT | FIXED, with markupValue = % or £ amount.
+  markupType            String          @default("NONE")
+  markupValue           Float?
+
   // Deposit
   depositAmount         Float?
   depositPaidAt         DateTime?

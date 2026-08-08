@@ -62,3 +62,38 @@ export function calculateProposalTotals(items: PricingItem[]) {
   const vat = included.reduce((sum, i) => sum + (lineNet(i) * i.vat) / 100, 0)
   return { subtotal, vat, total: subtotal + vat }
 }
+
+// --- Contractor markup ---------------------------------------------------------
+// A non-destructive markup a user (e.g. a sub-contractor) adds on top of THEIR
+// price so the end client sees a higher price with no sign of a markup. The
+// original line prices are never changed — the markup is applied at display/output
+// time by scaling unit prices by a single factor (so no separate "markup" line
+// appears). PERCENT scales by (1 + value%); FIXED spreads a flat £ amount across
+// the included lines.
+export type MarkupType = "NONE" | "PERCENT" | "FIXED"
+
+export function markupFactor(
+  items: PricingItem[],
+  type: string | null | undefined,
+  value: number | null | undefined
+): number {
+  if (!type || type === "NONE" || !value || value <= 0) return 1
+  if (type === "PERCENT") return 1 + value / 100
+  if (type === "FIXED") {
+    const base = items.filter((i) => !i.isOptional).reduce((sum, i) => sum + lineNet(i), 0)
+    if (base > 0) return (base + value) / base
+  }
+  return 1
+}
+
+// Returns the items with unit prices scaled by the markup (or the same array when
+// there's no markup). Keeps every other field intact.
+export function applyMarkup<T extends PricingItem>(
+  items: T[],
+  type: string | null | undefined,
+  value: number | null | undefined
+): T[] {
+  const f = markupFactor(items, type, value)
+  if (f === 1) return items
+  return items.map((i) => ({ ...i, unitPrice: i.unitPrice * f }))
+}
