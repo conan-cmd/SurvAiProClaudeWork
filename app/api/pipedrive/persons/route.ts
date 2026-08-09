@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
-import { pipedriveConfigured, searchPersons } from "@/lib/pipedrive"
+import { pipedriveConfigured, searchPersons, PIPEDRIVE_SELECT } from "@/lib/pipedrive"
 
 // Searches the firm's Pipedrive contacts so a survey can be started from one.
 export async function GET(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
   const org = await db.organization.findUnique({
     where: { id: user.organizationId },
-    select: { pipedriveApiToken: true, pipedriveCompanyDomain: true },
+    select: PIPEDRIVE_SELECT,
   })
   if (!org || !pipedriveConfigured(org)) {
     return NextResponse.json({ error: "Pipedrive isn't connected." }, { status: 400 })

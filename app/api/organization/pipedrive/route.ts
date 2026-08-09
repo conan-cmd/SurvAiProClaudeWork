@@ -3,19 +3,28 @@ import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { encryptSecret } from "@/lib/crypto"
-import { pipedriveTest } from "@/lib/pipedrive"
+import { pipedriveTest, oauthAvailable } from "@/lib/pipedrive"
 
-// Connection status (never returns the token).
+// Connection status (never returns any token).
 export async function GET() {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const org = await db.organization.findUnique({
     where: { id: user.organizationId },
-    select: { pipedriveApiToken: true, pipedriveCompanyDomain: true },
+    select: {
+      pipedriveApiToken: true, pipedriveCompanyDomain: true,
+      pipedriveAccessToken: true, pipedriveApiDomain: true,
+    },
   })
+  const oauthConnected = Boolean(org?.pipedriveAccessToken && org?.pipedriveApiDomain)
+  const tokenConnected = Boolean(org?.pipedriveApiToken && org?.pipedriveCompanyDomain)
   return NextResponse.json({
-    connected: Boolean(org?.pipedriveApiToken && org?.pipedriveCompanyDomain),
+    connected: oauthConnected || tokenConnected,
+    // "oauth" (one-click install) vs "token" (self-connect) — informs the UI.
+    mode: oauthConnected ? "oauth" : tokenConnected ? "token" : null,
+    oauthAvailable: oauthAvailable(),
     companyDomain: org?.pipedriveCompanyDomain || null,
+    apiDomain: org?.pipedriveApiDomain || null,
   })
 }
 
@@ -67,7 +76,11 @@ export async function DELETE() {
   }
   await db.organization.update({
     where: { id: user.organizationId },
-    data: { pipedriveApiToken: null, pipedriveCompanyDomain: null },
+    data: {
+      pipedriveApiToken: null, pipedriveCompanyDomain: null,
+      pipedriveAccessToken: null, pipedriveRefreshToken: null,
+      pipedriveTokenExpiresAt: null, pipedriveApiDomain: null, pipedriveCompanyId: null,
+    },
   })
   return NextResponse.json({ connected: false })
 }

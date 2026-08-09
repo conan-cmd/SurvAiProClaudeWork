@@ -1,35 +1,149 @@
 import "server-only"
 import { db } from "@/lib/db"
-import { decryptSecret } from "@/lib/crypto"
+import { encryptSecret, decryptSecret } from "@/lib/crypto"
 import { calculateProposalTotals } from "@/lib/utils"
 import { publicBaseUrl } from "@/lib/public-url"
 
-// Per-firm Pipedrive CRM integration. Each organisation connects its own account
-// (API token + company domain). Best-effort throughout — a CRM hiccup never blocks
-// the user's action.
+// Per-firm Pipedrive CRM integration. Two connection modes:
+//  - OAuth (Marketplace install): access/refresh tokens + api_domain. Preferred.
+//  - API token (private self-connect): api_token + company domain. Fallback.
+// Best-effort throughout — a CRM hiccup never blocks the user's action.
 
-type OrgCreds = { pipedriveApiToken: string | null; pipedriveCompanyDomain: string | null }
-
-export function pipedriveConfigured(org: OrgCreds): boolean {
-  return Boolean(org.pipedriveApiToken && org.pipedriveCompanyDomain)
+// Everything pd()/sync need. `id` is required so refreshed OAuth tokens persist.
+export type PdOrg = {
+  id: string
+  pipedriveApiToken: string | null
+  pipedriveCompanyDomain: string | null
+  pipedriveAccessToken: string | null
+  pipedriveRefreshToken: string | null
+  pipedriveTokenExpiresAt: Date | null
+  pipedriveApiDomain: string | null
 }
 
-function baseUrl(domain: string): string {
-  return `https://${domain}.pipedrive.com/api/v1`
+// Columns to select whenever you need to call Pipedrive for an org.
+export const PIPEDRIVE_SELECT = {
+  id: true,
+  pipedriveApiToken: true,
+  pipedriveCompanyDomain: true,
+  pipedriveAccessToken: true,
+  pipedriveRefreshToken: true,
+  pipedriveTokenExpiresAt: true,
+  pipedriveApiDomain: true,
+} as const
+
+const AUTH_BASE = "https://oauth.pipedrive.com"
+
+export function oauthAvailable(): boolean {
+  return Boolean(process.env.PIPEDRIVE_CLIENT_ID && process.env.PIPEDRIVE_CLIENT_SECRET)
 }
+
+export function pipedriveConfigured(org: {
+  pipedriveApiToken?: string | null
+  pipedriveCompanyDomain?: string | null
+  pipedriveAccessToken?: string | null
+  pipedriveApiDomain?: string | null
+}): boolean {
+  return Boolean(
+    (org.pipedriveAccessToken && org.pipedriveApiDomain) ||
+      (org.pipedriveApiToken && org.pipedriveCompanyDomain)
+  )
+}
+
+function basicAuthHeader(): string {
+  const id = process.env.PIPEDRIVE_CLIENT_ID || ""
+  const secret = process.env.PIPEDRIVE_CLIENT_SECRET || ""
+  return "Basic " + Buffer.from(`${id}:${secret}`).toString("base64")
+}
+
+// --- OAuth ---------------------------------------------------------------------
+
+export function authorizeUrl(state: string, redirectUri: string): string {
+  const params = new URLSearchParams({
+    client_id: process.env.PIPEDRIVE_CLIENT_ID || "",
+    redirect_uri: redirectUri,
+    state,
+  })
+  return `${AUTH_BASE}/oauth/authorize?${params.toString()}`
+}
+
+type TokenResponse = {
+  access_token: string
+  refresh_token: string
+  expires_in: number
+  api_domain: string
+}
+
+export async function exchangeCodeForTokens(code: string, redirectUri: string): Promise<TokenResponse> {
+  const res = await fetch(`${AUTH_BASE}/oauth/token`, {
+    method: "POST",
+    headers: { Authorization: basicAuthHeader(), "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri }),
+    signal: AbortSignal.timeout(12000),
+  })
+  const json = (await res.json().catch(() => ({}))) as Partial<TokenResponse> & { error?: string }
+  if (!res.ok || !json.access_token) throw new Error(json.error || `Pipedrive token exchange failed (${res.status})`)
+  return json as TokenResponse
+}
+
+async function refreshTokens(refreshToken: string): Promise<Omit<TokenResponse, "api_domain"> & { api_domain?: string }> {
+  const res = await fetch(`${AUTH_BASE}/oauth/token`, {
+    method: "POST",
+    headers: { Authorization: basicAuthHeader(), "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken }),
+    signal: AbortSignal.timeout(12000),
+  })
+  const json = (await res.json().catch(() => ({}))) as Partial<TokenResponse> & { error?: string }
+  if (!res.ok || !json.access_token) throw new Error(json.error || `Pipedrive token refresh failed (${res.status})`)
+  return json as TokenResponse
+}
+
+// Returns a valid access token + api base, refreshing (and persisting) if expired.
+async function oauthContext(org: PdOrg): Promise<{ token: string; apiBase: string } | null> {
+  if (!org.pipedriveAccessToken || !org.pipedriveApiDomain) return null
+  let token = decryptSecret(org.pipedriveAccessToken)
+  const expiresAt = org.pipedriveTokenExpiresAt?.getTime() ?? 0
+  // Refresh a minute before expiry.
+  if (expiresAt - Date.now() < 60_000 && org.pipedriveRefreshToken) {
+    const refreshed = await refreshTokens(decryptSecret(org.pipedriveRefreshToken))
+    token = refreshed.access_token
+    await db.organization.update({
+      where: { id: org.id },
+      data: {
+        pipedriveAccessToken: encryptSecret(refreshed.access_token),
+        pipedriveRefreshToken: encryptSecret(refreshed.refresh_token),
+        pipedriveTokenExpiresAt: new Date(Date.now() + refreshed.expires_in * 1000),
+        ...(refreshed.api_domain ? { pipedriveApiDomain: refreshed.api_domain } : {}),
+      },
+    })
+  }
+  return { token, apiBase: `${org.pipedriveApiDomain}/api/v1` }
+}
+
+// --- API call (OAuth first, token fallback) ------------------------------------
 
 async function pd(
-  org: OrgCreds,
+  org: PdOrg,
   path: string,
   opts?: { method?: string; body?: Record<string, unknown> }
 ): Promise<Record<string, unknown> | null> {
-  if (!org.pipedriveApiToken || !org.pipedriveCompanyDomain) throw new Error("Pipedrive not connected")
-  const token = decryptSecret(org.pipedriveApiToken)
-  const sep = path.includes("?") ? "&" : "?"
-  const url = `${baseUrl(org.pipedriveCompanyDomain)}${path}${sep}api_token=${encodeURIComponent(token)}`
+  const oauth = await oauthContext(org)
+  let url: string
+  const headers: Record<string, string> = {}
+  if (oauth) {
+    headers.Authorization = `Bearer ${oauth.token}`
+    url = `${oauth.apiBase}${path}`
+  } else if (org.pipedriveApiToken && org.pipedriveCompanyDomain) {
+    const apiToken = decryptSecret(org.pipedriveApiToken)
+    const sep = path.includes("?") ? "&" : "?"
+    url = `https://${org.pipedriveCompanyDomain}.pipedrive.com/api/v1${path}${sep}api_token=${encodeURIComponent(apiToken)}`
+  } else {
+    throw new Error("Pipedrive not connected")
+  }
+  if (opts?.body) headers["Content-Type"] = "application/json"
+
   const res = await fetch(url, {
     method: opts?.method || "GET",
-    headers: opts?.body ? { "Content-Type": "application/json" } : {},
+    headers,
     body: opts?.body ? JSON.stringify(opts.body) : undefined,
     signal: AbortSignal.timeout(12000),
   })
@@ -38,9 +152,9 @@ async function pd(
   return (json.data ?? null) as Record<string, unknown> | null
 }
 
-// Validates a token + domain by calling /users/me. Returns the connected user's name.
+// Validates an API token + domain (private mode) via /users/me.
 export async function pipedriveTest(token: string, domain: string): Promise<{ name: string }> {
-  const res = await fetch(`${baseUrl(domain)}/users/me?api_token=${encodeURIComponent(token)}`, {
+  const res = await fetch(`https://${domain}.pipedrive.com/api/v1/users/me?api_token=${encodeURIComponent(token)}`, {
     signal: AbortSignal.timeout(12000),
   })
   const json = (await res.json().catch(() => ({}))) as { data?: { name?: string }; error?: string }
@@ -50,8 +164,7 @@ export async function pipedriveTest(token: string, domain: string): Promise<{ na
 
 export type PdPerson = { id: number; name: string; email: string; phone: string; company: string }
 
-// Search persons by name/email/phone for the "import a contact" flow.
-export async function searchPersons(org: OrgCreds, term: string): Promise<PdPerson[]> {
+export async function searchPersons(org: PdOrg, term: string): Promise<PdPerson[]> {
   if (!term.trim()) return []
   const data = await pd(org, `/persons/search?term=${encodeURIComponent(term)}&fields=name,email,phone&limit=10`)
   const items = ((data as { items?: unknown[] } | null)?.items || []) as Array<{
@@ -66,20 +179,18 @@ export async function searchPersons(org: OrgCreds, term: string): Promise<PdPers
   }))
 }
 
-// Maps a proposal's status to a Pipedrive deal status.
 function dealStatusFor(status: string): "open" | "won" | "lost" {
   if (["SIGNED", "DEPOSIT_PAID", "WON"].includes(status)) return "won"
   if (status === "LOST") return "lost"
   return "open"
 }
 
-// Creates or updates the Pipedrive person + organization + deal for a proposal and
-// keeps the deal's value & status in sync. Safe to call repeatedly.
+// Creates/updates the Pipedrive person + organization + deal for a proposal.
 export async function syncProposalToPipedrive(proposalId: string): Promise<void> {
   const proposal = await db.proposal.findUnique({
     where: { id: proposalId },
     include: {
-      organization: { select: { pipedriveApiToken: true, pipedriveCompanyDomain: true } },
+      organization: { select: PIPEDRIVE_SELECT },
       survey: { select: { title: true, clientCompany: true, clientEmail: true, clientPhone: true } },
       pricingLineItems: true,
     },
@@ -89,14 +200,12 @@ export async function syncProposalToPipedrive(proposalId: string): Promise<void>
   if (!pipedriveConfigured(org)) return
 
   try {
-    // 1) Organization (from the client's company name)
     let orgId = proposal.pipedriveOrgId ? Number(proposal.pipedriveOrgId) : null
     if (!orgId && proposal.survey.clientCompany?.trim()) {
       const created = await pd(org, "/organizations", { method: "POST", body: { name: proposal.survey.clientCompany.trim() } })
       orgId = (created as { id?: number } | null)?.id ?? null
     }
 
-    // 2) Person (the client contact)
     let personId = proposal.pipedrivePersonId ? Number(proposal.pipedrivePersonId) : null
     if (!personId) {
       const body: Record<string, unknown> = { name: proposal.clientName }
@@ -107,7 +216,6 @@ export async function syncProposalToPipedrive(proposalId: string): Promise<void>
       personId = (created as { id?: number } | null)?.id ?? null
     }
 
-    // 3) Deal (value = your own proposal total; status tracks the proposal)
     const value = calculateProposalTotals(proposal.pricingLineItems).total
     const status = dealStatusFor(proposal.status)
     let dealId = proposal.pipedriveDealId ? Number(proposal.pipedriveDealId) : null
@@ -122,7 +230,6 @@ export async function syncProposalToPipedrive(proposalId: string): Promise<void>
       if (orgId) body.org_id = orgId
       const created = await pd(org, "/deals", { method: "POST", body })
       dealId = (created as { id?: number } | null)?.id ?? null
-      // Attach a note with a link back to the proposal (best-effort).
       if (dealId) {
         const link = `${publicBaseUrl("")}/proposals/${proposal.id}`
         await pd(org, "/notes", {
