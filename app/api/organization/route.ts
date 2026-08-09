@@ -54,8 +54,11 @@ export async function GET() {
   const org = await db.organization.findUnique({
     where: { id: user.organizationId },
   })
-
-  return NextResponse.json(org)
+  if (!org) return NextResponse.json(null)
+  // Never expose the encrypted Pipedrive token to the client.
+  const { pipedriveApiToken, ...safe } = org
+  void pipedriveApiToken
+  return NextResponse.json(safe)
 }
 
 export async function PATCH(request: NextRequest) {

@@ -125,6 +125,10 @@ model Organization {
   proposalIdentityMode   String  @default("CREATOR")
   proposalIdentityUserId String?
 
+  // Pipedrive CRM connection (per-firm). Token is encrypted at rest (lib/crypto).
+  pipedriveApiToken      String?
+  pipedriveCompanyDomain String?
+
   // True once the first-run setup wizard is finished (or dismissed for good).
   onboardingComplete    Boolean         @default(false)
 
@@ -407,6 +411,11 @@ model Proposal {
   // to the end client). NONE | PERCENT | FIXED, with markupValue = % or £ amount.
   markupType            String          @default("NONE")
   markupValue           Float?
+
+  // Pipedrive CRM sync — the deal/person/org this proposal maps to (once pushed).
+  pipedriveDealId       String?
+  pipedrivePersonId     String?
+  pipedriveOrgId        String?
 
   // Deposit
   depositAmount         Float?

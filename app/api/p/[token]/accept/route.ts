@@ -86,6 +86,10 @@ export async function POST(
   // Let the business know their proposal was just accepted (best-effort).
   notifySigned(link.proposal, agreedTotal, request.nextUrl.origin).catch(() => {})
 
+  // Mark the Pipedrive deal won (best-effort).
+  const { syncProposalToPipedrive } = await import("@/lib/pipedrive")
+  await syncProposalToPipedrive(link.proposal.id)
+
   return NextResponse.json({ success: true })
 }
 

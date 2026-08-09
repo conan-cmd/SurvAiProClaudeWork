@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/session"
 import { canSend, sendEmail } from "@/lib/email"
 import { canSendProposal } from "@/lib/permissions"
 import { resolveProposalIdentity } from "@/lib/proposal-identity"
+import { syncProposalToPipedrive } from "@/lib/pipedrive"
 import { slugify } from "@/lib/utils"
 import { publicBaseUrl } from "@/lib/public-url"
 
@@ -137,6 +138,9 @@ export async function POST(
       where: { id: proposal.id },
       data: { status: "SENT", sentAt: new Date(), clientEmail: recipients[0] },
     })
+
+    // Push to Pipedrive (creates/updates the deal). Best-effort — never blocks send.
+    await syncProposalToPipedrive(proposal.id)
 
     return NextResponse.json({ success: true, url })
   } catch (error) {

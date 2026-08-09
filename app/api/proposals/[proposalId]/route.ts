@@ -85,6 +85,12 @@ export async function PATCH(
     data,
   })
 
+  // Keep the Pipedrive deal's status in sync when the proposal status changes.
+  if (parsed.data.status) {
+    const { syncProposalToPipedrive } = await import("@/lib/pipedrive")
+    await syncProposalToPipedrive(params.proposalId)
+  }
+
   return NextResponse.json(proposal)
 }
 

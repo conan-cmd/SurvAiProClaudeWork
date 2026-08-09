@@ -7,6 +7,7 @@ import { StripeConnect } from "@/components/stripe-connect"
 import { BillingStatus } from "@/components/billing-status"
 import { SignOutButton } from "@/components/sign-out-button"
 import { SignatureDraw } from "@/components/signature-draw"
+import { PipedriveConnect } from "@/components/pipedrive-connect"
 
 type Org = {
   id: string
@@ -745,6 +746,8 @@ export default function SettingsPage() {
           )}
         </section>
       )}
+
+      {(me?.role === "OWNER" || me?.role === "ADMIN") && <PipedriveConnect />}
 
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
         <h2 className="font-semibold text-brand-navy">Your personal sign-off</h2>

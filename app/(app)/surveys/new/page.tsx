@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowRight } from "lucide-react"
+import { ArrowRight, Loader2, Search, X, Users } from "lucide-react"
 import { DictateButton } from "@/components/dictate-button"
 import { AddressInput } from "@/components/address-input"
 
@@ -13,11 +13,32 @@ const GENERIC_SERVICES = [
   "Painting & Decorating", "Flooring", "Windows & Doors", "General Building",
 ]
 
+// Module scope (not inside the page) so it's a stable component type — otherwise
+// re-renders remount the Dictate button and kill an in-progress recording when you
+// tap another control (e.g. the residential/commercial toggle).
+function FieldLabel({ label, onText }: { label: string; onText: (text: string) => void }) {
+  return (
+    <div className="flex items-center justify-between mb-1">
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <DictateButton onText={onText} />
+    </div>
+  )
+}
+
 export default function NewSurveyPage() {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [services, setServices] = useState<string[]>(GENERIC_SERVICES)
   const [customService, setCustomService] = useState("")
+
+  // Pipedrive "import a contact" state.
+  type PdPerson = { id: number; name: string; email: string; phone: string; company: string }
+  const [pipedriveOn, setPipedriveOn] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  const [results, setResults] = useState<PdPerson[]>([])
+  const [searching, setSearching] = useState(false)
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     fetch("/api/organization")
@@ -31,7 +52,32 @@ export default function NewSurveyPage() {
         }
       })
       .catch(() => {})
+    fetch("/api/organization/pipedrive")
+      .then((r) => r.json())
+      .then((d) => setPipedriveOn(!!d.connected))
+      .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!importOpen) return
+    if (searchTimer.current) clearTimeout(searchTimer.current)
+    if (query.trim().length < 2) {
+      setResults([])
+      return
+    }
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true)
+      try {
+        const res = await fetch(`/api/pipedrive/persons?q=${encodeURIComponent(query)}`)
+        const d = await res.json()
+        setResults(res.ok && Array.isArray(d) ? d : [])
+      } catch {
+        setResults([])
+      } finally {
+        setSearching(false)
+      }
+    }, 350)
+  }, [query, importOpen])
   const [form, setForm] = useState({
     clientName: "",
     clientCompany: "",
@@ -50,6 +96,20 @@ export default function NewSurveyPage() {
 
   const set = (name: string, value: string | boolean) =>
     setForm((prev) => ({ ...prev, [name]: value }))
+
+  const pickContact = (p: PdPerson) => {
+    setForm((prev) => ({
+      ...prev,
+      clientName: p.name || prev.clientName,
+      clientEmail: p.email || prev.clientEmail,
+      clientPhone: p.phone || prev.clientPhone,
+      clientCompany: p.company || prev.clientCompany,
+    }))
+    setImportOpen(false)
+    setQuery("")
+    setResults([])
+    toast.success("Contact imported from Pipedrive")
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -90,13 +150,6 @@ export default function NewSurveyPage() {
   const dictateInto = (name: keyof typeof form) => (text: string) =>
     set(name, ((form[name] as string) + " " + text).trim())
 
-  const FieldLabel = ({ label, field }: { label: string; field: keyof typeof form }) => (
-    <div className="flex items-center justify-between mb-1">
-      <span className="text-sm font-medium text-gray-700">{label}</span>
-      <DictateButton onText={dictateInto(field)} />
-    </div>
-  )
-
   return (
     <div className="max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold text-brand-navy mb-1">New site survey</h1>
@@ -106,7 +159,15 @@ export default function NewSurveyPage() {
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
-          <h2 className="font-semibold text-brand-navy">Client</h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-semibold text-brand-navy">Client</h2>
+            {pipedriveOn && (
+              <button type="button" onClick={() => setImportOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium text-brand-blue hover:bg-blue-50">
+                <Users className="w-4 h-4" /> Import from Pipedrive
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Client name *</label>
@@ -179,33 +240,33 @@ export default function NewSurveyPage() {
             </div>
           </div>
           <div>
-            <FieldLabel label="Written survey description" field="writtenDescription" />
+            <FieldLabel label="Written survey description" onText={dictateInto("writtenDescription")} />
             <textarea rows={4} className={inputCls} value={form.writtenDescription}
               onChange={(e) => set("writtenDescription", e.target.value)}
               placeholder="What you found on site, condition, recommended works…" />
           </div>
           <div>
-            <FieldLabel label="Client priorities" field="clientPriorities" />
+            <FieldLabel label="Client priorities" onText={dictateInto("clientPriorities")} />
             <textarea rows={2} className={inputCls} value={form.clientPriorities}
               onChange={(e) => set("clientPriorities", e.target.value)}
               placeholder="e.g. Minimal disruption, done before end of month" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <FieldLabel label="Access notes" field="accessNotes" />
+              <FieldLabel label="Access notes" onText={dictateInto("accessNotes")} />
               <textarea rows={2} className={inputCls} value={form.accessNotes}
                 onChange={(e) => set("accessNotes", e.target.value)}
                 placeholder="Parking, keys, restrictions…" />
             </div>
             <div>
-              <FieldLabel label="Measurements" field="measurements" />
+              <FieldLabel label="Measurements" onText={dictateInto("measurements")} />
               <textarea rows={2} className={inputCls} value={form.measurements}
                 onChange={(e) => set("measurements", e.target.value)}
                 placeholder="e.g. Roof approx 85m², gutters 24m" />
             </div>
           </div>
           <div>
-            <FieldLabel label="Exclusions" field="exclusions" />
+            <FieldLabel label="Exclusions" onText={dictateInto("exclusions")} />
             <textarea rows={2} className={inputCls} value={form.exclusions}
               onChange={(e) => set("exclusions", e.target.value)}
               placeholder="Anything not included in the job" />
@@ -217,6 +278,43 @@ export default function NewSurveyPage() {
           {saving ? "Creating…" : "Create survey"} <ArrowRight className="w-4 h-4" />
         </button>
       </form>
+
+      {importOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4"
+          onClick={() => setImportOpen(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-3"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-brand-navy">Import a Pipedrive contact</h3>
+              <button type="button" onClick={() => setImportOpen(false)} aria-label="Close"
+                className="p-1 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="relative">
+              <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by name or email…"
+                className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+            </div>
+            <div className="max-h-72 overflow-y-auto -mx-1">
+              {searching ? (
+                <div className="flex items-center gap-2 text-sm text-gray-400 p-3"><Loader2 className="w-4 h-4 animate-spin" /> Searching…</div>
+              ) : query.trim().length < 2 ? (
+                <p className="text-sm text-gray-400 p-3">Type at least 2 characters to search your Pipedrive contacts.</p>
+              ) : results.length === 0 ? (
+                <p className="text-sm text-gray-400 p-3">No contacts found.</p>
+              ) : (
+                results.map((p) => (
+                  <button key={p.id} type="button" onClick={() => pickContact(p)}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50">
+                    <div className="font-medium text-gray-900 text-sm">{p.name || "Unnamed"}</div>
+                    <div className="text-xs text-gray-500">{[p.company, p.email, p.phone].filter(Boolean).join(" · ") || "—"}</div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
