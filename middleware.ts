@@ -20,6 +20,28 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/auth/login", request.url))
   }
 
+  // Restricted "Contractor" login: locked to Job Reports only. Everything else is
+  // blocked here (defence-in-depth on top of per-route checks) — pages redirect to
+  // /reports, disallowed APIs get a 403.
+  if (token && (token as { role?: string }).role === "CONTRACTOR") {
+    const isApi = pathname.startsWith("/api/")
+    const apiAllowed =
+      pathname.startsWith("/api/job-sites") ||
+      pathname.startsWith("/api/job-reports") ||
+      pathname.startsWith("/api/blob") ||
+      pathname.startsWith("/api/dictate") ||
+      pathname.startsWith("/api/me") ||
+      pathname.startsWith("/api/auth") ||
+      // org info (name/id/branding) is read-only for the nav + blob upload path
+      (pathname.startsWith("/api/organization") && request.method === "GET")
+    if (isApi) {
+      if (!apiAllowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    } else {
+      const pageAllowed = pathname.startsWith("/reports") || pathname.startsWith("/auth")
+      if (!pageAllowed) return NextResponse.redirect(new URL("/reports", request.url))
+    }
+  }
+
   // Add organization context to request headers
   if (token && (token as any).organizationId) {
     const requestHeaders = new Headers(request.headers)
@@ -39,12 +61,10 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
+     * Match everything except static assets. API routes ARE included so the
+     * Contractor-role lockdown can 403 disallowed API calls (unauthenticated
+     * public API routes still pass through — they have no token).
      */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 }

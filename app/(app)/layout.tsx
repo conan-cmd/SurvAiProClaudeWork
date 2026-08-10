@@ -2,12 +2,12 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/session"
 import { hasActiveAccess } from "@/lib/billing"
-import { isApprover } from "@/lib/permissions"
+import { isApprover, isContractor } from "@/lib/permissions"
 import { isPlatformAdmin } from "@/lib/admin"
 import { db } from "@/lib/db"
 import { FeedbackButton } from "@/components/feedback-button"
 import { SignOutButton } from "@/components/sign-out-button"
-import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings, ShieldAlert, KeyRound } from "lucide-react"
+import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings, ShieldAlert, KeyRound, ClipboardCheck } from "lucide-react"
 
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; badge?: number }
 
@@ -31,14 +31,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Reviewing happens inside each proposal — no separate Reviews tab.
   const approver = isApprover(user)
   const admin = isPlatformAdmin(user)
+  const contractor = isContractor(user)
   const pendingReviews = approver
     ? await db.proposal.count({ where: { organizationId: user.organizationId, approvalStatus: "PENDING" } })
     : 0
-  const NAV: NavItem[] = pendingReviews
-    ? BASE_NAV.map((n) => (n.href === "/proposals" ? { ...n, badge: pendingReviews } : n))
-    : BASE_NAV
+  const REPORTS_ITEM: NavItem = { href: "/reports", label: "Reports", icon: ClipboardCheck }
+  // A Contractor is locked to Job Reports only (also enforced in middleware).
+  let NAV: NavItem[]
+  if (contractor) {
+    NAV = [REPORTS_ITEM]
+  } else {
+    const base = pendingReviews
+      ? BASE_NAV.map((n) => (n.href === "/proposals" ? { ...n, badge: pendingReviews } : n))
+      : BASE_NAV
+    NAV = [...base.slice(0, 4), REPORTS_ITEM, ...base.slice(4)]
+  }
   // Mobile bottom bar drops Gallery (stays in the top nav) to keep the bar compact.
-  const MOBILE_NAV = NAV.filter((n) => n.href !== "/gallery")
+  const MOBILE_NAV = contractor ? NAV : NAV.filter((n) => n.href !== "/gallery")
 
   return (
     <div className="min-h-screen bg-brand-gray">

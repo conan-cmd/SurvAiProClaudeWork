@@ -30,6 +30,7 @@ const providers: NextAuthOptions["providers"] = [
         name: user.name,
         image: user.image,
         organizationId: user.organizationId,
+        role: user.role,
       }
     },
   }),
@@ -87,18 +88,20 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.organizationId = (user as { organizationId?: string }).organizationId
+        token.role = (user as { role?: string }).role
         // Record the login timestamp (best-effort; email is unique). `user` is only
         // present on the initial sign-in, so this fires once per login, not on refresh.
         if (user.email) {
           await db.user.update({ where: { email: user.email }, data: { lastLoginAt: new Date() } }).catch(() => {})
         }
       }
-      // Social logins don't carry organizationId - resolve it from the DB once
-      if (!token.organizationId && token.email) {
+      // Social logins (and older sessions) may lack org/role - resolve from the DB.
+      if ((!token.organizationId || !token.role) && token.email) {
         const dbUser = await db.user.findUnique({ where: { email: token.email } })
         if (dbUser) {
           token.id = dbUser.id
           token.organizationId = dbUser.organizationId
+          token.role = dbUser.role
         }
       }
       return token
