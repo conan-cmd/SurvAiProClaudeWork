@@ -1294,11 +1294,14 @@ function PhotoPicker({
   const fileInput = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
 
-  let selected: string[] = []
+  // Default (photoIds null) = every survey photo is included. The user deselects to
+  // drop one; that's when photoIds becomes the explicit kept set.
+  const includable = proposal.survey.photos.filter((p) => p.includeInProposal && !p.internalOnly).map((p) => p.id)
+  let selected: string[] = includable
   try {
-    selected = section.photoIds ? JSON.parse(section.photoIds) : []
+    selected = section.photoIds ? JSON.parse(section.photoIds) : includable
   } catch {
-    selected = []
+    selected = includable
   }
 
   const toggle = (photoId: string) => {

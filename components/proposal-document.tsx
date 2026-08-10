@@ -148,9 +148,15 @@ function CoverSection({ section, data }: { section: Section; data: ProposalDocum
 }
 
 // Site photos are shown live from the survey (those marked "In proposal"), so
-// photos added after the proposal was generated still appear.
-function PhotosSection({ data }: { data: ProposalDocumentData }) {
-  const photos = data.photos
+// photos added after the proposal was generated still appear. A photos section
+// shows ALL of them by default (photoIds null); once the user deselects any in the
+// editor, photoIds becomes the explicit kept set.
+function PhotosSection({ data, section }: { data: ProposalDocumentData; section: Section }) {
+  let ids: string[] | null = null
+  if (section.photoIds) {
+    try { ids = JSON.parse(section.photoIds) } catch { ids = null }
+  }
+  const photos = ids ? data.photos.filter((p) => ids!.includes(p.id)) : data.photos
   if (!photos.length) return null
 
   return (
@@ -383,7 +389,7 @@ export function ProposalDocument({ data }: { data: ProposalDocumentData }) {
               style={{ backgroundColor: data.organization.brandColor }}
             />
             {section.type === "photos" ? (
-              <PhotosSection data={data} />
+              <PhotosSection data={data} section={section} />
             ) : section.type === "pricing" ? (
               <PricingSection data={data} />
             ) : section.type === "videos" ? (
