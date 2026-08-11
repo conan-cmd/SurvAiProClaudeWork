@@ -13,9 +13,6 @@ const updateProposalSchema = z.object({
   // Per-proposal identity override. null clears it (inherit the org default).
   identityMode: z.enum(["CREATOR", "USER", "ORG"]).nullable().optional(),
   identityUserId: z.string().nullable().optional(),
-  // Contractor markup (user-side only).
-  markupType: z.enum(["NONE", "PERCENT", "FIXED"]).optional(),
-  markupValue: z.number().min(0).nullable().optional(),
 })
 
 export async function GET(
