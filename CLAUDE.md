@@ -123,6 +123,22 @@ RAMS upgraded to LBC's real format + operative signing. All deployed; prod DB mi
 - **First-run onboarding (DONE):** signup already redirected to the 3-step `/onboarding/branding` wizard; added a **welcome step 0** with "Set up my account" vs **"Skip — I'll jump straight in"**, a persistent "Skip for now" link, and `Organization.onboardingComplete Boolean @default(false)` (set true on Finish; org PATCH accepts it). Dashboard shows a dismissible `OnboardingNudge` banner when `!onboardingComplete && !hasBasics` (hasBasics = logo or non-empty mainServices), so skippers/Google-signups get reminded but established orgs (LBC) never are. Dismiss → PATCH complete=true.
 - **Deferred:** Gmail Tier-2 still needs Conan to whitelist redirect URI (see [[gmail-send-tier2]]); per-tenant custom domains (#20).
 
+## Session 2026-08-12 — Job Reports P1 live + UX batch (shipped)
+
+Two deploys, both live; prod Neon migrated first each time.
+- **Job Reports P1 shipped** (merge of `jobreports-phase1`): CONTRACTOR role + JobSite/JobReport/JobReportPhoto tables live on prod. Conan still to: set the pest-control contractor's role in Settings → Team, and set org Contact email = info@lbcclean.co.uk.
+- **Per-user nav sections** (`lib/nav-sections.ts`, `User.navSections`): Settings → Team → "Sections this person sees" checkboxes per member. Null = role default; **Reports hidden for MEMBERs by default** (owners/admins see it) so existing teams aren't confused. Dashboard/Settings always visible; Contractor locked to Reports.
+- **Mark accepted** (verbal/on-paper go-ahead): editor button → PATCH `{markAccepted:true}` → status SIGNED + `signedAt` + labelled `signedName`; blocks double e-sign; Pipedrive synced. Status dropdown now shows friendly labels.
+- **Nudge**: "Nudge" button on SENT proposals → `api/proposals/[id]/nudge` (fresh share link, plain personal email, stamps `Proposal.lastNudgeAt`). Body customisable at Settings → "Follow-up reminder message" (`Organization.nudgeMessage`; default in `lib/nudge.ts`).
+- **Spellcheck** on all textareas app-wide (`spellCheck` attr).
+- **Address editing**: survey header address click-to-edit (scrolls + opens Site location editor via `openSignal`); **Duplicate** now lands on the copy with the editor open (`?editAddress=1`); proposal cover has a Site address field + "Update location & imagery" (geocode route); RAMS job details has an Edit link.
+- **Search** (`components/list-search.tsx`, `?q=`): surveys/proposals/RAMS lists filter server-side on title/client/company/address (+email on proposals); reports sites filter client-side.
+- **Video preview**: play overlay on VideoPicker tiles → in-app youtube-nocookie modal with Add/Remove.
+- **Schema added this session (all live on prod):** `User.navSections`, `Organization.nudgeMessage`, `Proposal.lastNudgeAt` (+ the P1 tables/enum).
+- **3D building imagery (investigated, parked):** Google Aerial View API (address → 3D flyover) is still **US-only**; Photorealistic 3D Tiles cover the UK but need a WebGL viewer (Cesium/Maps JS) client-side and give no static "grab" — revisit as an interactive viewer feature if wanted.
+- **GHL/Damian:** his webhook URL ends `/webhook-trigger/undefined` (bad copy). 8 sample lifecycle payloads sent (all HTTP 200 — GHL 200s regardless); awaiting his confirmation/corrected URL. `GHL_WEBHOOK_URL` not yet on Vercel.
+- ⚠️ **Prod DATABASE_URL was pasted in chat this session — Conan to rotate the Neon password and update Vercel `DATABASE_URL` + redeploy.**
+
 ## Deploy pipeline (current — 2026-07-25)
 
 **The repo is now on GitHub and auto-deploys via Vercel. Do NOT use the old `npx vercel --token=…` flow (those tokens were revoked).**
