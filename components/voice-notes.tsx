@@ -240,7 +240,7 @@ function TranscriptCard({
       </div>
 
       {editing ? (
-        <textarea
+        <textarea spellCheck
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={6}

@@ -117,6 +117,9 @@ model Organization {
   termsAndConditions    String?
   termsCommercial       String?
 
+  // Gentle-reminder email body for unsigned proposals (null = app default).
+  nudgeMessage          String?
+
   // YouTube channel for embedding similar-work videos in proposals
   youtubeChannelUrl     String?
 
@@ -407,6 +410,7 @@ model Proposal {
   // Metadata
   status                ProposalStatus  @default(DRAFT)
   sentAt                DateTime?
+  lastNudgeAt           DateTime?
 
   // Sign-off workflow (for draft-only surveyors — see User.canSendProposals)
   approvalStatus        ApprovalStatus  @default(NONE)

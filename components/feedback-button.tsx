@@ -63,7 +63,7 @@ export function FeedbackButton({ founding = false }: { founding?: boolean }) {
                 ? "You're a founding member — your feedback directly shapes the roadmap. What would make SurvAIPro better?"
                 : "We're in beta and building fast. Tell us what would make SurvAIPro better — bugs, missing bits, ideas, anything."}
             </p>
-            <textarea rows={5} value={message} onChange={(e) => setMessage(e.target.value)}
+            <textarea spellCheck rows={5} value={message} onChange={(e) => setMessage(e.target.value)}
               placeholder="I'd love it if…"
               className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" />
             <div className="flex justify-end gap-2">

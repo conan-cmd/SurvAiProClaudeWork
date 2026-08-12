@@ -5,16 +5,18 @@ import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { formatDate } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
+import { ListSearch } from "@/components/list-search"
 
 export default async function SurveysPage({
   searchParams,
 }: {
-  searchParams: { folder?: string; scope?: string }
+  searchParams: { folder?: string; scope?: string; q?: string }
 }) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
 
   const folderId = searchParams.folder
+  const q = searchParams.q?.trim()
   const canViewAll = user.role === "OWNER" || user.organization.membersViewAll
   const viewingAll = searchParams.scope === "all" && canViewAll
   const buildLink = (folder?: string, all?: boolean) => {
@@ -35,6 +37,16 @@ export default async function SurveysPage({
         organizationId: user.organizationId,
         ...(folderId ? { folderId } : {}),
         ...(viewingAll ? {} : { createdById: user.id }),
+        ...(q
+          ? {
+              OR: [
+                { title: { contains: q, mode: "insensitive" as const } },
+                { clientName: { contains: q, mode: "insensitive" as const } },
+                { clientCompany: { contains: q, mode: "insensitive" as const } },
+                { clientAddress: { contains: q, mode: "insensitive" as const } },
+              ],
+            }
+          : {}),
       },
       orderBy: { updatedAt: "desc" },
       include: {
@@ -54,6 +66,8 @@ export default async function SurveysPage({
           <Plus className="w-5 h-5" /> New survey
         </Link>
       </div>
+
+      <ListSearch placeholder="Search by job, client, company or address…" />
 
       {canViewAll && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -85,7 +99,7 @@ export default async function SurveysPage({
 
       {surveys.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-10 text-center text-gray-400">
-          No surveys yet. Create your first one to get started.
+          {q ? <>No surveys match &ldquo;{q}&rdquo;.</> : "No surveys yet. Create your first one to get started."}
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm divide-y">

@@ -13,6 +13,8 @@ const updateProposalSchema = z.object({
   // Per-proposal identity override. null clears it (inherit the org default).
   identityMode: z.enum(["CREATOR", "USER", "ORG"]).nullable().optional(),
   identityUserId: z.string().nullable().optional(),
+  // Records a verbal / on-paper acceptance the client won't be signing digitally.
+  markAccepted: z.boolean().optional(),
 })
 
 export async function GET(
@@ -73,8 +75,17 @@ export async function PATCH(
   }
 
   const data: Record<string, unknown> = { ...parsed.data }
+  delete data.markAccepted
   if (parsed.data.status === "SENT" && existing.status !== "SENT") {
     data.sentAt = new Date()
+  }
+  if (parsed.data.markAccepted) {
+    if (existing.signedAt) {
+      return NextResponse.json({ error: "This proposal is already accepted" }, { status: 409 })
+    }
+    data.status = "SIGNED"
+    data.signedAt = new Date()
+    data.signedName = `${existing.clientName} (accepted verbally / on paper)`
   }
 
   const proposal = await db.proposal.update({
@@ -83,7 +94,7 @@ export async function PATCH(
   })
 
   // Keep the Pipedrive deal's status in sync when the proposal status changes.
-  if (parsed.data.status) {
+  if (parsed.data.status || parsed.data.markAccepted) {
     const { syncProposalToPipedrive } = await import("@/lib/pipedrive")
     await syncProposalToPipedrive(params.proposalId)
   }

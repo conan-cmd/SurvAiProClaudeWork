@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/session"
 import { isApprover } from "@/lib/permissions"
 import { formatCurrency, formatDate, calculateProposalTotals } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
+import { ListSearch } from "@/components/list-search"
 import { ProposalStatus } from "@prisma/client"
 
 function relTime(d: Date | string): string {
@@ -30,12 +31,13 @@ const STATUS_STYLES: Record<string, string> = {
 export default async function ProposalsPage({
   searchParams,
 }: {
-  searchParams: { folder?: string; scope?: string; status?: string }
+  searchParams: { folder?: string; scope?: string; status?: string; q?: string }
 }) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
 
   const folderId = searchParams.folder
+  const q = searchParams.q?.trim()
   const approver = isApprover(user)
   const canViewAll = user.role === "OWNER" || user.organization.membersViewAll
   const viewingAll = searchParams.scope === "all" && canViewAll
@@ -69,6 +71,17 @@ export default async function ProposalsPage({
         ...(folderId ? { survey: { folderId } } : {}),
         ...(viewingAll ? {} : { createdById: user.id }),
         ...statusWhere,
+        ...(q
+          ? {
+              OR: [
+                { clientName: { contains: q, mode: "insensitive" as const } },
+                { clientEmail: { contains: q, mode: "insensitive" as const } },
+                { survey: { title: { contains: q, mode: "insensitive" as const } } },
+                { survey: { clientAddress: { contains: q, mode: "insensitive" as const } } },
+                { survey: { clientCompany: { contains: q, mode: "insensitive" as const } } },
+              ],
+            }
+          : {}),
       },
       orderBy: { updatedAt: "desc" },
       include: {
@@ -84,6 +97,8 @@ export default async function ProposalsPage({
   return (
     <div className="space-y-6 overflow-x-hidden">
       <h1 className="text-2xl font-bold text-brand-navy">Proposals</h1>
+
+      <ListSearch placeholder="Search by job, client, company, email or address…" />
 
       {canViewAll && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -124,7 +139,7 @@ export default async function ProposalsPage({
 
       {proposals.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-10 text-center text-gray-400">
-          Generate a proposal from one of your surveys and it will appear here.
+          {q ? <>No proposals match &ldquo;{q}&rdquo;.</> : "Generate a proposal from one of your surveys and it will appear here."}
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm divide-y">

@@ -36,6 +36,7 @@ const updateOrgSchema = z.object({
   ourApproachSection: z.string().optional(),
   termsAndConditions: z.string().optional(),
   termsCommercial: z.string().optional(),
+  nudgeMessage: z.string().max(1000).optional(),
   youtubeChannelUrl: z.string().optional(),
   depositRules: z.string().max(500).optional(),
   signOffName: z.string().max(100).optional(),

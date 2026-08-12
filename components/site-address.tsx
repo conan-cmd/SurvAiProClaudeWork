@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Loader2, MapPin, Pencil, Search } from "lucide-react"
 import { AddressInput } from "@/components/address-input"
@@ -23,15 +23,26 @@ export function SiteAddress({
   address,
   hasCoords,
   onUpdated,
+  openSignal,
 }: {
   surveyId: string
   address: string
   hasCoords: boolean
   onUpdated: (data: LocationUpdate) => void
+  // Bump to pop the editor open from elsewhere (header address, ?editAddress=1).
+  openSignal?: number
 }) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(address)
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (openSignal) {
+      setValue(address)
+      setEditing(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSignal])
 
   const find = async () => {
     if (!value.trim()) {

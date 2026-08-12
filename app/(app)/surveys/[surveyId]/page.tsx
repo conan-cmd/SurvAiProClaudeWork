@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Loader2, Sparkles, FileText, Check } from "lucide-react"
+import { Loader2, Sparkles, FileText, Check, Pencil } from "lucide-react"
 import { PhotoManager, Photo } from "@/components/photo-manager"
 import { VoiceNotes, VoiceNoteWithTranscript } from "@/components/voice-notes"
 import { DictateButton } from "@/components/dictate-button"
@@ -89,6 +89,14 @@ export default function SurveyDetailPage() {
   const [organising, setOrganising] = useState(false)
   const [template, setTemplate] = useState<string | null>(null)
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Bumping this pops the Site location address editor open (header click,
+  // or arriving with ?editAddress=1 — e.g. straight after duplicating a job).
+  const [addressEditSignal, setAddressEditSignal] = useState(0)
+
+  const editAddress = () => {
+    setAddressEditSignal((n) => n + 1)
+    document.getElementById("site-location")?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
 
   useEffect(() => {
     fetch(`/api/surveys/${surveyId}`)
@@ -99,6 +107,11 @@ export default function SurveyDetailPage() {
       .then((data: Survey) => {
         setSurvey(data)
         setTemplate(recommend(data))
+        if (new URLSearchParams(window.location.search).get("editAddress")) {
+          window.history.replaceState({}, "", `/surveys/${surveyId}`)
+          setAddressEditSignal((n) => n + 1)
+          setTimeout(() => document.getElementById("site-location")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150)
+        }
       })
       .catch(() => toast.error("Failed to load survey"))
   }, [surveyId])
@@ -198,7 +211,12 @@ export default function SurveyDetailPage() {
             className="text-2xl font-bold text-brand-navy bg-transparent w-full border-b border-transparent hover:border-gray-300 focus:border-brand-blue focus:outline-none"
           />
           <p className="text-gray-500 text-sm mt-0.5">
-            {survey.clientName} · {survey.clientAddress}
+            {survey.clientName} ·{" "}
+            <button type="button" onClick={editAddress}
+              title="Edit the site address"
+              className="text-left hover:text-brand-blue hover:underline underline-offset-2">
+              {survey.clientAddress || "Add address"} <Pencil className="w-3 h-3 inline-block align-baseline" />
+            </button>
           </p>
           {survey.latitude != null && survey.longitude != null && (
             <p className="text-xs text-gray-400 mt-0.5">
@@ -238,7 +256,7 @@ export default function SurveyDetailPage() {
         </div>
         <div>
           <FieldLabel label="Describe the whole job (type or dictate)" onText={dictateInto("writtenDescription")} />
-          <textarea rows={4} className={inputCls} value={survey.writtenDescription || ""}
+          <textarea spellCheck rows={4} className={inputCls} value={survey.writtenDescription || ""}
             placeholder="Just describe everything about the job here — sizes, what's included/excluded, access, what the client wants. Then tap 'Organise into sections' and AI sorts it out."
             onChange={(e) => updateField("writtenDescription", e.target.value)} />
           <p className="text-xs text-gray-400 mt-1">Say it once — AI fills the fields below, which you can then tweak.</p>
@@ -246,33 +264,33 @@ export default function SurveyDetailPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <FieldLabel label="Client priorities" onText={dictateInto("clientPriorities")} />
-            <textarea rows={2} className={inputCls} value={survey.clientPriorities || ""}
+            <textarea spellCheck rows={2} className={inputCls} value={survey.clientPriorities || ""}
               onChange={(e) => updateField("clientPriorities", e.target.value)} />
           </div>
           <div>
             <FieldLabel label="Access notes" onText={dictateInto("accessNotes")} />
-            <textarea rows={2} className={inputCls} value={survey.accessNotes || ""}
+            <textarea spellCheck rows={2} className={inputCls} value={survey.accessNotes || ""}
               onChange={(e) => updateField("accessNotes", e.target.value)} />
           </div>
           <div>
             <FieldLabel label="Measurements" onText={dictateInto("measurements")} />
-            <textarea rows={2} className={inputCls} value={survey.measurements || ""}
+            <textarea spellCheck rows={2} className={inputCls} value={survey.measurements || ""}
               onChange={(e) => updateField("measurements", e.target.value)} />
           </div>
           <div>
             <FieldLabel label="Exclusions" onText={dictateInto("exclusions")} />
-            <textarea rows={2} className={inputCls} value={survey.exclusions || ""}
+            <textarea spellCheck rows={2} className={inputCls} value={survey.exclusions || ""}
               onChange={(e) => updateField("exclusions", e.target.value)} />
           </div>
           <div>
             <FieldLabel label="Chemicals required" onText={dictateInto("chemicalsRequired")} />
-            <textarea rows={2} className={inputCls} value={survey.chemicalsRequired || ""}
+            <textarea spellCheck rows={2} className={inputCls} value={survey.chemicalsRequired || ""}
               placeholder="e.g. sodium hypochlorite 5%, biocide, softwash mix"
               onChange={(e) => updateField("chemicalsRequired", e.target.value)} />
           </div>
           <div>
             <FieldLabel label="Water supply" onText={dictateInto("waterSupply")} />
-            <textarea rows={2} className={inputCls} value={survey.waterSupply || ""}
+            <textarea spellCheck rows={2} className={inputCls} value={survey.waterSupply || ""}
               placeholder="e.g. outside tap on-site / bring bowser / low pressure"
               onChange={(e) => updateField("waterSupply", e.target.value)} />
           </div>
@@ -321,13 +339,14 @@ export default function SurveyDetailPage() {
         })()
 
         return (
-          <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+          <section id="site-location" className="bg-white rounded-xl shadow-sm p-5 space-y-4 scroll-mt-16">
             <h2 className="font-semibold text-brand-navy">Site location</h2>
             <SiteAddress
               surveyId={survey.id}
               address={survey.clientAddress}
               hasCoords={hasCoords}
               onUpdated={onLocationUpdated}
+              openSignal={addressEditSignal}
             />
 
             {hasCoords && (

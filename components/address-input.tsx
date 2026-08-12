@@ -95,7 +95,7 @@ export function AddressInput({
 
   return (
     <div className="relative">
-      <textarea
+      <textarea spellCheck
         rows={2}
         className={className}
         value={value}

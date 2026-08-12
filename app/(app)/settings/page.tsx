@@ -9,6 +9,7 @@ import { SignOutButton } from "@/components/sign-out-button"
 import { SignatureDraw } from "@/components/signature-draw"
 import { PipedriveConnect } from "@/components/pipedrive-connect"
 import { HIDEABLE_SECTIONS, visibleSectionKeys } from "@/lib/nav-sections"
+import { DEFAULT_NUDGE_MESSAGE } from "@/lib/nudge"
 
 type Org = {
   id: string
@@ -32,6 +33,7 @@ type Org = {
   ourApproachSection: string | null
   termsAndConditions: string | null
   termsCommercial: string | null
+  nudgeMessage: string | null
   youtubeChannelUrl: string | null
   depositRules: string | null
   signOffName: string | null
@@ -301,6 +303,7 @@ export default function SettingsPage() {
           ourApproachSection: org.ourApproachSection || "",
           termsAndConditions: org.termsAndConditions || "",
           termsCommercial: org.termsCommercial || "",
+          nudgeMessage: org.nudgeMessage || "",
           youtubeChannelUrl: org.youtubeChannelUrl || "",
           depositRules: org.depositRules || "",
           signOffName: org.signOffName || "",
@@ -602,10 +605,19 @@ export default function SettingsPage() {
         ).map(([key, label]) => (
           <div key={key}>
             <label className={labelCls}>{label}</label>
-            <textarea rows={4} className={inputCls} value={org[key] || ""}
+            <textarea spellCheck rows={4} className={inputCls} value={org[key] || ""}
               onChange={(e) => set(key, e.target.value)} />
           </div>
         ))}
+        <div>
+          <label className={labelCls}>Follow-up reminder message</label>
+          <p className="text-xs text-gray-400 mb-1.5">
+            Sent when you tap &ldquo;Nudge&rdquo; on a sent proposal — a gentle prompt to select items and sign.
+          </p>
+          <textarea spellCheck rows={3} className={inputCls} value={org.nudgeMessage || ""}
+            placeholder={DEFAULT_NUDGE_MESSAGE}
+            onChange={(e) => set("nudgeMessage", e.target.value)} />
+        </div>
       </section>
 
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
@@ -907,7 +919,7 @@ export default function SettingsPage() {
                 Draft with AI
               </button>
             </div>
-            <textarea rows={9} className={inputCls} value={value || ""}
+            <textarea spellCheck rows={9} className={inputCls} value={value || ""}
               onChange={(e) => set(field, e.target.value)}
               placeholder={type === "commercial"
                 ? "Leave empty to use the residential terms for commercial jobs too…"

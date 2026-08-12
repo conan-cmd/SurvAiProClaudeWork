@@ -6,9 +6,10 @@ import { toast } from "sonner"
 import {
   Loader2, Sparkles, ChevronUp, ChevronDown, Trash2, Plus, Eye,
   Pencil, Link2, Printer, Check, Send, Copy, Share2, X, MessageCircle, MessageSquare,
-  ShieldCheck, ClipboardCheck, Clock, AlertTriangle,
+  ShieldCheck, ClipboardCheck, Clock, AlertTriangle, BellRing, MapPin, Play,
 } from "lucide-react"
 import { ProposalDocument } from "@/components/proposal-document"
+import { AddressInput } from "@/components/address-input"
 import { PricingEditor, EditableLineItem } from "@/components/pricing-editor"
 import { uploadSurveyPhotos, type UploadedPhoto } from "@/lib/photo-upload"
 import { RamsButton } from "@/components/rams-button"
@@ -28,6 +29,8 @@ type ProposalData = {
   clientEmail: string | null
   templateName: string
   status: string
+  signedAt: string | null
+  lastNudgeAt: string | null
   sections: Section[]
   pricingLineItems: EditableLineItem[]
   survey: {
@@ -77,6 +80,10 @@ type ProposalData = {
 }
 
 const STATUSES = ["DRAFT", "READY", "SENT", "SIGNED", "DEPOSIT_PAID", "WON", "LOST"] as const
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Draft", READY: "Ready", SENT: "Sent", SIGNED: "Accepted & signed",
+  DEPOSIT_PAID: "Deposit paid", WON: "Won", LOST: "Lost",
+}
 
 // photoIds goes to the API as an array but is stored locally as a JSON string
 type SectionPatch = Partial<Omit<Section, "photoIds">> & {
@@ -92,6 +99,7 @@ export default function ProposalEditorPage() {
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [canShare, setCanShare] = useState(false)
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle")
+  const [updatingAddress, setUpdatingAddress] = useState(false)
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [members, setMembers] = useState<{ id: string; name: string | null; email: string; role: string }[]>([])
 
@@ -242,6 +250,47 @@ export default function ProposalEditorPage() {
     if (!res.ok) {
       setProposal({ ...proposal, status: prev })
       toast.error("Failed to update status")
+    }
+  }
+
+  // Gentle follow-up on an unsigned proposal (message customisable in Settings).
+  const [nudging, setNudging] = useState(false)
+  const sendNudge = async () => {
+    if (!proposal) return
+    if (!window.confirm(
+      `Send ${proposal.clientName} a friendly reminder to select their items and sign?\n\nYou can customise the message in Settings → Proposal content.`
+    )) return
+    setNudging(true)
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/nudge`, { method: "POST" })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      setProposal((p) => (p ? { ...p, lastNudgeAt: d.lastNudgeAt } : p))
+      toast.success("Reminder sent")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't send the reminder")
+    } finally {
+      setNudging(false)
+    }
+  }
+
+  // Verbal / on-paper go-ahead: record the acceptance without a digital signature.
+  const markAccepted = async () => {
+    if (!proposal) return
+    if (!window.confirm(
+      `Mark this proposal as accepted by ${proposal.clientName}?\n\nUse this when the client has agreed verbally or on paper. The proposal will show as accepted and the signing link will no longer ask for a signature.`
+    )) return
+    const res = await fetch(`/api/proposals/${proposalId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markAccepted: true }),
+    })
+    if (res.ok) {
+      setProposal({ ...proposal, status: "SIGNED", signedAt: new Date().toISOString() })
+      toast.success("Marked as accepted")
+    } else {
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error || "Couldn't mark as accepted")
     }
   }
 
@@ -503,6 +552,32 @@ export default function ProposalEditorPage() {
     setProposal((p) => (p ? { ...p, survey: { ...p.survey, clientCompany: v } } : p))
     saveCover("cover-company", `/api/surveys/${proposal.survey.id}`, { clientCompany: v })
   }
+  // Address edits stay local until "Update location" — saving goes through the
+  // survey geocode route so the pin, imagery and what3words stay in sync.
+  const setCoverAddress = (v: string) =>
+    setProposal((p) => (p ? { ...p, survey: { ...p.survey, clientAddress: v } } : p))
+  const updateCoverAddress = async () => {
+    if (!proposal?.survey.clientAddress.trim()) return
+    setUpdatingAddress(true)
+    try {
+      const res = await fetch(`/api/surveys/${proposal.survey.id}/geocode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address: proposal.survey.clientAddress.trim() }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || "Couldn't locate that address")
+      setProposal((p) => p ? {
+        ...p,
+        survey: { ...p.survey, clientAddress: d.clientAddress, latitude: d.latitude, longitude: d.longitude, what3words: d.what3words },
+      } : p)
+      toast.success("Site location updated — imagery refreshed")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update the address")
+    } finally {
+      setUpdatingAddress(false)
+    }
+  }
 
   const docData = {
     clientName: proposal.clientName,
@@ -547,8 +622,25 @@ export default function ProposalEditorPage() {
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <select value={proposal.status} onChange={(e) => setStatus(e.target.value)}
             className="px-3 py-2 border rounded-lg text-sm font-medium bg-white">
-            {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}
           </select>
+          {proposal.status === "SENT" && !proposal.signedAt && (
+            <button onClick={sendNudge} disabled={nudging}
+              title={proposal.lastNudgeAt
+                ? `Last reminder sent ${new Date(proposal.lastNudgeAt).toLocaleDateString("en-GB")}`
+                : "Email the client a gentle reminder to sign (message customisable in Settings)"}
+              className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
+              {nudging ? <Loader2 className="w-4 h-4 animate-spin" /> : <BellRing className="w-4 h-4" />}
+              Nudge
+            </button>
+          )}
+          {!proposal.signedAt && !["SIGNED", "DEPOSIT_PAID", "WON"].includes(proposal.status) && (
+            <button onClick={markAccepted}
+              title="Client agreed verbally or on paper — record the acceptance without a digital signature"
+              className="inline-flex items-center gap-1.5 px-3 py-2 border border-emerald-300 text-emerald-700 rounded-lg text-sm font-medium bg-emerald-50 hover:bg-emerald-100">
+              <Check className="w-4 h-4" /> Mark accepted
+            </button>
+          )}
           <button onClick={() => setMode(mode === "edit" ? "preview" : "edit")}
             className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
             {mode === "edit" ? <Eye className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
@@ -814,6 +906,20 @@ export default function ProposalEditorPage() {
                       />
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Site address</label>
+                    <AddressInput
+                      value={proposal.survey.clientAddress}
+                      onChange={setCoverAddress}
+                      placeholder="Start typing the address…"
+                      className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                    />
+                    <button type="button" onClick={updateCoverAddress} disabled={updatingAddress}
+                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
+                      {updatingAddress ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+                      Update location &amp; imagery
+                    </button>
+                  </div>
                   <div className="pt-1 border-t">
                     <label className="block text-sm font-medium text-gray-700 mb-1 mt-2">Who this proposal is from</label>
                     <select
@@ -866,7 +972,7 @@ export default function ProposalEditorPage() {
                       <span className="text-xs text-gray-400">Tailored to your services — review before sending. Saved for future proposals too.</span>
                     </div>
                   )}
-                  <textarea
+                  <textarea spellCheck
                     value={section.content}
                     onChange={(e) => updateSection(section.id, { content: e.target.value })}
                     rows={Math.min(14, Math.max(4, section.content.split("\n").length + 2))}
@@ -937,7 +1043,7 @@ export default function ProposalEditorPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Message (optional)</label>
-              <textarea rows={3} value={sendMessage} onChange={(e) => setSendMessage(e.target.value)}
+              <textarea spellCheck rows={3} value={sendMessage} onChange={(e) => setSendMessage(e.target.value)}
                 placeholder="A short personal note…"
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" />
             </div>
@@ -986,6 +1092,8 @@ function VideoPicker({
   const [videos, setVideos] = useState<ChannelVideo[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState("")
+  // Watch a video in-app before deciding it belongs in the proposal.
+  const [preview, setPreview] = useState<ChannelVideo | null>(null)
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -1080,26 +1188,67 @@ function VideoPicker({
               {videos.map((video) => {
                 const on = selected.some((v) => v.videoId === video.videoId)
                 return (
-                  <button key={video.videoId} type="button" onClick={() => toggle(video)}
-                    className={`text-left rounded-lg overflow-hidden border-2 transition ${
+                  <div key={video.videoId}
+                    className={`relative rounded-lg overflow-hidden border-2 transition ${
                       on ? "border-brand-blue" : "border-transparent opacity-60 hover:opacity-100"
                     }`}>
-                    <div className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={video.thumbnail} alt="" className="w-full aspect-video object-cover" />
-                      {on && (
-                        <span className="absolute top-1 right-1 bg-brand-blue text-white rounded-full p-0.5">
-                          <Check className="w-3 h-3" />
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-600 p-1.5 leading-snug line-clamp-2">{video.title}</p>
-                  </button>
+                    <button type="button" onClick={() => toggle(video)} className="text-left w-full">
+                      <div className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={video.thumbnail} alt="" className="w-full aspect-video object-cover" />
+                        {on && (
+                          <span className="absolute top-1 right-1 bg-brand-blue text-white rounded-full p-0.5">
+                            <Check className="w-3 h-3" />
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-600 p-1.5 leading-snug line-clamp-2">{video.title}</p>
+                    </button>
+                    <button type="button" onClick={() => setPreview(video)}
+                      aria-label={`Preview ${video.title}`} title="Watch before adding"
+                      className="absolute top-1 left-1 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/85">
+                      <Play className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 )
               })}
             </div>
           )}
         </>
+      )}
+      {preview && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setPreview(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="aspect-video bg-black">
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${preview.videoId}?autoplay=1`}
+                title={preview.title}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-3 p-3">
+              <p className="text-sm font-medium text-gray-800 line-clamp-2 min-w-0">{preview.title}</p>
+              <div className="shrink-0 flex items-center gap-2">
+                <button type="button" onClick={() => toggle(preview)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
+                    selected.some((v) => v.videoId === preview.videoId)
+                      ? "border text-gray-600 hover:bg-gray-50"
+                      : "bg-brand-blue text-white hover:bg-blue-700"
+                  }`}>
+                  {selected.some((v) => v.videoId === preview.videoId) ? "Remove from proposal" : "Add to proposal"}
+                </button>
+                <button type="button" onClick={() => setPreview(null)}
+                  className="px-3 py-1.5 border rounded-lg text-sm font-medium hover:bg-gray-50">
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

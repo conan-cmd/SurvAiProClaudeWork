@@ -353,7 +353,7 @@ export default function OnboardingPage() {
               </div>
               <div>
                 <label className={labelCls}>Why do clients choose you?</label>
-                <textarea rows={3} placeholder="Fast turnaround, tidy work, fully insured..." className={inputCls}
+                <textarea spellCheck rows={3} placeholder="Fast turnaround, tidy work, fully insured..." className={inputCls}
                   value={form.whyChooseUs} onChange={(e) => set("whyChooseUs", e.target.value)} />
               </div>
               <div>
@@ -402,7 +402,7 @@ export default function OnboardingPage() {
                 ).map(([key, label]) => (
                   <div key={key}>
                     <label className={labelCls}>{label}</label>
-                    <textarea rows={5} className={inputCls}
+                    <textarea spellCheck rows={5} className={inputCls}
                       value={sections[key]}
                       onChange={(e) => setSections((p) => ({ ...p, [key]: e.target.value }))} />
                   </div>

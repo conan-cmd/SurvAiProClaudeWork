@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Loader2, Plus, MapPin, ClipboardList, X } from "lucide-react"
+import { Loader2, Plus, MapPin, ClipboardList, X, Search as SearchIcon } from "lucide-react"
 
 type Site = {
   id: string
@@ -18,6 +18,7 @@ type Site = {
 export default function ReportsPage() {
   const router = useRouter()
   const [sites, setSites] = useState<Site[] | null>(null)
+  const [query, setQuery] = useState("")
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ clientName: "", clientCompany: "", clientEmail: "", clientPhone: "", address: "" })
@@ -61,15 +62,33 @@ export default function ReportsPage() {
         </button>
       </div>
 
+      <div className="relative">
+        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+        <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by client, company or address…" aria-label="Search sites"
+          className="w-full pl-9 pr-3 py-2.5 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+      </div>
+
       {sites === null ? (
         <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-blue" /></div>
       ) : sites.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-10 text-center text-gray-400">
           No sites yet. Add a site to start logging visit reports.
         </div>
-      ) : (
+      ) : (() => {
+        const q = query.trim().toLowerCase()
+        const shown = q
+          ? sites.filter((s) =>
+              [s.clientName, s.clientCompany, s.address].some((v) => v?.toLowerCase().includes(q))
+            )
+          : sites
+        return shown.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm p-10 text-center text-gray-400">
+            No sites match &ldquo;{query.trim()}&rdquo;.
+          </div>
+        ) : (
         <div className="bg-white rounded-xl shadow-sm divide-y">
-          {sites.map((s) => (
+          {shown.map((s) => (
             <Link key={s.id} href={`/reports/${s.id}`} className="flex items-center justify-between gap-3 p-4 hover:bg-gray-50">
               <div className="min-w-0">
                 <div className="font-medium text-gray-900 truncate">{s.clientName}{s.clientCompany ? ` · ${s.clientCompany}` : ""}</div>
@@ -81,7 +100,8 @@ export default function ReportsPage() {
             </Link>
           ))}
         </div>
-      )}
+        )
+      })()}
 
       {open && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={() => !saving && setOpen(false)}>

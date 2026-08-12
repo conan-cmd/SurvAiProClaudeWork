@@ -67,8 +67,9 @@ export function ItemActions({
     setBusy(false)
     if (res.ok) {
       const data = await res.json()
-      toast.success("Duplicated")
-      router.push(`/surveys/${data.id}`)
+      toast.success("Duplicated — check the site address")
+      // Land with the address editor open: a duplicated job usually needs a new site.
+      router.push(`/surveys/${data.id}?editAddress=1`)
     } else toast.error("Couldn't duplicate")
   }
 

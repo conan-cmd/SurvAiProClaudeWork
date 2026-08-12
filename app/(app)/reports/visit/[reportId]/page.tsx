@@ -182,7 +182,7 @@ export default function JobReportEditor() {
                   <span className="text-sm font-medium text-gray-700">{f.label}</span>
                   <DictateButton onText={(t) => setField(f.key, ((fields[f.key] || "") + " " + t).trim())} />
                 </div>
-                <textarea rows={3} className={input} value={fields[f.key] || ""} placeholder={f.placeholder}
+                <textarea spellCheck rows={3} className={input} value={fields[f.key] || ""} placeholder={f.placeholder}
                   onChange={(e) => setField(f.key, e.target.value)} />
               </div>
             ))}

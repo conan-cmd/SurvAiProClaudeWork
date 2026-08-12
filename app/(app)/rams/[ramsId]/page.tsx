@@ -361,7 +361,7 @@ export default function RamsPage() {
             {items.filter((x) => x.trim()).map((x, i) => <li key={i}>{x}</li>)}
           </ul>
         )}
-        <textarea rows={Math.max(3, items.length + 1)} className={`no-print ${input}`}
+        <textarea spellCheck rows={Math.max(3, items.length + 1)} className={`no-print ${input}`}
           value={items.join("\n")}
           onChange={(e) => setSection(field, e.target.value.split("\n") as Sections[typeof field])}
           onBlur={(e) => {
@@ -447,7 +447,13 @@ export default function RamsPage() {
           <div className="text-sm text-gray-600 space-y-1 mb-3">
             <div><span className="text-gray-400">Contractor:</span> {rams.organization.name}</div>
             <div><span className="text-gray-400">Client:</span> {rams.survey.clientName}</div>
-            <div><span className="text-gray-400">Site address:</span> {rams.survey.clientAddress}</div>
+            <div>
+              <span className="text-gray-400">Site address:</span> {rams.survey.clientAddress}{" "}
+              <Link href={`/surveys/${rams.survey.id}?editAddress=1`}
+                className="no-print text-brand-blue text-xs font-medium hover:underline">
+                Edit
+              </Link>
+            </div>
           </div>
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
@@ -462,7 +468,7 @@ export default function RamsPage() {
             </div>
             <div className="sm:col-span-2">
               <label className="block text-[11px] text-gray-400 mb-0.5">Scope of works</label>
-              <textarea rows={2} className={input} value={sections.scopeOfWorks}
+              <textarea spellCheck rows={2} className={input} value={sections.scopeOfWorks}
                 onChange={(e) => setSection("scopeOfWorks", e.target.value)} />
             </div>
             <div>
@@ -483,7 +489,7 @@ export default function RamsPage() {
             </div>
             <div className="sm:col-span-2">
               <label className="block text-[11px] text-gray-400 mb-0.5">Access &amp; welfare notes</label>
-              <textarea rows={2} className={input} value={siteInfo}
+              <textarea spellCheck rows={2} className={input} value={siteInfo}
                 onChange={(e) => { setSiteInfo(e.target.value); save({ siteInfo: e.target.value }) }} />
             </div>
           </div>
@@ -492,7 +498,7 @@ export default function RamsPage() {
         {/* 2. Description of works */}
         <section className="bg-white rounded-xl shadow-sm p-5">
           <h2 className="font-semibold text-brand-navy mb-2">2. Description of works</h2>
-          <textarea rows={4} className={input} value={sections.descriptionOfWorks}
+          <textarea spellCheck rows={4} className={input} value={sections.descriptionOfWorks}
             onChange={(e) => setSection("descriptionOfWorks", e.target.value)} />
         </section>
 
@@ -540,7 +546,7 @@ export default function RamsPage() {
           )}
           {/* Custom extras */}
           <label className="no-print block text-[11px] text-gray-400 mt-4 mb-1">Other PPE (one per line)</label>
-          <textarea rows={2} className={`no-print ${input}`}
+          <textarea spellCheck rows={2} className={`no-print ${input}`}
             value={ppe.filter((x) => !isPreset(x)).join("\n")}
             onChange={(e) => {
               const extras = e.target.value.split("\n")
@@ -569,19 +575,19 @@ export default function RamsPage() {
                     <div className="grid sm:grid-cols-2 gap-2">
                       <div>
                         <label className="block text-[11px] text-gray-400 mb-0.5">Hazard</label>
-                        <textarea rows={2} className={input} value={h.hazard} onChange={(e) => setHaz(i, "hazard", e.target.value)} />
+                        <textarea spellCheck rows={2} className={input} value={h.hazard} onChange={(e) => setHaz(i, "hazard", e.target.value)} />
                       </div>
                       <div>
                         <label className="block text-[11px] text-gray-400 mb-0.5">Who&apos;s at risk</label>
-                        <textarea rows={2} className={input} value={h.whoAtRisk} onChange={(e) => setHaz(i, "whoAtRisk", e.target.value)} />
+                        <textarea spellCheck rows={2} className={input} value={h.whoAtRisk} onChange={(e) => setHaz(i, "whoAtRisk", e.target.value)} />
                       </div>
                       <div>
                         <label className="block text-[11px] text-gray-400 mb-0.5">Controls</label>
-                        <textarea rows={2} className={input} value={h.controls} onChange={(e) => setHaz(i, "controls", e.target.value)} />
+                        <textarea spellCheck rows={2} className={input} value={h.controls} onChange={(e) => setHaz(i, "controls", e.target.value)} />
                       </div>
                       <div>
                         <label className="block text-[11px] text-gray-400 mb-0.5">PPE</label>
-                        <textarea rows={2} className={input} value={h.ppe} onChange={(e) => setHaz(i, "ppe", e.target.value)} />
+                        <textarea spellCheck rows={2} className={input} value={h.ppe} onChange={(e) => setHaz(i, "ppe", e.target.value)} />
                       </div>
                     </div>
                     {/* Risk scoring: Probability × Severity = Risk Ranking, before and after controls */}
@@ -673,7 +679,7 @@ export default function RamsPage() {
                   {g.steps.map((s, si) => (
                     <li key={si} className="flex items-start gap-2">
                       <span className="text-gray-300 mt-2 shrink-0">•</span>
-                      <textarea rows={1} className={input} value={s} onChange={(e) => setStep(gi, si, e.target.value)} />
+                      <textarea spellCheck rows={1} className={input} value={s} onChange={(e) => setStep(gi, si, e.target.value)} />
                       <button onClick={() => rmStep(gi, si)} className="no-print p-1.5 text-gray-300 hover:text-red-600" aria-label="Remove step">
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -837,7 +843,7 @@ export default function RamsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Message (optional)</label>
-              <textarea rows={3} value={sendMessage} onChange={(e) => setSendMessage(e.target.value)}
+              <textarea spellCheck rows={3} value={sendMessage} onChange={(e) => setSendMessage(e.target.value)}
                 placeholder="A short personal note…"
                 className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" />
             </div>

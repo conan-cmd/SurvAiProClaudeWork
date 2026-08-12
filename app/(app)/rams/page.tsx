@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { ShieldAlert, Check } from "lucide-react"
 import { getCurrentUser } from "@/lib/session"
 import { db } from "@/lib/db"
+import { ListSearch } from "@/components/list-search"
 
 export const dynamic = "force-dynamic"
 
@@ -16,12 +17,30 @@ function signedCount(sections: string | null): { signed: number; total: number }
   }
 }
 
-export default async function RamsListPage() {
+export default async function RamsListPage({
+  searchParams,
+}: {
+  searchParams: { q?: string }
+}) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
 
+  const q = searchParams.q?.trim()
   const rams = await db.rams.findMany({
-    where: { organizationId: user.organizationId },
+    where: {
+      organizationId: user.organizationId,
+      ...(q
+        ? {
+            survey: {
+              OR: [
+                { title: { contains: q, mode: "insensitive" as const } },
+                { clientName: { contains: q, mode: "insensitive" as const } },
+                { clientAddress: { contains: q, mode: "insensitive" as const } },
+              ],
+            },
+          }
+        : {}),
+    },
     orderBy: { updatedAt: "desc" },
     include: { survey: { select: { title: true, clientName: true } } },
   })
@@ -33,10 +52,18 @@ export default async function RamsListPage() {
         <h1 className="text-xl font-bold text-brand-navy">RAMS</h1>
       </div>
 
+      <ListSearch placeholder="Search by job, client or address…" />
+
       {rams.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">
-          <p>No RAMS yet.</p>
-          <p className="text-sm mt-1">Open a survey or proposal and tap <strong>RAMS</strong> to draft one.</p>
+          {q ? (
+            <p>No RAMS match &ldquo;{q}&rdquo;.</p>
+          ) : (
+            <>
+              <p>No RAMS yet.</p>
+              <p className="text-sm mt-1">Open a survey or proposal and tap <strong>RAMS</strong> to draft one.</p>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-2">

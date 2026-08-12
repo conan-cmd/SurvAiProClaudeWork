@@ -241,33 +241,33 @@ export default function NewSurveyPage() {
           </div>
           <div>
             <FieldLabel label="Written survey description" onText={dictateInto("writtenDescription")} />
-            <textarea rows={4} className={inputCls} value={form.writtenDescription}
+            <textarea spellCheck rows={4} className={inputCls} value={form.writtenDescription}
               onChange={(e) => set("writtenDescription", e.target.value)}
               placeholder="What you found on site, condition, recommended works…" />
           </div>
           <div>
             <FieldLabel label="Client priorities" onText={dictateInto("clientPriorities")} />
-            <textarea rows={2} className={inputCls} value={form.clientPriorities}
+            <textarea spellCheck rows={2} className={inputCls} value={form.clientPriorities}
               onChange={(e) => set("clientPriorities", e.target.value)}
               placeholder="e.g. Minimal disruption, done before end of month" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <FieldLabel label="Access notes" onText={dictateInto("accessNotes")} />
-              <textarea rows={2} className={inputCls} value={form.accessNotes}
+              <textarea spellCheck rows={2} className={inputCls} value={form.accessNotes}
                 onChange={(e) => set("accessNotes", e.target.value)}
                 placeholder="Parking, keys, restrictions…" />
             </div>
             <div>
               <FieldLabel label="Measurements" onText={dictateInto("measurements")} />
-              <textarea rows={2} className={inputCls} value={form.measurements}
+              <textarea spellCheck rows={2} className={inputCls} value={form.measurements}
                 onChange={(e) => set("measurements", e.target.value)}
                 placeholder="e.g. Roof approx 85m², gutters 24m" />
             </div>
           </div>
           <div>
             <FieldLabel label="Exclusions" onText={dictateInto("exclusions")} />
-            <textarea rows={2} className={inputCls} value={form.exclusions}
+            <textarea spellCheck rows={2} className={inputCls} value={form.exclusions}
               onChange={(e) => set("exclusions", e.target.value)}
               placeholder="Anything not included in the job" />
           </div>
