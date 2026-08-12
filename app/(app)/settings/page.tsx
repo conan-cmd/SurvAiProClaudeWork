@@ -8,6 +8,7 @@ import { BillingStatus } from "@/components/billing-status"
 import { SignOutButton } from "@/components/sign-out-button"
 import { SignatureDraw } from "@/components/signature-draw"
 import { PipedriveConnect } from "@/components/pipedrive-connect"
+import { HIDEABLE_SECTIONS, visibleSectionKeys } from "@/lib/nav-sections"
 
 type Org = {
   id: string
@@ -67,7 +68,7 @@ type Me = {
 }
 
 type TeamData = {
-  users: { id: string; name: string | null; email: string; role: string; headshotUrl: string | null; canSendProposals?: boolean }[]
+  users: { id: string; name: string | null; email: string; role: string; headshotUrl: string | null; canSendProposals?: boolean; navSections?: string | null }[]
   invites: { id: string; email: string; token: string }[]
 }
 
@@ -617,7 +618,8 @@ export default function SettingsPage() {
             const canManage = (me?.role === "OWNER" || me?.role === "ADMIN") && u.role !== "OWNER" && u.id !== me?.id
             const draftOnly = u.canSendProposals === false
             return (
-            <div key={u.id} className="flex items-center gap-3">
+            <div key={u.id} className="space-y-1">
+            <div className="flex items-center gap-3">
               {u.headshotUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={u.headshotUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
@@ -673,6 +675,39 @@ export default function SettingsPage() {
                   )}
                 </div>
               )}
+            </div>
+            {canManage && u.role !== "CONTRACTOR" && (
+              <details className="ml-11">
+                <summary className="text-xs text-gray-400 cursor-pointer select-none hover:text-gray-600">
+                  Sections this person sees
+                </summary>
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-1.5 pb-1">
+                  {HIDEABLE_SECTIONS.map(({ key, label }) => {
+                    const current = visibleSectionKeys(u)
+                    const checked = current.includes(key)
+                    return (
+                      <label key={key} className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                        <input type="checkbox" checked={checked}
+                          onChange={async (e) => {
+                            const next = e.target.checked ? [...current, key] : current.filter((k) => k !== key)
+                            const json = JSON.stringify(next)
+                            setTeam((t) => t ? { ...t, users: t.users.map((x) => x.id === u.id ? { ...x, navSections: json } : x) } : t)
+                            const res = await fetch(`/api/team/${u.id}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ navSections: next }),
+                            })
+                            if (res.ok) toast.success("Sections updated")
+                            else toast.error("Couldn't update sections")
+                          }}
+                          className="rounded accent-blue-600" />
+                        {label}
+                      </label>
+                    )
+                  })}
+                </div>
+              </details>
+            )}
             </div>
           )})}
           {team?.invites.map((i) => (

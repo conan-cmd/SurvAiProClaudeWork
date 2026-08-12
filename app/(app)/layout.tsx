@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/session"
 import { hasActiveAccess } from "@/lib/billing"
 import { isApprover, isContractor } from "@/lib/permissions"
+import { visibleSectionKeys } from "@/lib/nav-sections"
 import { isPlatformAdmin } from "@/lib/admin"
 import { db } from "@/lib/db"
 import { FeedbackButton } from "@/components/feedback-button"
@@ -44,7 +45,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     const base = pendingReviews
       ? BASE_NAV.map((n) => (n.href === "/proposals" ? { ...n, badge: pendingReviews } : n))
       : BASE_NAV
-    NAV = [...base.slice(0, 4), REPORTS_ITEM, ...base.slice(4)]
+    // Per-user section visibility (Settings → Team). Dashboard/Settings always show.
+    const visible = new Set<string>(visibleSectionKeys(user))
+    NAV = [...base.slice(0, 4), REPORTS_ITEM, ...base.slice(4)].filter(
+      (n) => n.href === "/dashboard" || n.href === "/settings" || visible.has(n.href.slice(1))
+    )
   }
   // Mobile bottom bar drops Gallery (stays in the top nav) to keep the bar compact.
   const MOBILE_NAV = contractor ? NAV : NAV.filter((n) => n.href !== "/gallery")

@@ -24,6 +24,10 @@ model User {
   // approver (OWNER/ADMIN) before they can be sent. Owners/admins always can send.
   canSendProposals      Boolean         @default(true)
 
+  // JSON array of nav section keys this user sees (lib/nav-sections.ts). Null =
+  // role default: all sections, except Reports which only owners/admins see.
+  navSections           String?
+
   // Personal sign-off for proposals this user creates
   signOffName           String?
   headshotUrl           String?
