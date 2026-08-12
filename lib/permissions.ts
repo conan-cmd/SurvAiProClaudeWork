@@ -16,6 +16,16 @@ export function isApprover(user: UserLike): boolean {
   return user.role === "OWNER" || user.role === "ADMIN"
 }
 
+// A restricted subcontractor login — Job Reports only, sees only their own.
+export function isContractor(user: UserLike): boolean {
+  return user.role === "CONTRACTOR"
+}
+
+// Owners/admins see all job reports in the org; everyone else sees only their own.
+export function canSeeAllJobReports(user: UserLike): boolean {
+  return user.role === "OWNER" || user.role === "ADMIN"
+}
+
 // If a draft-only user edits an already-approved proposal, the sign-off no longer
 // applies to the changed content — clear it so it must be re-submitted.
 export async function resetApprovalIfEdited(

@@ -630,26 +630,48 @@ export default function SettingsPage() {
                 <div className="text-sm font-medium truncate">{u.name || u.email}</div>
                 <div className="text-xs text-gray-400 truncate">
                   {u.email} · {u.role.toLowerCase()}
-                  {u.role !== "OWNER" && (draftOnly ? " · draft only" : " · can send")}
+                  {u.role !== "OWNER" && u.role !== "CONTRACTOR" && (draftOnly ? " · draft only" : " · can send")}
                 </div>
               </div>
               {canManage && (
-                <label className="shrink-0 flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer" title="If off, this person must have their proposals signed off before sending">
-                  <input type="checkbox" checked={!draftOnly}
+                <div className="shrink-0 flex items-center gap-2">
+                  <select value={u.role}
                     onChange={async (e) => {
-                      const canSend = e.target.checked
-                      setTeam((t) => t ? { ...t, users: t.users.map((x) => x.id === u.id ? { ...x, canSendProposals: canSend } : x) } : t)
+                      const role = e.target.value
+                      setTeam((t) => t ? { ...t, users: t.users.map((x) => x.id === u.id ? { ...x, role } : x) } : t)
                       const res = await fetch(`/api/team/${u.id}`, {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ canSendProposals: canSend }),
+                        body: JSON.stringify({ role }),
                       })
-                      if (res.ok) toast.success(canSend ? "Can send proposals" : "Set to draft only — proposals need sign-off")
-                      else toast.error("Couldn't update")
+                      if (res.ok) toast.success("Role updated")
+                      else toast.error("Couldn't update role")
                     }}
-                    className="rounded accent-blue-600" />
-                  Can send
-                </label>
+                    className="text-xs border rounded-lg px-2 py-1.5 bg-white"
+                    title="Contractor = locked to Job Reports only">
+                    <option value="MEMBER">Member</option>
+                    <option value="ADMIN">Admin</option>
+                    <option value="CONTRACTOR">Contractor</option>
+                  </select>
+                  {u.role !== "CONTRACTOR" && (
+                    <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer" title="If off, this person must have their proposals signed off before sending">
+                      <input type="checkbox" checked={!draftOnly}
+                        onChange={async (e) => {
+                          const canSend = e.target.checked
+                          setTeam((t) => t ? { ...t, users: t.users.map((x) => x.id === u.id ? { ...x, canSendProposals: canSend } : x) } : t)
+                          const res = await fetch(`/api/team/${u.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ canSendProposals: canSend }),
+                          })
+                          if (res.ok) toast.success(canSend ? "Can send proposals" : "Set to draft only — proposals need sign-off")
+                          else toast.error("Couldn't update")
+                        }}
+                        className="rounded accent-blue-600" />
+                      Can send
+                    </label>
+                  )}
+                </div>
               )}
             </div>
           )})}

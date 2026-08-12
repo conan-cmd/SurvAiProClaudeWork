@@ -37,6 +37,8 @@ model User {
   surveysCreated        SiteSurvey[]    @relation("SurveyCreator")
   proposalsCreated      Proposal[]      @relation("ProposalCreator")
   ramsCreated           Rams[]          @relation("RamsCreator")
+  jobSitesCreated       JobSite[]       @relation("JobSiteCreator")
+  jobReportsCreated     JobReport[]     @relation("JobReportCreator")
 
   // Usage analytics (admin view): last successful login and last app activity.
   lastLoginAt           DateTime?
@@ -65,6 +67,9 @@ enum UserRole {
   OWNER
   ADMIN
   MEMBER
+  // Locked-down login (e.g. a subcontractor): can ONLY create sites + job reports,
+  // sees only their own, and nothing else in the app. See middleware.ts.
+  CONTRACTOR
 }
 
 // Sign-off state for a proposal drafted by a restricted (draft-only) user.
@@ -174,6 +179,8 @@ model Organization {
   folders               Folder[]
   rams                  Rams[]
   documents             OrgDocument[]
+  jobSites              JobSite[]
+  jobReports            JobReport[]
 
   // When true, team members can view everyone's surveys/proposals (owners always can)
   membersViewAll        Boolean         @default(false)
@@ -584,4 +591,74 @@ model AccessCode {
   maxUses               Int             @default(1)
   uses                  Int             @default(0)
   createdAt             DateTime        @default(now())
+}
+
+// --- Job Reports (restricted "Contractor" role — e.g. a subcontractor logging
+// recurring site visits). A JobSite is created once; each visit is a JobReport. ---
+model JobSite {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  clientName     String
+  clientCompany  String?
+  clientEmail    String?
+  clientPhone    String?
+  address        String
+  notes          String?
+
+  createdById    String?
+  createdBy      User?        @relation("JobSiteCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  reports        JobReport[]
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+}
+
+model JobReport {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  siteId         String
+  site           JobSite      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  visitDate      DateTime     @default(now())
+  status         String       @default("DRAFT") // DRAFT | COMPLETED
+  // Field values as JSON — forward-compatible with customisable fields (Phase 3).
+  fields         String?
+
+  technicianName String?
+  signatureImage String?      // data URL of the drawn signature
+  signedAt       DateTime?
+
+  publicToken    String?      @unique // client-viewable link (Phase 2)
+  completedAt    DateTime?
+
+  photos         JobReportPhoto[]
+
+  createdById    String?
+  createdBy      User?        @relation("JobReportCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([siteId])
+}
+
+model JobReportPhoto {
+  id          String    @id @default(cuid())
+  jobReportId String
+  jobReport   JobReport @relation(fields: [jobReportId], references: [id], onDelete: Cascade)
+  fileUrl     String
+  fileName    String
+  fileSize    Int
+  caption     String?
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([jobReportId])
 }
