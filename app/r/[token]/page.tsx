@@ -216,6 +216,42 @@ export default function PublicRamsPage() {
         {list(s.environmentalControls).length > 0 && <Section title="Environmental controls"><Bullets items={list(s.environmentalControls)} /></Section>}
         {list(s.emergencyProcedures).length > 0 && <Section title="Emergency procedures"><Bullets items={list(s.emergencyProcedures)} /></Section>}
         {list(s.coshh).length > 0 && <Section title="COSHH & hazardous substances"><Bullets items={list(s.coshh)} /></Section>}
+        {(() => {
+          const assessments = Array.isArray(s.coshhAssessments)
+            ? (s.coshhAssessments as Record<string, string>[]).filter((a) => a && (a.substance || "").trim())
+            : []
+          if (!assessments.length) return null
+          const rows: [string, string][] = [
+            ["use", "Used for"], ["form", "Form"], ["hazards", "Hazards"], ["routes", "Routes of exposure"],
+            ["whoAtRisk", "Who is at risk"], ["controls", "Controls & safe working"], ["ppe", "PPE"],
+            ["storage", "Storage & transport"], ["spill", "Spill / release"], ["firstAid", "First aid"],
+            ["disposal", "Disposal"],
+          ]
+          return (
+            <Section title="COSHH assessments — per chemical">
+              <p className="text-xs text-gray-500 mb-2">
+                Check each against the manufacturer&apos;s Safety Data Sheet before use.
+              </p>
+              <div className="space-y-3">
+                {assessments.map((a, i) => (
+                  <div key={i} className="border rounded-lg p-3">
+                    <div className="font-semibold text-sm text-gray-900">{a.substance}</div>
+                    <dl className="mt-1 space-y-1">
+                      {rows.map(([k, label]) =>
+                        (a[k] || "").trim() ? (
+                          <div key={k} className="text-sm">
+                            <dt className="inline text-xs text-gray-500">{label}: </dt>
+                            <dd className="inline text-gray-700">{a[k]}</dd>
+                          </div>
+                        ) : null
+                      )}
+                    </dl>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )
+        })()}
         {list(s.competency).length > 0 && <Section title="Competency"><Bullets items={list(s.competency)} /></Section>}
 
         {/* Sign block — hidden for the read-only client view */}

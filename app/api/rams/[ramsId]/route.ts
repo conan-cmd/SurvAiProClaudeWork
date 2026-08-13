@@ -24,7 +24,7 @@ export async function GET(
           proposal: { select: { id: true } },
         },
       },
-      organization: { select: { name: true, logoUrl: true, brandColor: true, phone: true, email: true } },
+      organization: { select: { id: true, name: true, logoUrl: true, brandColor: true, phone: true, email: true } },
     },
   })
   if (!rams) return NextResponse.json({ error: "Not found" }, { status: 404 })
@@ -58,6 +58,11 @@ const patchSchema = z.object({
     environmentalControls: z.array(z.string()),
     emergencyProcedures: z.array(z.string()),
     coshh: z.array(z.string()),
+    coshhAssessments: z.array(z.object({
+      substance: z.string(), use: z.string(), form: z.string(), hazards: z.string(),
+      routes: z.string(), whoAtRisk: z.string(), controls: z.string(), ppe: z.string(),
+      storage: z.string(), spill: z.string(), firstAid: z.string(), disposal: z.string(),
+    })),
     competency: z.array(z.string()),
     operatives: z.array(z.object({
       id: z.string().optional(),

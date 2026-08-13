@@ -79,14 +79,21 @@ export async function elementToPdfBlob(el: HTMLElement, opts?: { width?: number 
   return pdf.output("blob")
 }
 
-// Share a Blob as a file via the Web Share API (iOS/Android), or download it.
+// Share a Blob as a file via the Web Share API on MOBILE (iOS/Android — where a
+// share sheet is how you get a file into WhatsApp/Files), or download it. Desktop
+// browsers can also expose navigator.share (e.g. the Windows share dialog), but
+// there a straight download is what users expect — so share is mobile-only.
 export async function sharePdf(blob: Blob, filename: string, title: string): Promise<void> {
   const file = new File([blob], filename, { type: "application/pdf" })
   const nav = navigator as Navigator & {
     canShare?: (data: { files: File[] }) => boolean
     share?: (data: { files: File[]; title?: string }) => Promise<void>
   }
-  if (nav.canShare && nav.share && nav.canShare({ files: [file] })) {
+  const isMobile =
+    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    // iPadOS reports itself as a Mac, but Macs don't have multi-touch screens.
+    (/Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+  if (isMobile && nav.canShare && nav.share && nav.canShare({ files: [file] })) {
     try {
       await nav.share({ files: [file], title })
       return

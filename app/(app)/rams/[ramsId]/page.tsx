@@ -42,6 +42,31 @@ type Operative = {
 }
 type MethodGroup = { title: string; steps: string[] }
 
+// One drafted COSHH assessment per chemical used on the job. AI-drafted — the
+// user must verify each against the product's actual Safety Data Sheet.
+type CoshhAssessment = {
+  substance: string; use: string; form: string; hazards: string; routes: string
+  whoAtRisk: string; controls: string; ppe: string; storage: string; spill: string
+  firstAid: string; disposal: string
+}
+const EMPTY_COSHH: CoshhAssessment = {
+  substance: "", use: "", form: "", hazards: "", routes: "", whoAtRisk: "",
+  controls: "", ppe: "", storage: "", spill: "", firstAid: "", disposal: "",
+}
+const COSHH_FIELDS: { key: keyof CoshhAssessment; label: string }[] = [
+  { key: "use", label: "Used for" },
+  { key: "form", label: "Form" },
+  { key: "hazards", label: "Hazards (GHS)" },
+  { key: "routes", label: "Routes of exposure" },
+  { key: "whoAtRisk", label: "Who is at risk" },
+  { key: "controls", label: "Exposure controls & safe working" },
+  { key: "ppe", label: "PPE for handling" },
+  { key: "storage", label: "Storage & transport" },
+  { key: "spill", label: "Spill / accidental release" },
+  { key: "firstAid", label: "First aid" },
+  { key: "disposal", label: "Disposal" },
+]
+
 // Method statement is now grouped into phases. Older RAMS stored a flat string[] —
 // wrap those into a single untitled phase so nothing is lost.
 function parseMethod(raw: string | null): MethodGroup[] {
@@ -67,13 +92,14 @@ type Sections = {
   environmentalControls: string[]
   emergencyProcedures: string[]
   coshh: string[]
+  coshhAssessments: CoshhAssessment[]
   competency: string[]
   operatives: Operative[]
 }
 const EMPTY_SECTIONS: Sections = {
   activity: "", scopeOfWorks: "", numOperatives: "", siteSupervisor: "", emergencyContacts: "",
   nearestHospital: "", descriptionOfWorks: "", responsibilities: [], equipment: [], environmentalControls: [],
-  emergencyProcedures: [], coshh: [], competency: [], operatives: [],
+  emergencyProcedures: [], coshh: [], coshhAssessments: [], competency: [], operatives: [],
 }
 
 // Risk ranking (P × S) colour bands, matching LBC's key.
@@ -102,7 +128,7 @@ type Rams = {
     serviceType: string
     proposal: { id: string } | null
   }
-  organization: { name: string; logoUrl: string | null; brandColor: string; phone: string | null; email: string | null }
+  organization: { id: string; name: string; logoUrl: string | null; brandColor: string; phone: string | null; email: string | null }
 }
 
 function parse<T>(s: string | null, fallback: T): T {
@@ -127,6 +153,44 @@ export default function RamsPage() {
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [pdfBusy, setPdfBusy] = useState(false)
   const [sendOpen, setSendOpen] = useState(false)
+  // Document library — surfaced in the COSHH section so SDS sheets get attached.
+  const [documents, setDocuments] = useState<{ id: string; name: string; fileUrl: string }[]>([])
+  const [uploadingSds, setUploadingSds] = useState(false)
+  const sdsInput = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetch("/api/documents")
+      .then((r) => r.json())
+      .then((d) => Array.isArray(d) && setDocuments(d))
+      .catch(() => {})
+  }, [])
+
+  const uploadSds = async (file: File | undefined) => {
+    if (!file || !rams) return
+    setUploadingSds(true)
+    try {
+      const { upload } = await import("@vercel/blob/client")
+      const blob = await upload(
+        `organizations/${rams.organization.id}/documents/${Date.now()}-${file.name}`,
+        file,
+        { access: "public", handleUploadUrl: "/api/blob/upload" }
+      )
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: file.name, fileUrl: blob.url, fileType: file.type, fileSize: file.size }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error || "Upload failed")
+      const doc = await res.json()
+      setDocuments((d) => [doc, ...d])
+      toast.success("SDS added to your document library")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't upload the SDS")
+    } finally {
+      setUploadingSds(false)
+      if (sdsInput.current) sdsInput.current.value = ""
+    }
+  }
   const [sendTo, setSendTo] = useState("")
   const [sendMessage, setSendMessage] = useState("")
   const [sending, setSending] = useState(false)
@@ -705,6 +769,77 @@ export default function RamsPage() {
 
         {/* 10. COSHH / hazardous substances */}
         {listSection("10. COSHH & hazardous substances", "coshh")}
+
+        {/* 10b. Per-chemical COSHH assessments */}
+        <section className="bg-white rounded-xl shadow-sm p-5">
+          <h2 className="font-semibold text-brand-navy mb-1">10b. COSHH assessments — per chemical</h2>
+          <p className="no-print text-xs text-gray-400 mb-3">
+            AI-drafted from the chemicals on this job. <strong>Check every assessment against the
+            manufacturer&apos;s actual Safety Data Sheet</strong> before relying on it — concentrations and
+            hazards vary by product.
+          </p>
+
+          {/* SDS prompt + document library */}
+          <div className="no-print mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-sm text-amber-800 font-medium flex items-center gap-1.5">
+              <FileText className="w-4 h-4 shrink-0" /> Add the SDS for each chemical to your document library
+            </p>
+            <p className="text-xs text-amber-700 mt-1">
+              Operatives (and clients) may ask for them — keep the manufacturer&apos;s Safety Data Sheets on
+              file alongside this RAMS.
+            </p>
+            {documents.length > 0 && (
+              <ul className="mt-2 space-y-0.5">
+                {documents.map((d) => (
+                  <li key={d.id} className="text-xs text-gray-600 truncate">
+                    <a href={d.fileUrl} target="_blank" rel="noreferrer" className="hover:underline">📄 {d.name}</a>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button onClick={() => sdsInput.current?.click()} disabled={uploadingSds}
+              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 disabled:opacity-50">
+              {uploadingSds ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Upload SDS sheet
+            </button>
+            <input ref={sdsInput} type="file" accept=".pdf,.doc,.docx,image/*" className="hidden"
+              onChange={(e) => uploadSds(e.target.files?.[0])} />
+          </div>
+
+          {sections.coshhAssessments.length === 0 && (
+            <p className="no-print text-sm text-gray-400 mb-3">
+              No chemical assessments yet — add one below, or add the chemicals to the survey and regenerate.
+            </p>
+          )}
+          <div className="space-y-4">
+            {sections.coshhAssessments.map((a, i) => (
+              <div key={i} className="border rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <input className={`${input} font-semibold`} value={a.substance} placeholder="Chemical / product name & concentration"
+                    onChange={(e) => setSection("coshhAssessments", sections.coshhAssessments.map((x, xi) => xi === i ? { ...x, substance: e.target.value } : x))} />
+                  <button onClick={() => confirm(`Remove the assessment for "${a.substance || "this chemical"}"?`) &&
+                      setSection("coshhAssessments", sections.coshhAssessments.filter((_, xi) => xi !== i))}
+                    aria-label="Remove chemical" className="no-print p-1.5 text-gray-400 hover:text-red-600">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {COSHH_FIELDS.map(({ key, label }) => (
+                    <div key={key}>
+                      <label className="block text-[11px] text-gray-400 mb-0.5">{label}</label>
+                      <textarea spellCheck rows={2} className={input} value={a[key]}
+                        onChange={(e) => setSection("coshhAssessments", sections.coshhAssessments.map((x, xi) => xi === i ? { ...x, [key]: e.target.value } : x))} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button onClick={() => setSection("coshhAssessments", [...sections.coshhAssessments, { ...EMPTY_COSHH }])}
+            className="no-print mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue hover:underline">
+            <Plus className="w-4 h-4" /> Add chemical
+          </button>
+        </section>
 
         {/* 11. Competency */}
         {listSection("11. Competency", "competency",

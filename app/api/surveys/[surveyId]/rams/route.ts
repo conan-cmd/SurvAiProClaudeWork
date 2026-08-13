@@ -61,6 +61,16 @@ Respond with JSON only, matching exactly this shape:
   "environmentalControls": [string],  // runoff, drains, chemical handling
   "emergencyProcedures": [string],    // stop-work, first aid, reporting, keeping access clear
   "coshh": [string],                  // COSHH / hazardous substances notes and asbestos/lead caveat
+  "coshhAssessments": [{"substance":string,"use":string,"form":string,"hazards":string,"routes":string,"whoAtRisk":string,"controls":string,"ppe":string,"storage":string,"spill":string,"firstAid":string,"disposal":string}],
+  // One DRAFT COSHH assessment PER cleaning chemical / hazardous substance used on this job ([] if none).
+  // substance = product/chemical name incl. typical concentration (e.g. "Sodium hypochlorite 14-15%");
+  // use = what it's used for on this job; form = liquid/powder/aerosol etc; hazards = key GHS hazards in
+  // plain English (corrosive, causes severe burns, toxic to aquatic life…); routes = exposure routes;
+  // whoAtRisk = operatives/public/environment; controls = exposure controls & safe working (dilution,
+  // ventilation, no mixing…); ppe = PPE for handling; storage = storage & transport; spill = spill and
+  // accidental-release procedure; firstAid = first aid by route (skin/eyes/inhalation/ingestion);
+  // disposal = disposal of residues and containers. Draft from typical manufacturer guidance — the
+  // contractor MUST verify every assessment against the actual product's Safety Data Sheet.
   "competency": [string]              // training/competencies operatives must hold
 }`,
         },
@@ -74,7 +84,8 @@ Client: ${survey.clientName}
 Site address: ${survey.clientAddress}
 Description: ${survey.writtenDescription || "n/a"}
 Access notes: ${survey.accessNotes || "n/a"}
-Measurements: ${survey.measurements || "n/a"}`,
+Measurements: ${survey.measurements || "n/a"}
+Chemicals to be used: ${survey.chemicalsRequired || "not specified — infer typical products for this work if chemicals are clearly involved, otherwise return no COSHH assessments"}`,
         },
       ],
       response_format: { type: "json_object" },
@@ -84,6 +95,22 @@ Measurements: ${survey.measurements || "n/a"}`,
     const genMs = Date.now() - start
 
     const asList = (v: unknown) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()) : [])
+    const str = (v: unknown) => (typeof v === "string" ? v : "")
+    // Per-chemical COSHH assessments — sanitise every field to a string.
+    const asCoshhAssessments = (v: unknown) =>
+      Array.isArray(v)
+        ? v
+            .filter((x) => x && typeof x === "object" && str((x as Record<string, unknown>).substance).trim())
+            .map((x) => {
+              const o = x as Record<string, unknown>
+              return {
+                substance: str(o.substance), use: str(o.use), form: str(o.form),
+                hazards: str(o.hazards), routes: str(o.routes), whoAtRisk: str(o.whoAtRisk),
+                controls: str(o.controls), ppe: str(o.ppe), storage: str(o.storage),
+                spill: str(o.spill), firstAid: str(o.firstAid), disposal: str(o.disposal),
+              }
+            })
+        : []
     // Carry over anything the user typed themselves so a regenerate never wipes it.
     let prior: Record<string, unknown> = {}
     try { prior = survey.rams?.sections ? JSON.parse(survey.rams.sections) : {} } catch { prior = {} }
@@ -107,6 +134,7 @@ Measurements: ${survey.measurements || "n/a"}`,
       environmentalControls: asList(data.environmentalControls),
       emergencyProcedures: asList(data.emergencyProcedures),
       coshh: asList(data.coshh),
+      coshhAssessments: asCoshhAssessments(data.coshhAssessments),
       competency: asList(data.competency),
       operatives: Array.isArray(prior.operatives) ? prior.operatives : [],
     }

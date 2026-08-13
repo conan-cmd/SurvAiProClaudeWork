@@ -151,6 +151,28 @@ export async function POST(
     ${section("Environmental controls", ul(list(sections.environmentalControls)))}
     ${section("Emergency procedures", ul(list(sections.emergencyProcedures)))}
     ${section("COSHH &amp; hazardous substances", ul(list(sections.coshh)))}
+    ${(() => {
+      const assessments = Array.isArray(sections.coshhAssessments)
+        ? (sections.coshhAssessments as Record<string, string>[]).filter((a) => a && (a.substance || "").trim())
+        : []
+      if (!assessments.length) return ""
+      const rows: [string, string][] = [
+        ["use", "Used for"], ["form", "Form"], ["hazards", "Hazards"], ["routes", "Routes of exposure"],
+        ["whoAtRisk", "Who is at risk"], ["controls", "Controls & safe working"], ["ppe", "PPE"],
+        ["storage", "Storage & transport"], ["spill", "Spill / release"], ["firstAid", "First aid"],
+        ["disposal", "Disposal"],
+      ]
+      return `
+    <h3 style="color:#0f172a;margin:22px 0 6px;font-size:16px">COSHH assessments — per chemical</h3>
+    <p style="color:#6b7280;font-size:12px;margin:0 0 8px">Check each against the manufacturer's Safety Data Sheet before use.</p>
+    ${assessments.map((a) => `
+      <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:10px;font-size:13px">
+        <div style="font-weight:700;margin-bottom:4px">${esc(a.substance)}</div>
+        ${rows.map(([k, label]) => (a[k] || "").trim()
+          ? `<div style="margin-bottom:2px"><span style="color:#6b7280">${label}:</span> ${esc(a[k])}</div>`
+          : "").join("")}
+      </div>`).join("")}`
+    })()}
     ${section("Competency", ul(list(sections.competency)))}
 
     <div style="margin-top:24px;padding:16px;background:#f9fafb;border-radius:8px;font-size:13px;color:#374151;text-align:center">
