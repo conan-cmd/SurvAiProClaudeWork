@@ -236,6 +236,9 @@ model SiteSurvey {
   organizationId        String
   organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  // Manual list position (drag to reorder). Null = untouched → newest-first.
+  sortIndex             Int?
+
   // Client info
   clientName            String
   clientCompany         String?
@@ -414,6 +417,8 @@ model Proposal {
   status                ProposalStatus  @default(DRAFT)
   sentAt                DateTime?
   lastNudgeAt           DateTime?
+  // Manual list position (drag to reorder). Null = untouched → newest-first.
+  sortIndex             Int?
   // JSON NudgeRecord[] — every reminder sent: when, which template, by whom.
   nudgeHistory          String?
 
@@ -507,6 +512,9 @@ model Rams {
   id                    String          @id @default(cuid())
   organizationId        String
   organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Manual list position (drag to reorder). Null = untouched → newest-first.
+  sortIndex             Int?
 
   surveyId              String          @unique
   survey                SiteSurvey      @relation(fields: [surveyId], references: [id], onDelete: Cascade)

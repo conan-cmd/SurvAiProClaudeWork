@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/session"
 import { db } from "@/lib/db"
 import { ListSearch } from "@/components/list-search"
 import { NewRamsButton } from "@/components/new-rams-modal"
+import { DraggableRow } from "@/components/draggable-row"
 
 export const dynamic = "force-dynamic"
 
@@ -42,7 +43,7 @@ export default async function RamsListPage({
           }
         : {}),
     },
-    orderBy: { updatedAt: "desc" },
+    orderBy: [{ sortIndex: { sort: "asc", nulls: "first" } }, { updatedAt: "desc" }],
     include: { survey: { select: { title: true, clientName: true } } },
   })
 
@@ -77,8 +78,10 @@ export default async function RamsListPage({
           {rams.map((r) => {
             const { signed, total } = signedCount(r.sections)
             return (
-              <Link key={r.id} href={`/rams/${r.id}`}
-                className="flex items-center justify-between gap-3 bg-white rounded-xl shadow-sm p-4 hover:shadow transition">
+              <DraggableRow key={r.id} kind="rams" id={r.id}
+                className="flex items-center bg-white rounded-xl shadow-sm hover:shadow transition">
+              <Link href={`/rams/${r.id}`}
+                className="flex items-center justify-between gap-3 p-4 pl-2 flex-1 min-w-0">
                 <div className="min-w-0">
                   <div className="font-semibold text-brand-navy truncate">{r.survey.title}</div>
                   <div className="text-sm text-gray-500 truncate">{r.survey.clientName}</div>
@@ -96,6 +99,7 @@ export default async function RamsListPage({
                   </div>
                 </div>
               </Link>
+              </DraggableRow>
             )
           })}
         </div>

@@ -42,7 +42,9 @@ export async function POST(
   if (!link || link.revoked || link.expiresAt < new Date()) {
     return NextResponse.json({ error: "This link is no longer valid" }, { status: 404 })
   }
-  if (link.proposal.signedAt || link.proposal.status === "SIGNED" || link.proposal.status === "WON") {
+  // Block re-signing only when a signature actually exists. A WON-but-unsigned
+  // proposal (verbal go-ahead recorded in-app) can still be signed properly.
+  if (link.proposal.signedAt || link.proposal.status === "SIGNED") {
     return NextResponse.json({ error: "This proposal has already been accepted" }, { status: 409 })
   }
 

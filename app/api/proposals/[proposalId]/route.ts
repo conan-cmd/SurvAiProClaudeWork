@@ -83,9 +83,10 @@ export async function PATCH(
     if (existing.signedAt) {
       return NextResponse.json({ error: "This proposal is already accepted" }, { status: 409 })
     }
-    data.status = "SIGNED"
-    data.signedAt = new Date()
-    data.signedName = `${existing.clientName} (accepted verbally / on paper)`
+    // A verbal / on-paper yes is a WON deal — but NOT a signature. signedAt stays
+    // null so the proposal honestly shows "Not signed" and the client can still
+    // sign the paperwork digitally later (e.g. after a nudge).
+    data.status = "WON"
   }
 
   const proposal = await db.proposal.update({

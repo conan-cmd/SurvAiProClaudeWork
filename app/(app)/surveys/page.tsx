@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/session"
 import { formatDate } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
 import { ListSearch } from "@/components/list-search"
+import { DraggableRow } from "@/components/draggable-row"
 
 export default async function SurveysPage({
   searchParams,
@@ -48,7 +49,7 @@ export default async function SurveysPage({
             }
           : {}),
       },
-      orderBy: { updatedAt: "desc" },
+      orderBy: [{ sortIndex: { sort: "asc", nulls: "first" } }, { updatedAt: "desc" }],
       include: {
         proposal: { select: { id: true, status: true } },
         _count: { select: { photos: true, voiceNotes: true } },
@@ -104,7 +105,7 @@ export default async function SurveysPage({
       ) : (
         <div className="bg-white rounded-xl shadow-sm divide-y">
           {surveys.map((s) => (
-            <div key={s.id} className="flex items-center gap-1 pr-2 hover:bg-gray-50 transition">
+            <DraggableRow key={s.id} kind="survey" id={s.id} className="flex items-center gap-1 pr-2 hover:bg-gray-50 transition">
               <Link href={`/surveys/${s.id}`}
                 className="flex items-center justify-between gap-3 p-4 flex-1 min-w-0">
                 <div className="min-w-0">
@@ -128,7 +129,7 @@ export default async function SurveysPage({
                 )}
               </Link>
               <ItemActions kind="survey" id={s.id} title={s.title} />
-            </div>
+            </DraggableRow>
           ))}
         </div>
       )}

@@ -7,6 +7,7 @@ import { isApprover } from "@/lib/permissions"
 import { formatDate, calculateProposalTotals, formatNetPlusVat } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
 import { ListSearch } from "@/components/list-search"
+import { DraggableRow } from "@/components/draggable-row"
 import { parseNudgeHistory } from "@/lib/nudge"
 import { ProposalStatus } from "@prisma/client"
 
@@ -53,13 +54,16 @@ export default async function ProposalsPage({
     : statusFilter
       ? { status: statusFilter }
       : {}
-  const buildLink = (folder?: string, all?: boolean) => {
+  const buildLink = (folder?: string, all?: boolean, status?: string) => {
     const p = new URLSearchParams()
     if (all) p.set("scope", "all")
     if (folder) p.set("folder", folder)
+    if (status) p.set("status", status)
+    if (searchParams.q) p.set("q", searchParams.q)
     const s = p.toString()
     return `/proposals${s ? `?${s}` : ""}`
   }
+  const currentStatus = wonFilter ? "won" : statusFilter
 
   const [folders, proposals] = await Promise.all([
     db.folder.findMany({
@@ -84,7 +88,7 @@ export default async function ProposalsPage({
             }
           : {}),
       },
-      orderBy: { updatedAt: "desc" },
+      orderBy: [{ sortIndex: { sort: "asc", nulls: "first" } }, { updatedAt: "desc" }],
       include: {
         pricingLineItems: true,
         survey: { select: { title: true } },
@@ -129,10 +133,32 @@ export default async function ProposalsPage({
         </div>
       )}
 
-      {(statusFilter || wonFilter) && (
+      {/* Stage filter — see all drafts to send, or everything out with clients */}
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        {([
+          ["", "All"],
+          ["DRAFT", "Draft"],
+          ["READY", "Ready"],
+          ["SENT", "Sent"],
+          ["SIGNED", "Signed"],
+          ["DEPOSIT_PAID", "Deposit paid"],
+          ["WON", "Won"],
+          ["LOST", "Lost"],
+        ] as const).map(([value, label]) => (
+          <Link key={value || "all"} href={buildLink(folderId, viewingAll, value || undefined)}
+            className={`px-3 py-1.5 rounded-full font-medium border transition ${
+              (currentStatus || "") === value
+                ? "bg-brand-blue text-white border-brand-blue"
+                : "bg-white text-gray-600 hover:border-gray-400"
+            }`}>
+            {label}
+          </Link>
+        ))}
+      </div>
+      {wonFilter && (
         <div className="text-sm">
           <span className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-brand-blue font-medium">
-            Showing {wonFilter ? "won deals (signed, deposit paid & won)" : statusFilter!.replace(/_/g, " ")}
+            Showing won deals (signed, deposit paid &amp; won)
             <Link href={buildLink(folderId, viewingAll)} className="text-gray-400 hover:text-gray-600" aria-label="Clear filter">✕</Link>
           </span>
         </div>
@@ -145,7 +171,7 @@ export default async function ProposalsPage({
       ) : (
         <div className="bg-white rounded-xl shadow-sm divide-y">
           {proposals.map((p) => (
-            <div key={p.id} className="flex items-center gap-1 pr-2 hover:bg-gray-50 transition">
+            <DraggableRow key={p.id} kind="proposal" id={p.id} className="flex items-center gap-1 pr-2 hover:bg-gray-50 transition">
               <Link href={`/proposals/${p.id}`}
                 className="flex items-center justify-between gap-3 p-4 flex-1 min-w-0">
                 <div className="min-w-0">
@@ -193,13 +219,22 @@ export default async function ProposalsPage({
                       </span>
                     )
                   })()}
+                  {/* Won-stage deals must show whether the paperwork is actually signed */}
+                  {["SIGNED", "DEPOSIT_PAID", "WON"].includes(p.status) && (
+                    <span className={`whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                      p.signedAt ? "border-emerald-300 text-emerald-700 bg-white" : "border-amber-300 text-amber-700 bg-amber-50"
+                    }`}
+                      title={p.signedAt ? `Signed ${new Date(p.signedAt).toLocaleDateString("en-GB")}` : "No signature on record"}>
+                      {p.signedAt ? "Signed" : "Not signed"}
+                    </span>
+                  )}
                   <span className={`whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[p.status]}`}>
                     {p.status}
                   </span>
                 </div>
               </Link>
               <ItemActions kind="proposal" id={p.id} surveyId={p.surveyId} title={p.survey.title} proposalStatus={p.status} />
-            </div>
+            </DraggableRow>
           ))}
         </div>
       )}

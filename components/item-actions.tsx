@@ -82,7 +82,7 @@ export function ItemActions({
 
   const markAccepted = async () => {
     setOpen(false)
-    if (!window.confirm(`Mark "${title}" as accepted? Use this when the client has agreed verbally or on paper.`)) return
+    if (!window.confirm(`Mark "${title}" as won? Use this when the client has agreed verbally or on paper — it will show as Won but "Not signed".`)) return
     setBusy(true)
     const res = await fetch(`/api/proposals/${id}`, {
       method: "PATCH",
@@ -91,11 +91,11 @@ export function ItemActions({
     })
     setBusy(false)
     if (res.ok) {
-      toast.success("Marked as accepted")
+      toast.success("Marked as won")
       router.refresh()
     } else {
       const d = await res.json().catch(() => ({}))
-      toast.error(d.error || "Couldn't mark as accepted")
+      toast.error(d.error || "Couldn't mark as won")
     }
   }
 
@@ -207,8 +207,8 @@ export function ItemActions({
               )}
               {kind === "proposal" && ["DRAFT", "READY", "SENT"].includes(proposalStatus || "") && (
                 <button onClick={(e) => { e.preventDefault(); markAccepted() }} className={menuItem}
-                  title="Client agreed verbally or on paper">
-                  <Check className="w-4 h-4" /> Mark accepted
+                  title="Client agreed verbally or on paper — shows as Won, Not signed">
+                  <Check className="w-4 h-4" /> Mark as won
                 </button>
               )}
               <button onClick={(e) => { e.preventDefault(); rename() }} className={menuItem}>

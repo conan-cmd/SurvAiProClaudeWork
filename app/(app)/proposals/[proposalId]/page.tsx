@@ -262,6 +262,12 @@ export default function ProposalEditorPage() {
   const [nudging, setNudging] = useState(false)
   const [nudgeTemplates, setNudgeTemplates] = useState<NudgeTemplate[] | null>(null)
   const [nudgeTemplateId, setNudgeTemplateId] = useState<string | null>(null)
+  // Inline custom message ("__custom__" pseudo-template) + optional save-back.
+  const [nudgeCustom, setNudgeCustom] = useState("")
+  const [nudgeSaveTemplate, setNudgeSaveTemplate] = useState(false)
+  const [nudgeTemplateName, setNudgeTemplateName] = useState("")
+  // Missing client email can be added right here instead of via the survey.
+  const [nudgeEmail, setNudgeEmail] = useState("")
   const openNudge = async () => {
     setNudgeOpen(true)
     if (nudgeTemplates) return
@@ -278,17 +284,59 @@ export default function ProposalEditorPage() {
   }
   const sendNudge = async () => {
     if (!proposal) return
+    const usingCustom = nudgeTemplateId === "__custom__"
+    if (usingCustom && !nudgeCustom.trim()) {
+      toast.error("Write your custom message first")
+      return
+    }
+    if (!proposal.clientEmail && !/.+@.+\..+/.test(nudgeEmail.trim())) {
+      toast.error("Add the client's email address first")
+      return
+    }
     setNudging(true)
     try {
+      // No email on the proposal yet — save the one typed in the dialog first.
+      if (!proposal.clientEmail) {
+        const emailRes = await fetch(`/api/proposals/${proposalId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clientEmail: nudgeEmail.trim() }),
+        })
+        if (!emailRes.ok) throw new Error((await emailRes.json()).error || "Couldn't save the email")
+        setProposal((p) => (p ? { ...p, clientEmail: nudgeEmail.trim() } : p))
+      }
       const res = await fetch(`/api/proposals/${proposalId}/nudge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ templateId: nudgeTemplateId }),
+        body: JSON.stringify(
+          usingCustom
+            ? { message: nudgeCustom.trim(), messageName: nudgeSaveTemplate && nudgeTemplateName.trim() ? nudgeTemplateName.trim() : undefined }
+            : { templateId: nudgeTemplateId }
+        ),
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error)
       setProposal((p) => (p ? { ...p, lastNudgeAt: d.lastNudgeAt, nudgeHistory: d.nudgeHistory } : p))
+      // Save the custom message back as a reusable template without a Settings trip.
+      if (usingCustom && nudgeSaveTemplate && nudgeTemplates) {
+        const name = nudgeTemplateName.trim() || "My template"
+        const next = [...nudgeTemplates, { id: `t-${Date.now()}`, name, body: nudgeCustom.trim() }]
+        const saved = await fetch("/api/organization", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nudgeTemplates: JSON.stringify(next) }),
+        })
+        if (saved.ok) {
+          setNudgeTemplates(next)
+          toast.success(`Saved "${name}" as a template`)
+        } else {
+          toast.error("Reminder sent, but the template couldn't be saved")
+        }
+      }
       setNudgeOpen(false)
+      setNudgeCustom("")
+      setNudgeSaveTemplate(false)
+      setNudgeTemplateName("")
       toast.success("Reminder sent")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't send the reminder")
@@ -297,11 +345,12 @@ export default function ProposalEditorPage() {
     }
   }
 
-  // Verbal / on-paper go-ahead: record the acceptance without a digital signature.
+  // Verbal / on-paper go-ahead: the deal is WON, but there's no signature — the
+  // proposal shows "Not signed" and the client can still sign digitally later.
   const markAccepted = async () => {
     if (!proposal) return
     if (!window.confirm(
-      `Mark this proposal as accepted by ${proposal.clientName}?\n\nUse this when the client has agreed verbally or on paper. The proposal will show as accepted and the signing link will no longer ask for a signature.`
+      `Mark this proposal as won?\n\nUse this when ${proposal.clientName} has agreed verbally or on paper. It will show as Won but "Not signed" — they can still sign the paperwork via their link.`
     )) return
     const res = await fetch(`/api/proposals/${proposalId}`, {
       method: "PATCH",
@@ -309,11 +358,11 @@ export default function ProposalEditorPage() {
       body: JSON.stringify({ markAccepted: true }),
     })
     if (res.ok) {
-      setProposal({ ...proposal, status: "SIGNED", signedAt: new Date().toISOString() })
-      toast.success("Marked as accepted")
+      setProposal({ ...proposal, status: "WON" })
+      toast.success("Marked as won")
     } else {
       const d = await res.json().catch(() => ({}))
-      toast.error(d.error || "Couldn't mark as accepted")
+      toast.error(d.error || "Couldn't mark as won")
     }
   }
 
@@ -571,6 +620,13 @@ export default function ProposalEditorPage() {
     setProposal((p) => (p ? { ...p, clientName: v } : p))
     saveCover("cover-client", `/api/proposals/${proposalId}`, { clientName: v })
   }
+  const setCoverEmail = (v: string) => {
+    setProposal((p) => (p ? { ...p, clientEmail: v } : p))
+    // Only autosave a valid (or cleared) address — half-typed ones would 400.
+    if (v === "" || /.+@.+\..+/.test(v)) {
+      saveCover("cover-email", `/api/proposals/${proposalId}`, { clientEmail: v })
+    }
+  }
   const setCoverCompany = (v: string) => {
     setProposal((p) => (p ? { ...p, survey: { ...p.survey, clientCompany: v } } : p))
     saveCover("cover-company", `/api/surveys/${proposal.survey.id}`, { clientCompany: v })
@@ -647,7 +703,15 @@ export default function ProposalEditorPage() {
             className="px-3 py-2 border rounded-lg text-sm font-medium bg-white">
             {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}
           </select>
-          {proposal.status === "SENT" && !proposal.signedAt && (() => {
+          {["SIGNED", "DEPOSIT_PAID", "WON"].includes(proposal.status) && (
+            <span className={`inline-flex items-center whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full border ${
+              proposal.signedAt ? "border-emerald-300 text-emerald-700 bg-white" : "border-amber-300 text-amber-700 bg-amber-50"
+            }`}
+              title={proposal.signedAt ? `Signed ${new Date(proposal.signedAt).toLocaleDateString("en-GB")}` : "No signature on record — nudge them to sign"}>
+              {proposal.signedAt ? "Signed" : "Not signed"}
+            </span>
+          )}
+          {["SENT", "WON"].includes(proposal.status) && !proposal.signedAt && (() => {
             const count = parseNudgeHistory(proposal.nudgeHistory).length
             return (
               <button onClick={openNudge}
@@ -662,9 +726,9 @@ export default function ProposalEditorPage() {
           })()}
           {!proposal.signedAt && !["SIGNED", "DEPOSIT_PAID", "WON"].includes(proposal.status) && (
             <button onClick={markAccepted}
-              title="Client agreed verbally or on paper — record the acceptance without a digital signature"
+              title="Client agreed verbally or on paper — records the win without claiming a signature"
               className="inline-flex items-center gap-1.5 px-3 py-2 border border-emerald-300 text-emerald-700 rounded-lg text-sm font-medium bg-emerald-50 hover:bg-emerald-100">
-              <Check className="w-4 h-4" /> Mark accepted
+              <Check className="w-4 h-4" /> Mark as won
             </button>
           )}
           {nudgeOpen && (
@@ -697,6 +761,16 @@ export default function ProposalEditorPage() {
                     <p className="text-xs text-gray-400">No reminders sent yet for this proposal.</p>
                   )
                 })()}
+                {!proposal.clientEmail && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <label className="block text-sm font-medium text-amber-800 mb-1.5">
+                      No client email on this proposal yet — add it here:
+                    </label>
+                    <input type="email" value={nudgeEmail} placeholder="client@example.co.uk"
+                      onChange={(e) => setNudgeEmail(e.target.value)}
+                      className="w-full text-sm px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+                  </div>
+                )}
                 {!nudgeTemplates ? (
                   <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
                     <Loader2 className="w-4 h-4 animate-spin" /> Loading templates…
@@ -717,8 +791,39 @@ export default function ProposalEditorPage() {
                         <span className="block text-xs text-gray-500 mt-1.5 leading-relaxed">{t.body}</span>
                       </label>
                     ))}
+                    <label
+                      className={`block border rounded-lg p-3 cursor-pointer transition ${
+                        nudgeTemplateId === "__custom__" ? "border-brand-blue ring-1 ring-brand-blue bg-blue-50/50" : "hover:border-gray-400"
+                      }`}>
+                      <span className="flex items-center gap-2">
+                        <input type="radio" name="nudge-template" checked={nudgeTemplateId === "__custom__"}
+                          onChange={() => setNudgeTemplateId("__custom__")} className="accent-blue-600" />
+                        <span className="text-sm font-semibold text-gray-800">Custom message</span>
+                      </span>
+                      {nudgeTemplateId === "__custom__" && (
+                        <span className="block mt-2 space-y-2" onClick={(e) => e.preventDefault()}>
+                          <textarea spellCheck rows={3} value={nudgeCustom} autoFocus
+                            placeholder="Write your reminder…"
+                            onChange={(e) => setNudgeCustom(e.target.value)}
+                            className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+                          <span className="flex items-center gap-2">
+                            <input type="checkbox" checked={nudgeSaveTemplate}
+                              onChange={(e) => setNudgeSaveTemplate(e.target.checked)}
+                              className="rounded accent-blue-600" id="nudge-save-template" />
+                            <label htmlFor="nudge-save-template" className="text-xs text-gray-600 cursor-pointer">
+                              Save as a template for next time
+                            </label>
+                          </span>
+                          {nudgeSaveTemplate && (
+                            <input value={nudgeTemplateName} placeholder="Template name (e.g. Price-hold reminder)"
+                              onChange={(e) => setNudgeTemplateName(e.target.value)}
+                              className="w-full text-sm px-3 py-1.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+                          )}
+                        </span>
+                      )}
+                    </label>
                     <p className="text-xs text-gray-400">
-                      Edit these templates in Settings → Follow-up reminders.
+                      Edit saved templates in Settings → Follow-up reminders.
                     </p>
                   </div>
                 )}
@@ -995,6 +1100,16 @@ export default function ProposalEditorPage() {
                       <input
                         value={proposal.survey.clientCompany || ""}
                         onChange={(e) => setCoverCompany(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Client email</label>
+                      <input
+                        type="email"
+                        value={proposal.clientEmail || ""}
+                        placeholder="Used for sending & reminders"
+                        onChange={(e) => setCoverEmail(e.target.value)}
                         className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
                       />
                     </div>
