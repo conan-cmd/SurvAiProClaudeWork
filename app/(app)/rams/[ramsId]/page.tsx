@@ -328,6 +328,15 @@ export default function RamsPage() {
     catch { toast.error("Copy failed — long-press the link to copy") }
   }
 
+  // Read-only version of the same link for the CLIENT — no sign-off section.
+  const copyClientLink = async () => {
+    const url = await getShareLink()
+    if (!url) return
+    const clientUrl = `${url}${url.includes("?") ? "&" : "?"}client=1`
+    try { await navigator.clipboard.writeText(clientUrl); toast.success("Client link copied — read-only, no signing") }
+    catch { toast.error("Copy failed — long-press the link to copy") }
+  }
+
   const sendToOperatives = async () => {
     const withEmail = sections.operatives.filter((o) => /.+@.+\..+/.test(o.email))
     if (withEmail.length === 0) {
@@ -872,6 +881,11 @@ export default function RamsPage() {
             <button onClick={copyShareLink}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border hover:bg-gray-50">
               <Copy className="w-4 h-4" /> Copy sign link
+            </button>
+            <button onClick={copyClientLink}
+              title="Read-only copy for the client — shows the full RAMS with no signing section"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border hover:bg-gray-50">
+              <Link2 className="w-4 h-4" /> Copy client link
             </button>
           </div>
           {shareUrl && (
