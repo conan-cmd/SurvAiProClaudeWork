@@ -75,7 +75,12 @@ export function ItemActions({
 
   const remove = async () => {
     setOpen(false)
-    if (!window.confirm(`Delete "${title}"? This can't be undone.`)) return
+    // A survey is the parent record — deleting it cascades to the job's
+    // proposal, RAMS and photos. A proposal delete removes only the proposal.
+    const warning = kind === "survey"
+      ? `Delete "${title}"? This deletes the whole job — including its proposal, RAMS and photos — and can't be undone.`
+      : `Delete this proposal for "${title}"? The survey and any RAMS stay. This can't be undone.`
+    if (!window.confirm(warning)) return
     setBusy(true)
     const path = kind === "survey" ? `/api/surveys/${id}` : `/api/proposals/${id}`
     const res = await fetch(path, { method: "DELETE" })
