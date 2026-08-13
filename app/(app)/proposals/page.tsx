@@ -173,7 +173,7 @@ export default async function ProposalsPage({
           {proposals.map((p) => (
             <DraggableRow key={p.id} kind="proposal" id={p.id} className="flex items-center gap-1 pr-2 hover:bg-gray-50 transition">
               <Link href={`/proposals/${p.id}`}
-                className="flex items-center justify-between gap-3 p-4 flex-1 min-w-0">
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 sm:gap-3 p-4 pl-2 flex-1 min-w-0">
                 <div className="min-w-0">
                   <div className="font-medium text-gray-900 truncate">{p.survey.title}</div>
                   <div className="text-sm text-gray-500 truncate">
@@ -181,7 +181,8 @@ export default async function ProposalsPage({
                     {viewingAll && p.createdBy && ` · by ${p.createdBy.name || p.createdBy.email}`}
                   </div>
                 </div>
-                <div className="shrink-0 flex items-center gap-1.5">
+                {/* Chips wrap onto their own line on mobile so the title keeps full width */}
+                <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0 sm:justify-end [&>span]:text-[11px] sm:[&>span]:text-xs">
                   {/* Sign-off flag — only meaningful before a proposal is sent */}
                   {["DRAFT", "READY"].includes(p.status) && p.approvalStatus === "PENDING" && (
                     <span className={`inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${approver ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-700"}`}
