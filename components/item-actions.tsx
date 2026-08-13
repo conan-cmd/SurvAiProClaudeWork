@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
-  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus,
+  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check,
 } from "lucide-react"
 
 type FolderOption = { id: string; name: string }
@@ -16,12 +16,15 @@ export function ItemActions({
   id,
   surveyId,
   title,
+  proposalStatus,
 }: {
   kind: "survey" | "proposal"
   id: string
   // For proposals, actions that target the job (rename/move) act on the survey.
   surveyId?: string
   title: string
+  // Enables quick status actions (Mark as sent / Mark accepted) on proposal rows.
+  proposalStatus?: string
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -58,6 +61,42 @@ export function ItemActions({
       toast.success("Renamed")
       router.refresh()
     } else toast.error("Couldn't rename")
+  }
+
+  // Quick status changes without opening the editor. "Sent" covers proposals
+  // delivered outside the app (printed, WhatsApp'd); "accepted" a verbal yes.
+  const markSent = async () => {
+    setOpen(false)
+    setBusy(true)
+    const res = await fetch(`/api/proposals/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "SENT" }),
+    })
+    setBusy(false)
+    if (res.ok) {
+      toast.success("Marked as sent")
+      router.refresh()
+    } else toast.error("Couldn't update status")
+  }
+
+  const markAccepted = async () => {
+    setOpen(false)
+    if (!window.confirm(`Mark "${title}" as accepted? Use this when the client has agreed verbally or on paper.`)) return
+    setBusy(true)
+    const res = await fetch(`/api/proposals/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markAccepted: true }),
+    })
+    setBusy(false)
+    if (res.ok) {
+      toast.success("Marked as accepted")
+      router.refresh()
+    } else {
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error || "Couldn't mark as accepted")
+    }
   }
 
   const duplicate = async () => {
@@ -160,6 +199,18 @@ export function ItemActions({
         <div className="absolute right-0 top-full mt-1 w-48 bg-white border rounded-lg shadow-lg py-1 z-30 text-sm">
           {!showFolders ? (
             <>
+              {kind === "proposal" && ["DRAFT", "READY"].includes(proposalStatus || "") && (
+                <button onClick={(e) => { e.preventDefault(); markSent() }} className={menuItem}
+                  title="For proposals delivered outside the app — printed, WhatsApp'd, handed over">
+                  <Send className="w-4 h-4" /> Mark as sent
+                </button>
+              )}
+              {kind === "proposal" && ["DRAFT", "READY", "SENT"].includes(proposalStatus || "") && (
+                <button onClick={(e) => { e.preventDefault(); markAccepted() }} className={menuItem}
+                  title="Client agreed verbally or on paper">
+                  <Check className="w-4 h-4" /> Mark accepted
+                </button>
+              )}
               <button onClick={(e) => { e.preventDefault(); rename() }} className={menuItem}>
                 <Pencil className="w-4 h-4" /> Rename
               </button>

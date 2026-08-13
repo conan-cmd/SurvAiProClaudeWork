@@ -198,7 +198,7 @@ export default async function ProposalsPage({
                   </span>
                 </div>
               </Link>
-              <ItemActions kind="proposal" id={p.id} surveyId={p.surveyId} title={p.survey.title} />
+              <ItemActions kind="proposal" id={p.id} surveyId={p.surveyId} title={p.survey.title} proposalStatus={p.status} />
             </div>
           ))}
         </div>
