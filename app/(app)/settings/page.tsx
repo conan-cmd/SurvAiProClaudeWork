@@ -183,27 +183,33 @@ export default function SettingsPage() {
     }
   }
 
-  const uploadDoc = async (file: File | undefined) => {
-    if (!file || !org) return
+  const uploadDoc = async (files: FileList | null) => {
+    if (!files?.length || !org) return
     setUploadingDoc(true)
+    let ok = 0
     try {
       const { upload } = await import("@vercel/blob/client")
-      const blob = await upload(
-        `organizations/${org.id}/documents/${Date.now()}-${file.name}`,
-        file,
-        { access: "public", handleUploadUrl: "/api/blob/upload" }
-      )
-      const res = await fetch("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: file.name, fileUrl: blob.url, fileType: file.type, fileSize: file.size }),
-      })
-      if (!res.ok) throw new Error((await res.json()).error || "Upload failed")
-      const doc = await res.json()
-      setDocuments((d) => [doc, ...d])
-      toast.success("Document uploaded")
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Upload failed")
+      for (const file of Array.from(files)) {
+        try {
+          const blob = await upload(
+            `organizations/${org.id}/documents/${Date.now()}-${file.name}`,
+            file,
+            { access: "public", handleUploadUrl: "/api/blob/upload" }
+          )
+          const res = await fetch("/api/documents", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: file.name, fileUrl: blob.url, fileType: file.type, fileSize: file.size }),
+          })
+          if (!res.ok) throw new Error((await res.json()).error || "Upload failed")
+          const doc = await res.json()
+          setDocuments((d) => [doc, ...d])
+          ok++
+        } catch (e) {
+          toast.error(`${file.name}: ${e instanceof Error ? e.message : "upload failed"}`)
+        }
+      }
+      if (ok > 0) toast.success(ok === 1 ? "Document uploaded" : `${ok} documents uploaded`)
     } finally {
       setUploadingDoc(false)
       if (docInput.current) docInput.current.value = ""
@@ -543,8 +549,8 @@ export default function SettingsPage() {
         <p className="text-sm text-gray-500">
           Upload insurance certificates, accreditations, etc. You&apos;ll be able to attach these to proposal emails.
         </p>
-        <input ref={docInput} type="file" accept="application/pdf,image/*,.doc,.docx" className="hidden"
-          onChange={(e) => uploadDoc(e.target.files?.[0])} />
+        <input ref={docInput} type="file" multiple accept="application/pdf,image/*,.doc,.docx" className="hidden"
+          onChange={(e) => uploadDoc(e.target.files)} />
         <button onClick={() => docInput.current?.click()} disabled={uploadingDoc}
           className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50 w-fit">
           {uploadingDoc ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}

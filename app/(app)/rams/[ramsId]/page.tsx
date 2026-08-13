@@ -165,27 +165,33 @@ export default function RamsPage() {
       .catch(() => {})
   }, [])
 
-  const uploadSds = async (file: File | undefined) => {
-    if (!file || !rams) return
+  const uploadSds = async (files: FileList | null) => {
+    if (!files?.length || !rams) return
     setUploadingSds(true)
+    let ok = 0
     try {
       const { upload } = await import("@vercel/blob/client")
-      const blob = await upload(
-        `organizations/${rams.organization.id}/documents/${Date.now()}-${file.name}`,
-        file,
-        { access: "public", handleUploadUrl: "/api/blob/upload" }
-      )
-      const res = await fetch("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: file.name, fileUrl: blob.url, fileType: file.type, fileSize: file.size }),
-      })
-      if (!res.ok) throw new Error((await res.json()).error || "Upload failed")
-      const doc = await res.json()
-      setDocuments((d) => [doc, ...d])
-      toast.success("SDS added to your document library")
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't upload the SDS")
+      for (const file of Array.from(files)) {
+        try {
+          const blob = await upload(
+            `organizations/${rams.organization.id}/documents/${Date.now()}-${file.name}`,
+            file,
+            { access: "public", handleUploadUrl: "/api/blob/upload" }
+          )
+          const res = await fetch("/api/documents", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: file.name, fileUrl: blob.url, fileType: file.type, fileSize: file.size }),
+          })
+          if (!res.ok) throw new Error((await res.json()).error || "Upload failed")
+          const doc = await res.json()
+          setDocuments((d) => [doc, ...d])
+          ok++
+        } catch (e) {
+          toast.error(`${file.name}: ${e instanceof Error ? e.message : "couldn't upload"}`)
+        }
+      }
+      if (ok > 0) toast.success(ok === 1 ? "SDS added to your document library" : `${ok} SDS sheets added to your document library`)
     } finally {
       setUploadingSds(false)
       if (sdsInput.current) sdsInput.current.value = ""
@@ -802,8 +808,8 @@ export default function RamsPage() {
               {uploadingSds ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Upload SDS sheet
             </button>
-            <input ref={sdsInput} type="file" accept=".pdf,.doc,.docx,image/*" className="hidden"
-              onChange={(e) => uploadSds(e.target.files?.[0])} />
+            <input ref={sdsInput} type="file" multiple accept=".pdf,.doc,.docx,image/*" className="hidden"
+              onChange={(e) => uploadSds(e.target.files)} />
           </div>
 
           {sections.coshhAssessments.length === 0 && (
