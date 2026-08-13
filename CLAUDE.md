@@ -141,6 +141,14 @@ Two deploys, both live; prod Neon migrated first each time.
 - **GHL/Damian:** his webhook URL ends `/webhook-trigger/undefined` (bad copy). 8 sample lifecycle payloads sent (all HTTP 200 — GHL 200s regardless); awaiting his confirmation/corrected URL. `GHL_WEBHOOK_URL` not yet on Vercel.
 - ⚠️ **Prod DATABASE_URL was pasted in chat this session — Conan to rotate the Neon password and update Vercel `DATABASE_URL` + redeploy.**
 
+## Session 2026-08-13 (cont.) — list UX + honest Won/Signed (shipped)
+
+- **Drag-to-reorder** surveys/proposals/RAMS lists (desktop grip handle, `components/draggable-row.tsx` → `/api/reorder`, raw UPDATE so @updatedAt isn't bumped). `sortIndex Int?` added to SiteSurvey/Proposal/Rams — **live on prod**. Ordering everywhere: `[{sortIndex asc nulls first}, {updatedAt desc}]`.
+- **Proposals status filter chips** (All→Lost) + net+VAT display (`formatNetPlusVat`) + quick "Mark as sent"/"Mark as won" in row ⋮ menu + Nudged ×n chip.
+- **Won ≠ signed (important semantics change):** "Mark accepted" renamed **"Mark as won"** → sets `status: WON` with **no** signedAt/signedName (old behaviour faked a signature — prod data reclassified via SQL). Accept route now only blocks when actually signed (signedAt/SIGNED), so WON-unsigned clients can still e-sign; nudge allowed on WON-unsigned. SIGNED/DEPOSIT_PAID/WON rows + editor show a **Signed / Not signed** chip.
+- **Nudge dialog:** custom one-off message + "save as template" write-back; inline client-email capture when the proposal has none (PATCHes proposal then sends). Cover editor gained a Client email field (valid-only autosave).
+- **Drag & drop uploads** everywhere (`components/drop-zone.tsx`); multi-file SDS/doc uploads; role guide expander in Settings → Team; RAMS "Client link" (read-only `?client=1`) in top toolbar + operatives row; delete confirms spell out cascade scope.
+
 ## Deploy pipeline (current — 2026-07-25)
 
 **The repo is now on GitHub and auto-deploys via Vercel. Do NOT use the old `npx vercel --token=…` flow (those tokens were revoked).**
