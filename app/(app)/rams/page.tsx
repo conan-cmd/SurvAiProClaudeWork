@@ -4,6 +4,7 @@ import { ShieldAlert, Check } from "lucide-react"
 import { getCurrentUser } from "@/lib/session"
 import { db } from "@/lib/db"
 import { ListSearch } from "@/components/list-search"
+import { NewRamsButton } from "@/components/new-rams-modal"
 
 export const dynamic = "force-dynamic"
 
@@ -47,9 +48,12 @@ export default async function RamsListPage({
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
-      <div className="flex items-center gap-2">
-        <ShieldAlert className="w-6 h-6 text-amber-600" />
-        <h1 className="text-xl font-bold text-brand-navy">RAMS</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <ShieldAlert className="w-6 h-6 text-amber-600" />
+          <h1 className="text-xl font-bold text-brand-navy">RAMS</h1>
+        </div>
+        <NewRamsButton />
       </div>
 
       <ListSearch placeholder="Search by job, client or address…" />
@@ -61,7 +65,10 @@ export default async function RamsListPage({
           ) : (
             <>
               <p>No RAMS yet.</p>
-              <p className="text-sm mt-1">Open a survey or proposal and tap <strong>RAMS</strong> to draft one.</p>
+              <p className="text-sm mt-1">
+                Tap <strong>New RAMS</strong> to draft one from scratch — or open a survey or proposal
+                and tap <strong>Create RAMS</strong> there.
+              </p>
             </>
           )}
         </div>

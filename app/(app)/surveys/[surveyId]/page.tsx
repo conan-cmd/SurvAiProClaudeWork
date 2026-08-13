@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Loader2, Sparkles, FileText, Check, Pencil } from "lucide-react"
+import { RamsButton } from "@/components/rams-button"
 import { PhotoManager, Photo } from "@/components/photo-manager"
 import { VoiceNotes, VoiceNoteWithTranscript } from "@/components/voice-notes"
 import { DictateButton } from "@/components/dictate-button"
@@ -235,14 +236,20 @@ export default function SurveyDetailPage() {
         </span>
       </div>
 
-      {survey.proposal && (
-        <button
-          onClick={() => router.push(`/proposals/${survey.proposal!.id}`)}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-blue-50 border border-blue-200 text-brand-blue rounded-xl font-semibold hover:bg-blue-100"
-        >
-          <FileText className="w-4 h-4" /> Open proposal ({survey.proposal.status})
-        </button>
-      )}
+      <div className={`grid gap-2 ${survey.proposal ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
+        {survey.proposal && (
+          <button
+            onClick={() => router.push(`/proposals/${survey.proposal!.id}`)}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-50 border border-blue-200 text-brand-blue rounded-xl font-semibold hover:bg-blue-100"
+          >
+            <FileText className="w-4 h-4" /> Open proposal ({survey.proposal.status})
+          </button>
+        )}
+        {/* RAMS straight from the survey — no proposal needed. Opens the existing
+            RAMS if one was already drafted for this job. */}
+        <RamsButton surveyId={survey.id}
+          className="w-full flex items-center justify-center gap-2 py-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl font-semibold hover:bg-amber-100" />
+      </div>
 
       {/* Survey notes */}
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
