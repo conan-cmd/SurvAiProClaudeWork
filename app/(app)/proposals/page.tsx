@@ -1,12 +1,13 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Eye, ShieldAlert, Clock, AlertTriangle, ShieldCheck } from "lucide-react"
+import { Eye, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { isApprover } from "@/lib/permissions"
 import { formatCurrency, formatDate, calculateProposalTotals } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
 import { ListSearch } from "@/components/list-search"
+import { parseNudgeHistory } from "@/lib/nudge"
 import { ProposalStatus } from "@prisma/client"
 
 function relTime(d: Date | string): string {
@@ -181,6 +182,17 @@ export default async function ProposalsPage({
                       <Eye className="w-3.5 h-3.5" /> Viewed{p.views[0] ? ` ${relTime(p.views[0].updatedAt)}` : ""}
                     </span>
                   )}
+                  {(() => {
+                    const nudges = parseNudgeHistory(p.nudgeHistory)
+                    if (!nudges.length || ["SIGNED", "DEPOSIT_PAID", "WON"].includes(p.status)) return null
+                    const last = nudges[nudges.length - 1]
+                    return (
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700"
+                        title={`Last nudge: ${last.templateName} — ${new Date(last.at).toLocaleDateString("en-GB")}`}>
+                        <BellRing className="w-3.5 h-3.5" /> Nudged{nudges.length > 1 ? ` ×${nudges.length}` : ""}
+                      </span>
+                    )
+                  })()}
                   <span className={`whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[p.status]}`}>
                     {p.status}
                   </span>

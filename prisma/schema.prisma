@@ -117,8 +117,11 @@ model Organization {
   termsAndConditions    String?
   termsCommercial       String?
 
-  // Gentle-reminder email body for unsigned proposals (null = app default).
+  // Gentle-reminder email body for unsigned proposals (legacy single message,
+  // kept as a fallback) and the newer named template list (JSON NudgeTemplate[],
+  // see lib/nudge.ts; null = app defaults).
   nudgeMessage          String?
+  nudgeTemplates        String?
 
   // YouTube channel for embedding similar-work videos in proposals
   youtubeChannelUrl     String?
@@ -411,6 +414,8 @@ model Proposal {
   status                ProposalStatus  @default(DRAFT)
   sentAt                DateTime?
   lastNudgeAt           DateTime?
+  // JSON NudgeRecord[] — every reminder sent: when, which template, by whom.
+  nudgeHistory          String?
 
   // Sign-off workflow (for draft-only surveyors — see User.canSendProposals)
   approvalStatus        ApprovalStatus  @default(NONE)

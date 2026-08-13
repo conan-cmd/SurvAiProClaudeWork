@@ -13,6 +13,7 @@ import { AddressInput } from "@/components/address-input"
 import { PricingEditor, EditableLineItem } from "@/components/pricing-editor"
 import { uploadSurveyPhotos, type UploadedPhoto } from "@/lib/photo-upload"
 import { RamsButton } from "@/components/rams-button"
+import { parseNudgeTemplates, parseNudgeHistory, type NudgeTemplate } from "@/lib/nudge"
 
 type Section = {
   id: string
@@ -31,6 +32,7 @@ type ProposalData = {
   status: string
   signedAt: string | null
   lastNudgeAt: string | null
+  nudgeHistory: string | null
   sections: Section[]
   pricingLineItems: EditableLineItem[]
   survey: {
@@ -253,19 +255,39 @@ export default function ProposalEditorPage() {
     }
   }
 
-  // Gentle follow-up on an unsigned proposal (message customisable in Settings).
+  // Gentle follow-up on an unsigned proposal — pick a template, see past nudges.
+  // Templates are managed in Settings; history lives on the proposal.
+  const [nudgeOpen, setNudgeOpen] = useState(false)
   const [nudging, setNudging] = useState(false)
+  const [nudgeTemplates, setNudgeTemplates] = useState<NudgeTemplate[] | null>(null)
+  const [nudgeTemplateId, setNudgeTemplateId] = useState<string | null>(null)
+  const openNudge = async () => {
+    setNudgeOpen(true)
+    if (nudgeTemplates) return
+    try {
+      const org = await fetch("/api/organization").then((r) => r.json())
+      const t = parseNudgeTemplates(org || {})
+      setNudgeTemplates(t)
+      setNudgeTemplateId(t[0]?.id ?? null)
+    } catch {
+      const t = parseNudgeTemplates({})
+      setNudgeTemplates(t)
+      setNudgeTemplateId(t[0]?.id ?? null)
+    }
+  }
   const sendNudge = async () => {
     if (!proposal) return
-    if (!window.confirm(
-      `Send ${proposal.clientName} a friendly reminder to select their items and sign?\n\nYou can customise the message in Settings → Proposal content.`
-    )) return
     setNudging(true)
     try {
-      const res = await fetch(`/api/proposals/${proposalId}/nudge`, { method: "POST" })
+      const res = await fetch(`/api/proposals/${proposalId}/nudge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ templateId: nudgeTemplateId }),
+      })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error)
-      setProposal((p) => (p ? { ...p, lastNudgeAt: d.lastNudgeAt } : p))
+      setProposal((p) => (p ? { ...p, lastNudgeAt: d.lastNudgeAt, nudgeHistory: d.nudgeHistory } : p))
+      setNudgeOpen(false)
       toast.success("Reminder sent")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't send the reminder")
@@ -624,22 +646,92 @@ export default function ProposalEditorPage() {
             className="px-3 py-2 border rounded-lg text-sm font-medium bg-white">
             {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}
           </select>
-          {proposal.status === "SENT" && !proposal.signedAt && (
-            <button onClick={sendNudge} disabled={nudging}
-              title={proposal.lastNudgeAt
-                ? `Last reminder sent ${new Date(proposal.lastNudgeAt).toLocaleDateString("en-GB")}`
-                : "Email the client a gentle reminder to sign (message customisable in Settings)"}
-              className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
-              {nudging ? <Loader2 className="w-4 h-4 animate-spin" /> : <BellRing className="w-4 h-4" />}
-              Nudge
-            </button>
-          )}
+          {proposal.status === "SENT" && !proposal.signedAt && (() => {
+            const count = parseNudgeHistory(proposal.nudgeHistory).length
+            return (
+              <button onClick={openNudge}
+                title={proposal.lastNudgeAt
+                  ? `Last reminder sent ${new Date(proposal.lastNudgeAt).toLocaleDateString("en-GB")}`
+                  : "Email the client a gentle reminder to sign (templates customisable in Settings)"}
+                className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+                <BellRing className="w-4 h-4" />
+                Nudge{count > 0 ? ` (${count})` : ""}
+              </button>
+            )
+          })()}
           {!proposal.signedAt && !["SIGNED", "DEPOSIT_PAID", "WON"].includes(proposal.status) && (
             <button onClick={markAccepted}
               title="Client agreed verbally or on paper — record the acceptance without a digital signature"
               className="inline-flex items-center gap-1.5 px-3 py-2 border border-emerald-300 text-emerald-700 rounded-lg text-sm font-medium bg-emerald-50 hover:bg-emerald-100">
               <Check className="w-4 h-4" /> Mark accepted
             </button>
+          )}
+          {nudgeOpen && (
+            <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4"
+              onClick={() => !nudging && setNudgeOpen(false)}>
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-4 max-h-[85vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-brand-navy">Send a reminder</h3>
+                  <button onClick={() => setNudgeOpen(false)} disabled={nudging} aria-label="Close"
+                    className="p-1 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+                </div>
+                {(() => {
+                  const history = parseNudgeHistory(proposal.nudgeHistory)
+                  return history.length > 0 ? (
+                    <div className="bg-gray-50 border rounded-lg p-3">
+                      <p className="text-xs font-semibold text-gray-500 mb-1.5">
+                        Nudged {history.length} time{history.length === 1 ? "" : "s"}
+                      </p>
+                      <ul className="space-y-1">
+                        {history.slice().reverse().map((r, i) => (
+                          <li key={i} className="text-xs text-gray-600">
+                            {new Date(r.at).toLocaleDateString("en-GB")} — {r.templateName}
+                            {r.by ? <span className="text-gray-400"> · {r.by}</span> : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-400">No reminders sent yet for this proposal.</p>
+                  )
+                })()}
+                {!nudgeTemplates ? (
+                  <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Loading templates…
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-gray-700">Choose a message</p>
+                    {nudgeTemplates.map((t) => (
+                      <label key={t.id}
+                        className={`block border rounded-lg p-3 cursor-pointer transition ${
+                          nudgeTemplateId === t.id ? "border-brand-blue ring-1 ring-brand-blue bg-blue-50/50" : "hover:border-gray-400"
+                        }`}>
+                        <span className="flex items-center gap-2">
+                          <input type="radio" name="nudge-template" checked={nudgeTemplateId === t.id}
+                            onChange={() => setNudgeTemplateId(t.id)} className="accent-blue-600" />
+                          <span className="text-sm font-semibold text-gray-800">{t.name}</span>
+                        </span>
+                        <span className="block text-xs text-gray-500 mt-1.5 leading-relaxed">{t.body}</span>
+                      </label>
+                    ))}
+                    <p className="text-xs text-gray-400">
+                      Edit these templates in Settings → Follow-up reminders.
+                    </p>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-1">
+                  <button onClick={() => setNudgeOpen(false)} disabled={nudging}
+                    className="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
+                  <button onClick={sendNudge} disabled={nudging || !nudgeTemplates}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                    {nudging ? <Loader2 className="w-4 h-4 animate-spin" /> : <BellRing className="w-4 h-4" />}
+                    Send reminder
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
           <button onClick={() => setMode(mode === "edit" ? "preview" : "edit")}
             className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">

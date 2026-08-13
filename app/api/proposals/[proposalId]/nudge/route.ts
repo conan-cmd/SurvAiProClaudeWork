@@ -6,7 +6,10 @@ import { canSend, sendEmail } from "@/lib/email"
 import { resolveProposalIdentity } from "@/lib/proposal-identity"
 import { slugify } from "@/lib/utils"
 import { publicBaseUrl } from "@/lib/public-url"
-import { DEFAULT_NUDGE_MESSAGE } from "@/lib/nudge"
+import { z } from "zod"
+import { parseNudgeTemplates, parseNudgeHistory, type NudgeRecord } from "@/lib/nudge"
+
+const nudgeSchema = z.object({ templateId: z.string().max(100).optional() })
 
 // Sends the client a gentle follow-up on an unsigned proposal — e.g. after a
 // verbal go-ahead. Body text comes from Organization.nudgeMessage (Settings),
@@ -46,8 +49,15 @@ export async function POST(
     )
   }
 
+  const parsed = nudgeSchema.safeParse(await request.json().catch(() => ({})))
+  if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 })
+
   const identity = await resolveProposalIdentity(proposal)
   const org = proposal.organization
+
+  // Which template: the requested one, else the first configured/default.
+  const templates = parseNudgeTemplates(org)
+  const template = templates.find((t) => t.id === parsed.data.templateId) || templates[0]
 
   // Fresh secure link, same as a normal send.
   const token = randomBytes(16).toString("base64url")
@@ -56,7 +66,7 @@ export async function POST(
   const origin = publicBaseUrl(request.nextUrl.origin)
   const url = `${origin}/p/${slugify(proposal.survey.title || "proposal")}/${token}`
 
-  const message = (org.nudgeMessage || DEFAULT_NUDGE_MESSAGE).trim()
+  const message = template.body.trim()
   const safeMsg = message.replace(/</g, "&lt;").replace(/\n/g, "<br/>")
   const html = `
     <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;max-width:520px">
@@ -88,12 +98,18 @@ export async function POST(
       text,
       fromUserId: identity.userId ?? user.id,
     })
+    const record: NudgeRecord = {
+      at: new Date().toISOString(),
+      templateName: template.name,
+      by: user.name || user.email,
+    }
+    const history = [...parseNudgeHistory(proposal.nudgeHistory), record]
     const updated = await db.proposal.update({
       where: { id: proposal.id },
-      data: { lastNudgeAt: new Date() },
-      select: { lastNudgeAt: true },
+      data: { lastNudgeAt: new Date(), nudgeHistory: JSON.stringify(history) },
+      select: { lastNudgeAt: true, nudgeHistory: true },
     })
-    return NextResponse.json({ success: true, lastNudgeAt: updated.lastNudgeAt })
+    return NextResponse.json({ success: true, lastNudgeAt: updated.lastNudgeAt, nudgeHistory: updated.nudgeHistory })
   } catch (error) {
     console.error("Nudge email error:", error)
     const msg =

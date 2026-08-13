@@ -9,7 +9,7 @@ import { SignOutButton } from "@/components/sign-out-button"
 import { SignatureDraw } from "@/components/signature-draw"
 import { PipedriveConnect } from "@/components/pipedrive-connect"
 import { HIDEABLE_SECTIONS, visibleSectionKeys } from "@/lib/nav-sections"
-import { DEFAULT_NUDGE_MESSAGE } from "@/lib/nudge"
+import { parseNudgeTemplates, type NudgeTemplate } from "@/lib/nudge"
 
 type Org = {
   id: string
@@ -34,6 +34,7 @@ type Org = {
   termsAndConditions: string | null
   termsCommercial: string | null
   nudgeMessage: string | null
+  nudgeTemplates: string | null
   youtubeChannelUrl: string | null
   depositRules: string | null
   signOffName: string | null
@@ -304,6 +305,7 @@ export default function SettingsPage() {
           termsAndConditions: org.termsAndConditions || "",
           termsCommercial: org.termsCommercial || "",
           nudgeMessage: org.nudgeMessage || "",
+          nudgeTemplates: org.nudgeTemplates || "",
           youtubeChannelUrl: org.youtubeChannelUrl || "",
           depositRules: org.depositRules || "",
           signOffName: org.signOffName || "",
@@ -610,13 +612,50 @@ export default function SettingsPage() {
           </div>
         ))}
         <div>
-          <label className={labelCls}>Follow-up reminder message</label>
+          <label className={labelCls}>Follow-up reminders (nudge templates)</label>
           <p className="text-xs text-gray-400 mb-1.5">
-            Sent when you tap &ldquo;Nudge&rdquo; on a sent proposal — a gentle prompt to select items and sign.
+            Offered as choices when you tap &ldquo;Nudge&rdquo; on a sent proposal. Each nudge is logged on the
+            proposal so you can see what was sent and when. Edit below, then Save.
           </p>
-          <textarea spellCheck rows={3} className={inputCls} value={org.nudgeMessage || ""}
-            placeholder={DEFAULT_NUDGE_MESSAGE}
-            onChange={(e) => set("nudgeMessage", e.target.value)} />
+          {(() => {
+            // Lenient parse for editing: keep empty-body drafts visible here; the
+            // send route ignores them until they have content.
+            const templates: NudgeTemplate[] = (() => {
+              if (org.nudgeTemplates) {
+                try {
+                  const a = JSON.parse(org.nudgeTemplates)
+                  if (Array.isArray(a) && a.length) return a
+                } catch { /* fall through */ }
+              }
+              return parseNudgeTemplates(org)
+            })()
+            const setTemplates = (next: NudgeTemplate[]) => set("nudgeTemplates", JSON.stringify(next))
+            return (
+              <div className="space-y-3">
+                {templates.map((t, i) => (
+                  <div key={t.id} className="border rounded-lg p-3 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input value={t.name} placeholder="Template name"
+                        onChange={(e) => setTemplates(templates.map((x, xi) => (xi === i ? { ...x, name: e.target.value } : x)))}
+                        className="flex-1 px-3 py-1.5 border rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+                      <button type="button" disabled={templates.length === 1} aria-label={`Remove ${t.name}`}
+                        onClick={() => setTemplates(templates.filter((_, xi) => xi !== i))}
+                        className="p-1.5 text-gray-400 hover:text-red-600 disabled:opacity-30">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <textarea spellCheck rows={3} className={inputCls} value={t.body} placeholder="Message body…"
+                      onChange={(e) => setTemplates(templates.map((x, xi) => (xi === i ? { ...x, body: e.target.value } : x)))} />
+                  </div>
+                ))}
+                <button type="button"
+                  onClick={() => setTemplates([...templates, { id: `t-${Date.now()}`, name: "New template", body: "" }])}
+                  className="text-sm font-semibold text-brand-blue hover:underline">
+                  + Add template
+                </button>
+              </div>
+            )
+          })()}
         </div>
       </section>
 

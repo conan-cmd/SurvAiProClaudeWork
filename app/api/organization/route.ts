@@ -37,6 +37,8 @@ const updateOrgSchema = z.object({
   termsAndConditions: z.string().optional(),
   termsCommercial: z.string().optional(),
   nudgeMessage: z.string().max(1000).optional(),
+  // JSON NudgeTemplate[] (lib/nudge.ts). "" clears back to the app defaults.
+  nudgeTemplates: z.string().max(8000).optional(),
   youtubeChannelUrl: z.string().optional(),
   depositRules: z.string().max(500).optional(),
   signOffName: z.string().max(100).optional(),
