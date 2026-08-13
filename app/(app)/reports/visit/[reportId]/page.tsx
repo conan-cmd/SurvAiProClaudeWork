@@ -8,6 +8,7 @@ import { Loader2, Check, Printer, Send, Plus, Trash2, Eye, Pencil } from "lucide
 import { DictateButton } from "@/components/dictate-button"
 import { JobReportDocument, ReportDocData, REPORT_FIELDS } from "@/components/job-report-document"
 import { uploadJobReportPhotos } from "@/lib/report-photo-upload"
+import { DropZone } from "@/components/drop-zone"
 
 type Photo = { id: string; fileUrl: string; caption: string | null }
 type Report = {
@@ -205,10 +206,12 @@ export default function JobReportEditor() {
               </div>
             )}
             <input ref={fileInput} type="file" accept="image/*" multiple className="hidden" onChange={(e) => addPhotos(e.target.files)} />
-            <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue hover:underline disabled:opacity-50">
-              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} {uploading ? "Uploading…" : "Add photos"}
-            </button>
+            <DropZone onFiles={addPhotos} accept="image/*,.heic,.heif" disabled={uploading} className="w-fit">
+              <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue hover:underline disabled:opacity-50">
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} {uploading ? "Uploading…" : "Add photos"}
+              </button>
+            </DropZone>
           </section>
 
           <SignatureSection

@@ -10,6 +10,7 @@ import { SignatureDraw } from "@/components/signature-draw"
 import { PipedriveConnect } from "@/components/pipedrive-connect"
 import { HIDEABLE_SECTIONS, visibleSectionKeys } from "@/lib/nav-sections"
 import { parseNudgeTemplates, type NudgeTemplate } from "@/lib/nudge"
+import { DropZone } from "@/components/drop-zone"
 
 type Org = {
   id: string
@@ -544,10 +545,13 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <section className="bg-white rounded-xl shadow-sm p-5 space-y-3">
+      <DropZone onFiles={uploadDoc} accept="application/pdf,image/*,.doc,.docx" disabled={uploadingDoc}
+        className="bg-white rounded-xl shadow-sm">
+      <section className="p-5 space-y-3">
         <h2 className="font-semibold text-brand-navy">Document library</h2>
         <p className="text-sm text-gray-500">
-          Upload insurance certificates, accreditations, etc. You&apos;ll be able to attach these to proposal emails.
+          Upload insurance certificates, accreditations, SDS sheets, etc. You&apos;ll be able to attach these
+          to proposal emails. Drag &amp; drop onto this box works too.
         </p>
         <input ref={docInput} type="file" multiple accept="application/pdf,image/*,.doc,.docx" className="hidden"
           onChange={(e) => uploadDoc(e.target.files)} />
@@ -570,6 +574,7 @@ export default function SettingsPage() {
           </ul>
         )}
       </section>
+      </DropZone>
 
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-3">
         <h2 className="font-semibold text-brand-navy">Refer another business</h2>

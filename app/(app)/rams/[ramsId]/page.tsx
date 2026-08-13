@@ -10,6 +10,7 @@ import {
   Footprints, Shirt, Hand, Glasses, Umbrella, HardHat, Ear, Wind, LifeBuoy, Shield, ShieldCheck,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
+import { DropZone } from "@/components/drop-zone"
 
 // Common PPE for exterior-cleaning / trade work, shown as a selectable icon grid.
 // Uses inline SVG (lucide) icons — unlike emoji, these rasterise reliably in the
@@ -484,6 +485,11 @@ export default function RamsPage() {
             className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
             {pdfBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />} PDF
           </button>
+          <button onClick={copyClientLink}
+            title="Copy a read-only link to this RAMS for the client (no signing section)"
+            className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+            <Link2 className="w-4 h-4" /> Client link
+          </button>
           <button onClick={openSend}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700">
             <Send className="w-4 h-4" /> Send to client
@@ -795,7 +801,9 @@ export default function RamsPage() {
           </p>
 
           {/* SDS prompt + document library */}
-          <div className="no-print mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <DropZone onFiles={uploadSds} accept=".pdf,.doc,.docx,image/*" disabled={uploadingSds}
+            className="no-print mb-4">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
             <p className="text-sm text-amber-800 font-medium flex items-center gap-1.5">
               <FileText className="w-4 h-4 shrink-0" /> Add the SDS for each chemical to your document library
             </p>
@@ -820,6 +828,7 @@ export default function RamsPage() {
             <input ref={sdsInput} type="file" multiple accept=".pdf,.doc,.docx,image/*" className="hidden"
               onChange={(e) => uploadSds(e.target.files)} />
           </div>
+          </DropZone>
 
           {sections.coshhAssessments.length === 0 && (
             <p className="no-print text-sm text-gray-400 mb-3">

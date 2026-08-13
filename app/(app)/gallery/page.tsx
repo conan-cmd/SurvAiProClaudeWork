@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Camera, Loader2, Trash2 } from "lucide-react"
+import { DropZone } from "@/components/drop-zone"
 
 type GalleryPhoto = {
   id: string
@@ -90,11 +91,14 @@ export default function GalleryPage() {
           value={tags} onChange={(e) => setTags(e.target.value)} />
         <input ref={fileInput} type="file" accept="image/*" multiple className="hidden"
           onChange={(e) => upload(e.target.files)} />
-        <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading}
-          className="w-full border-2 border-dashed border-gray-300 rounded-xl py-6 flex flex-col items-center gap-2 text-gray-500 hover:border-brand-blue hover:text-brand-blue transition disabled:opacity-50">
-          {uploading ? <Loader2 className="w-7 h-7 animate-spin" /> : <Camera className="w-7 h-7" />}
-          <span className="font-medium">{uploading ? "Uploading…" : "Upload before/after photos"}</span>
-        </button>
+        <DropZone onFiles={upload} accept="image/*,.heic,.heif" disabled={uploading}>
+          <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading}
+            className="w-full border-2 border-dashed border-gray-300 rounded-xl py-6 flex flex-col items-center gap-2 text-gray-500 hover:border-brand-blue hover:text-brand-blue transition disabled:opacity-50">
+            {uploading ? <Loader2 className="w-7 h-7 animate-spin" /> : <Camera className="w-7 h-7" />}
+            <span className="font-medium">{uploading ? "Uploading…" : "Upload before/after photos"}</span>
+            <span className="text-xs">Drag &amp; drop works too</span>
+          </button>
+        </DropZone>
       </div>
 
       {!photos ? (

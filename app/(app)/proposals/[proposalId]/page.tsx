@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import { ProposalDocument } from "@/components/proposal-document"
 import { AddressInput } from "@/components/address-input"
+import { DropZone } from "@/components/drop-zone"
 import { PricingEditor, EditableLineItem } from "@/components/pricing-editor"
 import { uploadSurveyPhotos, type UploadedPhoto } from "@/lib/photo-upload"
 import { RamsButton } from "@/components/rams-button"
@@ -1481,7 +1482,7 @@ function PhotoPicker({
   }
 
   const uploadButton = (
-    <>
+    <DropZone onFiles={uploadPhotos} accept="image/*,.heic,.heif" disabled={uploading} className="w-fit">
       <input ref={fileInput} type="file" accept="image/*" multiple className="hidden"
         onChange={(e) => uploadPhotos(e.target.files)} />
       <button type="button" onClick={() => fileInput.current?.click()} disabled={uploading}
@@ -1489,7 +1490,7 @@ function PhotoPicker({
         {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
         {uploading ? "Uploading…" : "Add photos"}
       </button>
-    </>
+    </DropZone>
   )
 
   if (!proposal.survey.photos.length) {

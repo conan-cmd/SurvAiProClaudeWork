@@ -6,6 +6,7 @@ import {
   Camera, Trash2, Star, ChevronUp, ChevronDown, EyeOff, Loader2, Check,
 } from "lucide-react"
 import { uploadSurveyPhotos } from "@/lib/photo-upload"
+import { DropZone } from "@/components/drop-zone"
 
 export type Photo = {
   id: string
@@ -125,20 +126,22 @@ export function PhotoManager({
         className="hidden"
         onChange={(e) => upload(e.target.files)}
       />
-      <button
-        type="button"
-        onClick={() => fileInput.current?.click()}
-        disabled={uploading}
-        className="w-full border-2 border-dashed border-gray-300 rounded-xl py-8 flex flex-col items-center gap-2 text-gray-500 hover:border-brand-blue hover:text-brand-blue transition disabled:opacity-50"
-      >
-        {uploading ? (
-          <Loader2 className="w-8 h-8 animate-spin" />
-        ) : (
-          <Camera className="w-8 h-8" />
-        )}
-        <span className="font-medium">{uploading ? "Uploading…" : "Take or upload photos"}</span>
-        <span className="text-xs">JPG, PNG, WebP or HEIC — up to 15MB each</span>
-      </button>
+      <DropZone onFiles={upload} accept="image/*,.heic,.heif" disabled={uploading}>
+        <button
+          type="button"
+          onClick={() => fileInput.current?.click()}
+          disabled={uploading}
+          className="w-full border-2 border-dashed border-gray-300 rounded-xl py-8 flex flex-col items-center gap-2 text-gray-500 hover:border-brand-blue hover:text-brand-blue transition disabled:opacity-50"
+        >
+          {uploading ? (
+            <Loader2 className="w-8 h-8 animate-spin" />
+          ) : (
+            <Camera className="w-8 h-8" />
+          )}
+          <span className="font-medium">{uploading ? "Uploading…" : "Take or upload photos"}</span>
+          <span className="text-xs">JPG, PNG, WebP or HEIC — up to 15MB each. Drag &amp; drop works too.</span>
+        </button>
+      </DropZone>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {photos.map((photo, index) => (
