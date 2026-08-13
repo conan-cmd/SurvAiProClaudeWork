@@ -670,6 +670,29 @@ export default function SettingsPage() {
         <p className="text-sm text-gray-500">
           Everyone here shares this organisation&apos;s surveys, proposals and settings.
         </p>
+        <details className="rounded-lg border bg-gray-50 px-3 py-2">
+          <summary className="text-sm font-medium text-gray-600 cursor-pointer select-none">
+            What can each role do?
+          </summary>
+          <dl className="mt-2 space-y-2 text-sm text-gray-600">
+            <div>
+              <dt className="font-semibold text-gray-800">Owner</dt>
+              <dd>Full access to everything — all jobs, team management, billing and organisation settings. There&apos;s one owner and the role can&apos;t be reassigned here.</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-gray-800">Admin</dt>
+              <dd>Same day-to-day access as the owner: sees everyone&apos;s work, reviews and signs off proposals, manages team roles, and sees all job reports.</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-gray-800">Member</dt>
+              <dd>Creates surveys, proposals and RAMS. Sees their own work (plus everyone&apos;s if &ldquo;team visibility&rdquo; below is on). If &ldquo;Can send&rdquo; is off, their proposals need an owner/admin sign-off before they can go to a client. You can also choose which sections they see under &ldquo;Sections this person sees&rdquo;.</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-gray-800">Contractor</dt>
+              <dd>Locked-down login for external subcontractors: Job Reports only, and only their own sites and reports. Everything else — surveys, proposals, RAMS, settings — is blocked, including direct links. Completed reports are emailed to your Contact email.</dd>
+            </div>
+          </dl>
+        </details>
         <div className="space-y-2">
           {team?.users.map((u) => {
             const canManage = (me?.role === "OWNER" || me?.role === "ADMIN") && u.role !== "OWNER" && u.id !== me?.id
