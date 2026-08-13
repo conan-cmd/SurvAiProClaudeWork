@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { Users } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
-import { formatCurrency, formatDate, calculateProposalTotals } from "@/lib/utils"
+import { formatCurrency, formatDate, calculateProposalTotals, formatNetPlusVat } from "@/lib/utils"
 
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-600",
@@ -27,7 +27,7 @@ type Row = {
     id: string
     title: string
     status: string
-    total: number
+    totals: { subtotal: number; vat: number; total: number }
     updatedAt: Date
   }[]
   total: number
@@ -67,14 +67,15 @@ export default async function CustomersPage() {
       }
       map.set(key, row)
     }
+    const totals = calculateProposalTotals(p.pricingLineItems)
     row.proposals.push({
       id: p.id,
       title: p.survey.title,
       status: p.status,
-      total: calculateProposalTotals(p.pricingLineItems).total,
+      totals,
       updatedAt: p.updatedAt,
     })
-    row.total += calculateProposalTotals(p.pricingLineItems).total
+    row.total += totals.total
     if (p.sentAt) row.sent += 1
     if (WON.has(p.status)) row.won += 1
   }
@@ -120,7 +121,7 @@ export default async function CustomersPage() {
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-gray-400">Quoted</div>
+                      <div className="text-xs text-gray-400">Quoted (inc VAT)</div>
                       <div className="font-bold text-brand-navy">{formatCurrency(r.total)}</div>
                     </div>
                   </div>
@@ -132,7 +133,7 @@ export default async function CustomersPage() {
                         className="flex items-center justify-between gap-3 py-2.5 hover:bg-gray-50 -mx-2 px-2 rounded">
                         <span className="text-sm text-gray-700 truncate min-w-0">
                           {p.title}
-                          <span className="text-gray-400"> · {formatCurrency(p.total)} · {formatDate(p.updatedAt)}</span>
+                          <span className="text-gray-400"> · {formatNetPlusVat(p.totals)} · {formatDate(p.updatedAt)}</span>
                         </span>
                         <span className={`shrink-0 whitespace-nowrap text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLES[p.status]}`}>
                           {p.status}

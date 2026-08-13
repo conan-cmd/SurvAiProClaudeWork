@@ -4,7 +4,7 @@ import { Eye, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing } from "l
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { isApprover } from "@/lib/permissions"
-import { formatCurrency, formatDate, calculateProposalTotals } from "@/lib/utils"
+import { formatDate, calculateProposalTotals, formatNetPlusVat } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
 import { ListSearch } from "@/components/list-search"
 import { parseNudgeHistory } from "@/lib/nudge"
@@ -151,7 +151,7 @@ export default async function ProposalsPage({
                 <div className="min-w-0">
                   <div className="font-medium text-gray-900 truncate">{p.survey.title}</div>
                   <div className="text-sm text-gray-500 truncate">
-                    {p.clientName} · {formatCurrency(calculateProposalTotals(p.pricingLineItems).total)} · {formatDate(p.updatedAt)}
+                    {p.clientName} · {formatNetPlusVat(calculateProposalTotals(p.pricingLineItems))} · {formatDate(p.updatedAt)}
                     {viewingAll && p.createdBy && ` · by ${p.createdBy.name || p.createdBy.email}`}
                   </div>
                 </div>

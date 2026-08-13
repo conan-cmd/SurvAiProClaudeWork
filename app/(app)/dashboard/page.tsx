@@ -3,7 +3,7 @@ import { redirect } from "next/navigation"
 import { Plus, TrendingUp, Clock, FileText, ClipboardList } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
-import { formatCurrency, formatDate, calculateProposalTotals } from "@/lib/utils"
+import { formatCurrency, formatDate, calculateProposalTotals, formatNetPlusVat } from "@/lib/utils"
 import { OnboardingNudge } from "@/components/onboarding-nudge"
 
 const STATUS_STYLES: Record<string, string> = {
@@ -176,13 +176,14 @@ export default async function DashboardPage({
             <TrendingUp className="w-4 h-4" /> Total quoted
           </div>
           <div className="text-xl font-bold text-brand-navy">{formatCurrency(totalQuoted)}</div>
+          <div className="text-xs text-gray-400">inc VAT</div>
         </Link>
         <Link href="/proposals?scope=all" className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition block">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
             <FileText className="w-4 h-4" /> Proposals
           </div>
           <div className="text-xl font-bold text-brand-navy">{inRange.length}</div>
-          <div className="text-xs text-gray-400">avg {formatCurrency(avgValue)}</div>
+          <div className="text-xs text-gray-400">avg {formatCurrency(avgValue)} inc VAT</div>
         </Link>
         <div className="bg-white rounded-xl p-4 shadow-sm">
           <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
@@ -287,7 +288,7 @@ export default async function DashboardPage({
                     <div className="min-w-0">
                       <div className="font-medium text-gray-900 truncate">{p.clientName}</div>
                       <div className="text-sm text-gray-500">
-                        {formatCurrency(calculateProposalTotals(p.pricingLineItems).total)} · {formatDate(p.updatedAt)}
+                        {formatNetPlusVat(calculateProposalTotals(p.pricingLineItems))} · {formatDate(p.updatedAt)}
                       </div>
                     </div>
                     <span

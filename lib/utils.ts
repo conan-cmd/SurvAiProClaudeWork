@@ -63,6 +63,13 @@ export function calculateProposalTotals(items: PricingItem[]) {
   return { subtotal, vat, total: subtotal + vat }
 }
 
+// Unambiguous money label for lists: "£1,000 + VAT = £1,200" — or just the
+// figure when no VAT applies, where net and gross are the same number.
+export function formatNetPlusVat(t: { subtotal: number; vat: number; total: number }): string {
+  if (t.vat <= 0.005) return formatCurrency(t.total)
+  return `${formatCurrency(t.subtotal)} + VAT = ${formatCurrency(t.total)}`
+}
+
 // --- Contractor markup ---------------------------------------------------------
 // A non-destructive markup a user (e.g. a sub-contractor) adds on top of THEIR
 // price so the end client sees a higher price with no sign of a markup. The
