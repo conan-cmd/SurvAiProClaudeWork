@@ -9,8 +9,8 @@ import {
 
 type FolderOption = { id: string; name: string }
 
-// Row action menu for survey/proposal lists: rename, duplicate (surveys),
-// move to folder, delete. Sits alongside the row link; its clicks don't navigate.
+// Row action menu for survey/proposal lists: rename, duplicate, move to
+// folder, delete. Sits alongside the row link; its clicks don't navigate.
 export function ItemActions({
   kind,
   id,
@@ -99,16 +99,22 @@ export function ItemActions({
     }
   }
 
+  // Duplicating a survey copies the job only; duplicating a proposal copies the
+  // job AND the proposal content as a fresh unsent draft.
   const duplicate = async () => {
     setOpen(false)
     setBusy(true)
-    const res = await fetch(`/api/surveys/${id}/duplicate`, { method: "POST" })
+    const path = kind === "survey"
+      ? `/api/surveys/${id}/duplicate`
+      : `/api/proposals/${id}/duplicate`
+    const res = await fetch(path, { method: "POST" })
     setBusy(false)
     if (res.ok) {
       const data = await res.json()
       toast.success("Duplicated — check the site address")
       // Land with the address editor open: a duplicated job usually needs a new site.
-      router.push(`/surveys/${data.id}?editAddress=1`)
+      if (kind === "survey") router.push(`/surveys/${data.id}?editAddress=1`)
+      else router.push(`/proposals/${data.id}`)
     } else toast.error("Couldn't duplicate")
   }
 
@@ -214,11 +220,9 @@ export function ItemActions({
               <button onClick={(e) => { e.preventDefault(); rename() }} className={menuItem}>
                 <Pencil className="w-4 h-4" /> Rename
               </button>
-              {kind === "survey" && (
-                <button onClick={(e) => { e.preventDefault(); duplicate() }} className={menuItem}>
-                  <Copy className="w-4 h-4" /> Duplicate
-                </button>
-              )}
+              <button onClick={(e) => { e.preventDefault(); duplicate() }} className={menuItem}>
+                <Copy className="w-4 h-4" /> Duplicate
+              </button>
               {targetSurvey && (
                 <button onClick={(e) => { e.preventDefault(); openFolders() }} className={menuItem}>
                   <FolderInput className="w-4 h-4" /> Move to folder
