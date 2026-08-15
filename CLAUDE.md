@@ -149,6 +149,13 @@ Two deploys, both live; prod Neon migrated first each time.
 - **Nudge dialog:** custom one-off message + "save as template" write-back; inline client-email capture when the proposal has none (PATCHes proposal then sends). Cover editor gained a Client email field (valid-only autosave).
 - **Drag & drop uploads** everywhere (`components/drop-zone.tsx`); multi-file SDS/doc uploads; role guide expander in Settings → Team; RAMS "Client link" (read-only `?client=1`) in top toolbar + operatives row; delete confirms spell out cascade scope.
 
+## Session 2026-08-14/15 — duplicate proposals, pipeline board, site-visit metric (shipped)
+
+- **Duplicate on proposal rows** (`api/proposals/[id]/duplicate`): deep-copies survey+photos+sections+pricing as a DRAFT (photo refs remapped; signatures/links/nudges not copied).
+- **Site-visit conversion**: `SiteSurvey.surveyedInPerson` (prod migrated) — toggle pill on survey page + new-survey checkbox; dashboard card compares won% (of decided) for tagged vs untagged.
+- **Pipeline board** `/proposals/pipeline` (`lib/pipeline.ts`): kanban of open (DRAFT/READY/SENT) proposals; org-named stages (`Organization.pipelineStages` JSON, defaults Draft/Sent/One follow-up/Two+ follow-ups; rename inline/add/remove) + `Proposal.pipelineStageId` (both prod migrated); drag desktop+touch; auto-bucket untouched cards (draftish→col 1, sent→col 2); column totals; linked from proposals list.
+- Mobile proposals rows: chips wrap under the title. Touch drag-to-reorder on list grips.
+
 ## Deploy pipeline (current — 2026-07-25)
 
 **The repo is now on GitHub and auto-deploys via Vercel. Do NOT use the old `npx vercel --token=…` flow (those tokens were revoked).**
