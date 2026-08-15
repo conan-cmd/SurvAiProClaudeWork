@@ -123,6 +123,9 @@ model Organization {
   nudgeMessage          String?
   nudgeTemplates        String?
 
+  // Pipeline board stages (JSON PipelineStage[], lib/pipeline.ts; null = defaults).
+  pipelineStages        String?
+
   // YouTube channel for embedding similar-work videos in proposals
   youtubeChannelUrl     String?
 
@@ -263,6 +266,9 @@ model SiteSurvey {
   title                 String
   serviceType           String
   isResidential         Boolean
+  // Tag: the job was surveyed in person (vs quoted remotely) — drives the
+  // dashboard's site-visit vs no-visit conversion comparison.
+  surveyedInPerson      Boolean         @default(false)
   clientPriorities      String?
   accessNotes           String?
   measurements          String?
@@ -419,6 +425,9 @@ model Proposal {
   lastNudgeAt           DateTime?
   // Manual list position (drag to reorder). Null = untouched → newest-first.
   sortIndex             Int?
+  // Pipeline board column (stage id from Organization.pipelineStages). Null =
+  // auto-bucketed from status (draft-ish → first stage, sent → second).
+  pipelineStageId       String?
   // JSON NudgeRecord[] — every reminder sent: when, which template, by whom.
   nudgeHistory          String?
 
