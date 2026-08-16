@@ -210,6 +210,7 @@ export default function ProposalEditorPage() {
   const addVideoSection = () => addSection("videos", "Watch Us In Action")
   const addGallerySection = () => addSection("gallery", "Examples of Similar Work")
   const addPhotoSection = () => addSection("photos", "Photos")
+  const addTestimonialsSection = () => addSection("testimonials", "What Our Customers Say")
 
   const regenerate = async (sectionId: string) => {
     const feedback = prompt(
@@ -1073,6 +1074,8 @@ export default function ProposalEditorPage() {
                 <VideoPicker section={section} updateSection={updateSection} />
               ) : section.type === "gallery" ? (
                 <GalleryPicker section={section} updateSection={updateSection} />
+              ) : section.type === "testimonials" ? (
+                <TestimonialPicker section={section} updateSection={updateSection} />
               ) : section.type === "cover" ? (
                 <div className="space-y-3">
                   <p className="text-xs text-gray-400">
@@ -1212,6 +1215,10 @@ export default function ProposalEditorPage() {
             <button onClick={addGallerySection}
               className="border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
               <Plus className="w-5 h-5" /> Add gallery photos
+            </button>
+            <button onClick={addTestimonialsSection}
+              className="border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
+              <Plus className="w-5 h-5" /> Add testimonials
             </button>
           </div>
 
@@ -1639,6 +1646,102 @@ function PhotoPicker({
         })}
       </div>
       {uploadButton}
+    </div>
+  )
+}
+
+// Items are stored serialized in section.content (same shape the document
+// renders), so the public page never needs an extra fetch.
+type TestimonialPick = {
+  id: string
+  kind: string
+  title: string | null
+  text: string | null
+  author: string | null
+  rating: number | null
+  fileUrl: string | null
+  youtubeUrl: string | null
+  serviceTags?: string | null
+  audience?: string
+}
+
+function TestimonialPicker({
+  section,
+  updateSection,
+}: {
+  section: Section
+  updateSection: (id: string, patch: SectionPatch) => void
+}) {
+  const [all, setAll] = useState<TestimonialPick[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch("/api/testimonials")
+      .then(async (r) => {
+        const data = await r.json()
+        if (!r.ok) throw new Error(data.error)
+        setAll(data)
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load testimonials"))
+  }, [])
+
+  let selected: TestimonialPick[] = []
+  try {
+    selected = JSON.parse(section.content || "[]")
+  } catch {
+    selected = []
+  }
+
+  const toggle = (t: TestimonialPick) => {
+    const on = selected.some((s) => s.id === t.id)
+    const next = on
+      ? selected.filter((s) => s.id !== t.id)
+      : [...selected, {
+          id: t.id, kind: t.kind, title: t.title, text: t.text, author: t.author,
+          rating: t.rating, fileUrl: t.fileUrl, youtubeUrl: t.youtubeUrl,
+        }]
+    updateSection(section.id, { content: JSON.stringify(next) })
+  }
+
+  if (error) return <p className="text-sm text-amber-600">{error}</p>
+  if (!all) {
+    return (
+      <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading testimonials…
+      </div>
+    )
+  }
+  if (!all.length) {
+    return (
+      <p className="text-sm text-gray-400">
+        No reviews or testimonial videos yet — add them in{" "}
+        <a href="/settings" className="font-semibold text-brand-blue underline">Settings → Reviews &amp; testimonials</a>.
+      </p>
+    )
+  }
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-gray-500">
+        Tick the reviews and videos to show on this proposal ({selected.length} selected).
+      </p>
+      {all.map((t) => {
+        const on = selected.some((s) => s.id === t.id)
+        return (
+          <button key={t.id} type="button" onClick={() => toggle(t)}
+            className={`w-full text-left border rounded-lg p-3 transition ${
+              on ? "border-brand-blue ring-1 ring-brand-blue bg-blue-50/40" : "opacity-70 hover:opacity-100 hover:border-gray-400"
+            }`}>
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
+              {on && <Check className="w-4 h-4 text-brand-blue shrink-0" />}
+              <span className="truncate">
+                {t.kind === "video" ? "🎬 " : ""}{t.title || t.author || "Untitled"}
+              </span>
+              {t.rating ? <span className="text-amber-400 text-xs shrink-0">{"★".repeat(t.rating)}</span> : null}
+            </div>
+            {t.text && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{t.text}</p>}
+          </button>
+        )
+      })}
     </div>
   )
 }

@@ -126,6 +126,10 @@ model Organization {
   // Pipeline board stages (JSON PipelineStage[], lib/pipeline.ts; null = defaults).
   pipelineStages        String?
 
+  // Google Business Profile place (for importing Google reviews via Places API).
+  googlePlaceId         String?
+  testimonials          Testimonial[]
+
   // YouTube channel for embedding similar-work videos in proposals
   youtubeChannelUrl     String?
 
@@ -595,6 +599,29 @@ model PricingLineItem {
   order                 Int             @default(0)
 
   @@index([proposalId])
+}
+
+// Customer reviews & testimonial videos, tagged by service so relevant ones get
+// suggested onto matching proposals ("What Our Customers Say" section).
+model Testimonial {
+  id                    String          @id @default(cuid())
+  organizationId        String
+  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  kind                  String          // "review" (written) | "video"
+  title                 String?         // label, e.g. "Roof clean — Mrs Smith, Luton"
+  text                  String?         // review text (written reviews)
+  author                String?
+  rating                Int?            // 1-5 stars
+  fileUrl               String?         // uploaded video (Blob)
+  youtubeUrl            String?         // or a YouTube link
+  source                String          @default("manual") // manual | google
+  serviceTags           String?         // free text, e.g. "roof cleaning, moss removal"
+  audience              String          @default("ANY") // ANY | RESIDENTIAL | COMMERCIAL
+
+  createdAt             DateTime        @default(now())
+
+  @@index([organizationId])
 }
 
 // In-app beta feedback from users (stored + emailed to the SurvAIPro team).
