@@ -156,6 +156,13 @@ Two deploys, both live; prod Neon migrated first each time.
 - **Pipeline board** `/proposals/pipeline` (`lib/pipeline.ts`): kanban of open (DRAFT/READY/SENT) proposals; org-named stages (`Organization.pipelineStages` JSON, defaults Draft/Sent/One follow-up/Two+ follow-ups; rename inline/add/remove) + `Proposal.pipelineStageId` (both prod migrated); drag desktop+touch; auto-bucket untouched cards (draftish→col 1, sent→col 2); column totals; linked from proposals list.
 - Mobile proposals rows: chips wrap under the title. Touch drag-to-reorder on list grips.
 
+## Session 2026-08-16 — reviews & testimonials (shipped)
+
+- **Testimonial model** (prod migrated: table + `Organization.googlePlaceId`): written reviews (text/author/rating) or videos (Blob `fileUrl` / `youtubeUrl`), `serviceTags` + `audience` (ANY/RESIDENTIAL/COMMERCIAL), `source` manual|google.
+- **Settings → Reviews & testimonials** (`components/testimonials-manager.tsx`): Google connect via Places text search (`lib/google-places.ts`, uses GOOGLE_MAPS_API_KEY) → imports the **5 most relevant** Google reviews (full list would need approval-gated Business Profile API — future upgrade); manual review/video add (drag-drop video to Blob); per-item tag/audience inline editing.
+- **Auto-suggest on generation** (`api/proposals` POST): "What Our Customers Say" section (type `testimonials`, top-3 keyword+audience matches, serialized JSON content) inserted before pricing — same pattern as gallery/videos.
+- **Editor**: "Add testimonials" section button + `TestimonialPicker`; `proposal-document.tsx` renders starred quotes, `<video>` for uploads, YouTube thumb-cards.
+
 ## Deploy pipeline (current — 2026-07-25)
 
 **The repo is now on GitHub and auto-deploys via Vercel. Do NOT use the old `npx vercel --token=…` flow (those tokens were revoked).**
