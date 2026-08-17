@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
-  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check,
+  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check, ExternalLink,
 } from "lucide-react"
 
 type FolderOption = { id: string; name: string }
@@ -97,6 +97,17 @@ export function ItemActions({
       const d = await res.json().catch(() => ({}))
       toast.error(d.error || "Couldn't mark as won")
     }
+  }
+
+  // Manual CRM push — the automatic sync only fires on send / status changes.
+  const pushToPipedrive = async () => {
+    setOpen(false)
+    setBusy(true)
+    const res = await fetch(`/api/proposals/${id}/pipedrive-sync`, { method: "POST" })
+    const d = await res.json().catch(() => ({}))
+    setBusy(false)
+    if (res.ok) toast.success("Pushed to Pipedrive — deal created/updated")
+    else toast.error(d.error || "Couldn't push to Pipedrive")
   }
 
   const duplicate = async () => {
@@ -222,6 +233,12 @@ export function ItemActions({
                 title={kind === "proposal" ? "Copies the proposal (sections + pricing) onto a fresh job" : "Copies the job details and photos"}>
                 <Copy className="w-4 h-4" /> Duplicate
               </button>
+              {kind === "proposal" && (
+                <button onClick={(e) => { e.preventDefault(); pushToPipedrive() }} className={menuItem}
+                  title="Create/update the Pipedrive deal for this proposal (needs Pipedrive connected in Settings)">
+                  <ExternalLink className="w-4 h-4" /> Push to Pipedrive
+                </button>
+              )}
               {targetSurvey && (
                 <button onClick={(e) => { e.preventDefault(); openFolders() }} className={menuItem}>
                   <FolderInput className="w-4 h-4" /> Move to folder
