@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { toast } from "sonner"
-import { Loader2, Check, Printer, Send, Plus, Trash2, Eye, Pencil } from "lucide-react"
+import { Loader2, Check, Printer, Send, Plus, Trash2, Eye, Pencil, Link2, Copy, Share2, MessageCircle, X } from "lucide-react"
 import { DictateButton } from "@/components/dictate-button"
 import { JobReportDocument, ReportDocData, REPORT_FIELDS } from "@/components/job-report-document"
 import { uploadJobReportPhotos } from "@/lib/report-photo-upload"
@@ -33,6 +33,13 @@ export default function JobReportEditor() {
   const [busy, setBusy] = useState(false)
   const [pdfBusy, setPdfBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [sharing, setSharing] = useState(false)
+  const [canShare, setCanShare] = useState(false)
+
+  useEffect(() => {
+    setCanShare(typeof navigator !== "undefined" && !!navigator.share)
+  }, [])
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const fileInput = useRef<HTMLInputElement>(null)
   const pdfRef = useRef<HTMLDivElement>(null)
@@ -114,11 +121,50 @@ export default function JobReportEditor() {
       const d = await res.json()
       if (!res.ok) throw new Error(d.error)
       setReport((r) => (r ? { ...r, status: "COMPLETED" } : r))
+      // Surface the client link straight away so it can be copied/forwarded.
+      if (d.url) setShareUrl(d.url)
       toast.success("Report completed and sent to the office")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't complete the report")
     } finally {
       setBusy(false)
+    }
+  }
+
+  const getShareLink = async () => {
+    setSharing(true)
+    try {
+      const res = await fetch(`/api/job-reports/${reportId}/share-link`, { method: "POST" })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      setShareUrl(d.url)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't create the link")
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  // Triggered directly by a button tap with no await before the write, so the
+  // user activation is still live — this is what makes copy reliable on iOS.
+  const copyShareUrl = async () => {
+    if (!shareUrl) return
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      toast.success("Copied to clipboard")
+    } catch {
+      toast.error("Couldn't copy — select the link and copy it manually")
+    }
+  }
+
+  const nativeShareUrl = async () => {
+    if (!shareUrl || !report) return
+    try {
+      await navigator.share({ title: `Job report — ${report.site.clientName}`, url: shareUrl })
+    } catch (err) {
+      // User dismissed the share sheet — nothing to report.
+      if (err instanceof DOMException && err.name === "AbortError") return
+      toast.error("Couldn't open the share sheet")
     }
   }
 
@@ -153,11 +199,48 @@ export default function JobReportEditor() {
           <button onClick={downloadPdf} disabled={pdfBusy} className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
             {pdfBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />} PDF
           </button>
+          {report.status === "COMPLETED" && (
+            <button onClick={getShareLink} disabled={sharing}
+              title="Copy the read-only client link for this report"
+              className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
+              {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />} Share link
+            </button>
+          )}
           <button onClick={complete} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Complete &amp; send
           </button>
         </div>
       </div>
+
+      {shareUrl && (
+        <div className="no-print flex flex-wrap items-center gap-2 rounded-lg border border-brand-blue/30 bg-blue-50 px-3 py-2">
+          <input
+            readOnly
+            value={shareUrl}
+            onFocus={(e) => e.currentTarget.select()}
+            className="flex-1 min-w-0 bg-white border rounded-md px-2 py-1.5 text-sm text-gray-700"
+          />
+          <button onClick={copyShareUrl}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+            <Copy className="w-4 h-4" /> Copy
+          </button>
+          <a href={`https://wa.me/?text=${encodeURIComponent(`Job report for ${report.site.clientName} (${report.site.address}): ${shareUrl}`)}`}
+            target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-[#25D366] text-white hover:brightness-95">
+            <MessageCircle className="w-4 h-4" /> WhatsApp
+          </a>
+          {canShare && (
+            <button onClick={nativeShareUrl}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+              <Share2 className="w-4 h-4" /> Share
+            </button>
+          )}
+          <button onClick={() => setShareUrl(null)} aria-label="Dismiss"
+            className="inline-flex items-center justify-center p-1.5 text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {mode === "preview" ? (
         <div className="bg-white rounded-xl shadow-sm p-4 md:p-10 print-area"><JobReportDocument data={docData} /></div>
