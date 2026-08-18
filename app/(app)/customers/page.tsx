@@ -1,9 +1,14 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Users } from "lucide-react"
+import { Users, MapPin } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
+import { AUTO_IMAGERY_NAMES } from "@/lib/geo"
 import { formatCurrency, formatDate, calculateProposalTotals, formatNetPlusVat } from "@/lib/utils"
+
+// Files the app generates itself (Street View / aerial / measurement bakes) —
+// their presence says nothing about anyone having been on site.
+const GENERATED_FILES = [...AUTO_IMAGERY_NAMES, "measured-area.jpg"]
 
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-600",
@@ -29,6 +34,8 @@ type Row = {
     status: string
     totals: { subtotal: number; vat: number; total: number }
     updatedAt: Date
+    visited: boolean
+    sentOut: boolean
   }[]
   total: number
   sent: number
@@ -44,7 +51,16 @@ export default async function CustomersPage() {
     orderBy: { updatedAt: "desc" },
     include: {
       pricingLineItems: true,
-      survey: { select: { title: true, clientCompany: true } },
+      survey: {
+        select: {
+          title: true,
+          clientCompany: true,
+          // "Site visited" = the survey holds evidence gathered on site: any
+          // photo that isn't app-generated imagery, or a voice note.
+          photos: { where: { fileName: { notIn: GENERATED_FILES } }, select: { id: true }, take: 1 },
+          _count: { select: { voiceNotes: true } },
+        },
+      },
     },
   })
 
@@ -68,12 +84,15 @@ export default async function CustomersPage() {
       map.set(key, row)
     }
     const totals = calculateProposalTotals(p.pricingLineItems)
+    const visited = p.survey.photos.length > 0 || p.survey._count.voiceNotes > 0
     row.proposals.push({
       id: p.id,
       title: p.survey.title,
       status: p.status,
       totals,
       updatedAt: p.updatedAt,
+      visited,
+      sentOut: !!p.sentAt,
     })
     row.total += totals.total
     if (p.sentAt) row.sent += 1
@@ -83,6 +102,21 @@ export default async function CustomersPage() {
   // Most proposals first.
   const rows = [...map.values()].sort((a, b) => b.proposals.length - a.proposals.length)
 
+  // Does getting boots on the ground win more work? Compare conversion of
+  // site-visited jobs against desk quotes, over everything ever sent.
+  const split = { visited: { sent: 0, won: 0 }, desk: { sent: 0, won: 0 } }
+  for (const r of rows) {
+    for (const p of r.proposals) {
+      const bucket = p.visited ? split.visited : split.desk
+      // Won deals count as sent even without a sentAt (marked won directly) —
+      // they clearly reached the client.
+      if (p.sentOut || WON.has(p.status)) bucket.sent += 1
+      if (WON.has(p.status)) bucket.won += 1
+    }
+  }
+  const pct = (b: { sent: number; won: number }) =>
+    b.sent > 0 ? `${Math.round((b.won / b.sent) * 100)}%` : "—"
+
   return (
     <div className="space-y-6 overflow-x-hidden">
       <div className="flex items-center gap-2">
@@ -90,6 +124,32 @@ export default async function CustomersPage() {
         <h1 className="text-2xl font-bold text-brand-navy">Customers</h1>
         <span className="text-sm text-gray-400">({rows.length})</span>
       </div>
+
+      {/* Does a site visit win more work? Conversion split, all customers. */}
+      {(split.visited.sent > 0 || split.desk.sent > 0) && (
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div className="bg-white rounded-xl shadow-sm p-4 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold text-brand-blue flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5" /> Site visited
+              </div>
+              <div className="text-sm text-gray-500 mt-1">
+                {split.visited.won} won of {split.visited.sent} sent
+              </div>
+            </div>
+            <div className="text-2xl font-bold text-emerald-600">{pct(split.visited)}</div>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm p-4 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold text-gray-500">No site visit</div>
+              <div className="text-sm text-gray-500 mt-1">
+                {split.desk.won} won of {split.desk.sent} sent
+              </div>
+            </div>
+            <div className="text-2xl font-bold text-emerald-600">{pct(split.desk)}</div>
+          </div>
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-10 text-center text-gray-400">
@@ -135,8 +195,16 @@ export default async function CustomersPage() {
                           {p.title}
                           <span className="text-gray-400"> · {formatNetPlusVat(p.totals)} · {formatDate(p.updatedAt)}</span>
                         </span>
-                        <span className={`shrink-0 whitespace-nowrap text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLES[p.status]}`}>
-                          {p.status}
+                        <span className="shrink-0 flex items-center gap-1.5">
+                          {p.visited && (
+                            <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2 py-0.5 rounded-full border border-blue-200 bg-blue-50 text-brand-blue"
+                              title="Survey holds on-site evidence — photos or voice notes">
+                              <MapPin className="w-3 h-3" /> Site visit
+                            </span>
+                          )}
+                          <span className={`whitespace-nowrap text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_STYLES[p.status]}`}>
+                            {p.status}
+                          </span>
                         </span>
                       </Link>
                     </li>
@@ -149,6 +217,8 @@ export default async function CustomersPage() {
       )}
       <p className="text-xs text-gray-400">
         Conversion = accepted proposals (signed, deposit paid or won) as a share of those sent.
+        A job counts as site visited when its survey holds on-site evidence — uploaded photos
+        (beyond the app&apos;s own Street View / aerial imagery) or voice notes.
       </p>
     </div>
   )
