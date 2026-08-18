@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Plus, TrendingUp, Clock, FileText, ClipboardList } from "lucide-react"
+import { Plus, TrendingUp, Clock, FileText, ClipboardList, MapPin } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { formatCurrency, formatDate, calculateProposalTotals, formatNetPlusVat } from "@/lib/utils"
@@ -69,7 +69,7 @@ export default async function DashboardPage({
       orderBy: { updatedAt: "desc" },
       include: {
         pricingLineItems: true,
-        survey: { select: { createdAt: true } },
+        survey: { select: { createdAt: true, surveyedInPerson: true } },
       },
     }),
   ])
@@ -96,6 +96,23 @@ export default async function DashboardPage({
   const avgValue = inRange.length ? totalQuoted / inRange.length : 0
   const depositsPaid = inRange.filter((p) => p.depositPaidAt)
   const depositsTotal = depositsPaid.reduce((s, p) => s + (p.depositAmount || 0), 0)
+
+  // Site-visit vs remote-quote conversion. Won = any accepted stage; the
+  // denominator is deals that reached a decision point (sent or already won).
+  const WONISH = new Set(["SIGNED", "DEPOSIT_PAID", "WON"])
+  const visitSplit = (visited: boolean) => {
+    const group = inRange.filter((p) => Boolean(p.survey?.surveyedInPerson) === visited)
+    const decided = group.filter((p) => p.sentAt || WONISH.has(p.status) || p.status === "LOST")
+    const won = group.filter((p) => WONISH.has(p.status))
+    return {
+      total: group.length,
+      decided: decided.length,
+      won: won.length,
+      rate: decided.length ? Math.round((won.length / decided.length) * 100) : null,
+    }
+  }
+  const visited = visitSplit(true)
+  const remote = visitSplit(false)
 
   // Average AI generation time - the number that proves the tagline
   const genTimes = proposals
@@ -219,6 +236,32 @@ export default async function DashboardPage({
           </div>
         </Link>
       </div>
+
+      {/* Does an in-person site visit win more work? Tag surveys with
+          "Site survey carried out" and the split shows here. */}
+      {(visited.total > 0 || remote.total > 0) && (
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-gray-500 text-sm mb-3">
+            <MapPin className="w-4 h-4" /> Conversion: site visit vs remote quote
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              { label: "Site survey carried out", d: visited },
+              { label: "No site visit", d: remote },
+            ].map(({ label, d }) => (
+              <div key={label}>
+                <div className="text-xs text-gray-400">{label}</div>
+                <div className="text-xl font-bold text-brand-navy">
+                  {d.rate === null ? "—" : `${d.rate}%`}
+                </div>
+                <div className="text-xs text-gray-400">
+                  {d.won} won of {d.decided} decided · {d.total} proposal{d.total === 1 ? "" : "s"}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Recent surveys */}

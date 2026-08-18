@@ -87,6 +87,7 @@ export default function NewSurveyPage() {
     title: "",
     serviceType: "",
     isResidential: true,
+    surveyedInPerson: false,
     writtenDescription: "",
     clientPriorities: "",
     accessNotes: "",
@@ -237,6 +238,13 @@ export default function NewSurveyPage() {
                   </button>
                 ))}
               </div>
+              <label className="mt-2 flex items-center gap-2 text-sm text-gray-600 cursor-pointer"
+                title="Tag jobs surveyed in person — the dashboard compares their conversion against remote quotes">
+                <input type="checkbox" checked={form.surveyedInPerson}
+                  onChange={(e) => set("surveyedInPerson", e.target.checked)}
+                  className="rounded accent-blue-600" />
+                Site survey carried out in person
+              </label>
             </div>
           </div>
           <div>

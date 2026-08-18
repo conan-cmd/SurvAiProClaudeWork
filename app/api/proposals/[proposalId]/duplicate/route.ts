@@ -30,7 +30,8 @@ export async function POST(
   const remapPhotoIds = (raw: string | null) => {
     if (!raw) return null
     try {
-      const ids: string[] = JSON.parse(raw)
+      const ids = JSON.parse(raw)
+      if (!Array.isArray(ids)) return null
       return JSON.stringify(
         ids.map((pid) => survey.photoIdMap.get(pid)).filter(Boolean)
       )

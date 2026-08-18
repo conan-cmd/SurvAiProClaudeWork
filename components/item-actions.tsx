@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
-  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check,
+  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check, ExternalLink,
 } from "lucide-react"
 
 type FolderOption = { id: string; name: string }
@@ -99,22 +99,31 @@ export function ItemActions({
     }
   }
 
-  // Duplicating a survey copies the job only; duplicating a proposal copies the
-  // job AND the proposal content as a fresh unsent draft.
+  // Manual CRM push — the automatic sync only fires on send / status changes.
+  const pushToPipedrive = async () => {
+    setOpen(false)
+    setBusy(true)
+    const res = await fetch(`/api/proposals/${id}/pipedrive-sync`, { method: "POST" })
+    const d = await res.json().catch(() => ({}))
+    setBusy(false)
+    if (res.ok) toast.success("Pushed to Pipedrive — deal created/updated")
+    else toast.error(d.error || "Couldn't push to Pipedrive")
+  }
+
   const duplicate = async () => {
     setOpen(false)
     setBusy(true)
-    const path = kind === "survey"
-      ? `/api/surveys/${id}/duplicate`
-      : `/api/proposals/${id}/duplicate`
+    // Surveys copy the job (details + photos); proposals also copy their
+    // sections and pricing onto a fresh job.
+    const path = kind === "survey" ? `/api/surveys/${id}/duplicate` : `/api/proposals/${id}/duplicate`
     const res = await fetch(path, { method: "POST" })
     setBusy(false)
     if (res.ok) {
       const data = await res.json()
       toast.success("Duplicated — check the site address")
-      // Land with the address editor open: a duplicated job usually needs a new site.
-      if (kind === "survey") router.push(`/surveys/${data.id}?editAddress=1`)
-      else router.push(`/proposals/${data.id}`)
+      // Duplicated jobs usually need a new site: surveys land with the address
+      // editor open; proposals open the copy (address editable on the cover).
+      router.push(kind === "survey" ? `/surveys/${data.id}?editAddress=1` : `/proposals/${data.id}`)
     } else toast.error("Couldn't duplicate")
   }
 
@@ -220,9 +229,16 @@ export function ItemActions({
               <button onClick={(e) => { e.preventDefault(); rename() }} className={menuItem}>
                 <Pencil className="w-4 h-4" /> Rename
               </button>
-              <button onClick={(e) => { e.preventDefault(); duplicate() }} className={menuItem}>
+              <button onClick={(e) => { e.preventDefault(); duplicate() }} className={menuItem}
+                title={kind === "proposal" ? "Copies the proposal (sections + pricing) onto a fresh job" : "Copies the job details and photos"}>
                 <Copy className="w-4 h-4" /> Duplicate
               </button>
+              {kind === "proposal" && (
+                <button onClick={(e) => { e.preventDefault(); pushToPipedrive() }} className={menuItem}
+                  title="Create/update the Pipedrive deal for this proposal (needs Pipedrive connected in Settings)">
+                  <ExternalLink className="w-4 h-4" /> Push to Pipedrive
+                </button>
+              )}
               {targetSurvey && (
                 <button onClick={(e) => { e.preventDefault(); openFolders() }} className={menuItem}>
                   <FolderInput className="w-4 h-4" /> Move to folder

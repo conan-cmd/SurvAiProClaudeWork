@@ -23,6 +23,7 @@ type Survey = {
   title: string
   serviceType: string
   isResidential: boolean
+  surveyedInPerson: boolean
   clientPriorities: string | null
   accessNotes: string | null
   measurements: string | null
@@ -235,6 +236,21 @@ export default function SurveyDetailPage() {
           )}
         </span>
       </div>
+
+      {/* Tag for conversion tracking: in-person site visits vs remote quotes */}
+      <button
+        type="button"
+        onClick={() => updateField("surveyedInPerson", !survey.surveyedInPerson)}
+        title="Tag jobs surveyed in person — the dashboard compares their conversion rate against remote quotes"
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition ${
+          survey.surveyedInPerson
+            ? "bg-emerald-50 border-emerald-300 text-emerald-700"
+            : "bg-white border-gray-300 text-gray-500 hover:border-gray-400"
+        }`}
+      >
+        <Check className={`w-4 h-4 ${survey.surveyedInPerson ? "" : "opacity-30"}`} />
+        Site survey carried out{survey.surveyedInPerson ? "" : "?"}
+      </button>
 
       <div className={`grid gap-2 ${survey.proposal ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
         {survey.proposal && (

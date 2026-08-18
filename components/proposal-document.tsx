@@ -290,6 +290,72 @@ function VideosSection({ section }: { section: Section }) {
   )
 }
 
+type TestimonialItem = {
+  id: string
+  kind: string
+  title: string | null
+  text: string | null
+  author: string | null
+  rating: number | null
+  fileUrl: string | null
+  youtubeUrl: string | null
+}
+
+const youtubeId = (url: string): string | null =>
+  url.match(/(?:youtu\.be\/|v=|embed\/|shorts\/)([\w-]{11})/)?.[1] || null
+
+function TestimonialsSection({ section }: { section: Section }) {
+  let items: TestimonialItem[] = []
+  try {
+    items = JSON.parse(section.content || "[]")
+  } catch {
+    items = []
+  }
+  if (!items.length) return <p className="text-gray-400 italic">No testimonials selected yet.</p>
+  return (
+    <div className="space-y-4">
+      {items.map((t) => {
+        if (t.kind === "video") {
+          const ytId = t.youtubeUrl ? youtubeId(t.youtubeUrl) : null
+          return (
+            <figure key={t.id} className="break-inside-avoid">
+              {t.fileUrl ? (
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video controls preload="metadata" src={t.fileUrl} className="w-full rounded-lg bg-black max-h-80" />
+              ) : ytId ? (
+                <a href={t.youtubeUrl!} target="_blank" rel="noopener noreferrer" className="block group">
+                  <div className="relative rounded-lg overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`} alt={t.title || "Testimonial video"}
+                      className="w-full aspect-video object-cover" />
+                    <span className="absolute inset-0 flex items-center justify-center">
+                      <span className="w-12 h-12 rounded-full bg-black/60 group-hover:bg-red-600 transition flex items-center justify-center">
+                        <span className="ml-1 border-y-8 border-y-transparent border-l-[14px] border-l-white" />
+                      </span>
+                    </span>
+                  </div>
+                </a>
+              ) : null}
+              {t.title && <figcaption className="text-sm text-gray-600 mt-1.5">{t.title}</figcaption>}
+            </figure>
+          )
+        }
+        return (
+          <blockquote key={t.id} className="break-inside-avoid border-l-4 border-amber-300 bg-amber-50/50 rounded-r-lg p-4">
+            {t.rating ? (
+              <div className="text-amber-400 text-sm leading-none mb-1.5" aria-label={`${t.rating} out of 5 stars`}>
+                {"★".repeat(t.rating)}<span className="opacity-25">{"★".repeat(5 - t.rating)}</span>
+              </div>
+            ) : null}
+            <p className="text-gray-700 italic leading-relaxed">&ldquo;{t.text}&rdquo;</p>
+            {t.author && <footer className="text-sm text-gray-500 mt-2 not-italic">— {t.author}</footer>}
+          </blockquote>
+        )
+      })}
+    </div>
+  )
+}
+
 function GallerySection({ section }: { section: Section }) {
   let photos: { id: string; fileUrl: string; caption: string }[] = []
   try {
@@ -396,6 +462,8 @@ export function ProposalDocument({ data }: { data: ProposalDocumentData }) {
               <VideosSection section={section} />
             ) : section.type === "gallery" ? (
               <GallerySection section={section} />
+            ) : section.type === "testimonials" ? (
+              <TestimonialsSection section={section} />
             ) : (
               <TextContent content={section.content} />
             )}

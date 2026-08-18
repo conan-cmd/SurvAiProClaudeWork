@@ -175,6 +175,55 @@ export async function POST(request: NextRequest) {
       console.error("Gallery suggestion skipped:", err)
     }
 
+    // Auto-suggest matching testimonials (Google reviews / testimonial videos)
+    // tagged for this kind of job. Keyword match on tags/title/text + property
+    // type; skipped entirely when nothing matches.
+    try {
+      const testimonials = await db.testimonial.findMany({
+        where: {
+          organizationId: user.organizationId,
+          OR: [{ audience: "ANY" }, { audience: survey.isResidential ? "RESIDENTIAL" : "COMMERCIAL" }],
+        },
+      })
+      if (testimonials.length) {
+        const jobText = `${survey.serviceType} ${survey.title} ${survey.writtenDescription || ""}`.toLowerCase()
+        const terms = jobText.split(/[^a-z]+/).filter((t) => t.length > 3)
+        const matches = testimonials
+          .map((t) => {
+            const hay = `${t.serviceTags || ""} ${t.title || ""} ${t.text || ""}`.toLowerCase()
+            const score = terms.reduce((s, term) => s + (hay.includes(term) ? 1 : 0), 0)
+            return { t, score }
+          })
+          .filter((x) => x.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 3)
+          .map((x) => ({
+            id: x.t.id,
+            kind: x.t.kind,
+            title: x.t.title,
+            text: x.t.text,
+            author: x.t.author,
+            rating: x.t.rating,
+            fileUrl: x.t.fileUrl,
+            youtubeUrl: x.t.youtubeUrl,
+          }))
+        if (matches.length) {
+          const anchor = sectionsData.findIndex((s) => s.type === "pricing")
+          const insertAt = anchor === -1 ? sectionsData.length : anchor
+          sectionsData.splice(insertAt, 0, {
+            type: "testimonials",
+            title: "What Our Customers Say",
+            content: JSON.stringify(matches),
+            order: 0,
+            photoIds: null,
+          })
+          sectionsData.forEach((s, i) => (s.order = i))
+        }
+      }
+    } catch (err) {
+      console.error("Testimonial suggestion skipped:", err)
+    }
+
     // Auto-suggest similar-project videos from the org's YouTube channel.
     // Only added when titles genuinely match the job; the user can remove
     // or re-pick videos in the editor. Failure here never blocks generation.

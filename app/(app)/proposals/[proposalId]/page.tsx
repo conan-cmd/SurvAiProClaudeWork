@@ -217,6 +217,7 @@ export default function ProposalEditorPage() {
   const addVideoSection = () => addSection("videos", "Watch Us In Action")
   const addGallerySection = () => addSection("gallery", "Examples of Similar Work")
   const addPhotoSection = () => addSection("photos", "Photos")
+  const addTestimonialsSection = () => addSection("testimonials", "What Our Customers Say")
 
   const regenerate = async (sectionId: string) => {
     const feedback = prompt(
@@ -655,9 +656,15 @@ export default function ProposalEditorPage() {
       if (!res.ok) throw new Error(d.error || "Couldn't locate that address")
       setProposal((p) => p ? {
         ...p,
-        survey: { ...p.survey, clientAddress: d.clientAddress, latitude: d.latitude, longitude: d.longitude, what3words: d.what3words },
+        survey: {
+          ...p.survey,
+          clientAddress: d.clientAddress, latitude: d.latitude, longitude: d.longitude, what3words: d.what3words,
+          // The route re-shoots Street View + aerial for the new spot — swap in
+          // the fresh photo set so the preview updates immediately.
+          photos: Array.isArray(d.photos) ? d.photos : p.survey.photos,
+        },
       } : p)
-      toast.success("Site location updated — imagery refreshed")
+      toast.success("Site location updated — Street View & aerial refreshed")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't update the address")
     } finally {
@@ -1119,11 +1126,18 @@ export default function ProposalEditorPage() {
                     setProposal((p) =>
                       p ? { ...p, survey: { ...p.survey, photos: [...p.survey.photos, ...newPhotos] } } : p
                     )
+                  }
+                  onCaption={(photoId, caption) =>
+                    setProposal((p) =>
+                      p ? { ...p, survey: { ...p.survey, photos: p.survey.photos.map((ph) => ph.id === photoId ? { ...ph, caption } : ph) } } : p
+                    )
                   } />
               ) : section.type === "videos" ? (
                 <VideoPicker section={section} updateSection={updateSection} />
               ) : section.type === "gallery" ? (
                 <GalleryPicker section={section} updateSection={updateSection} />
+              ) : section.type === "testimonials" ? (
+                <TestimonialPicker section={section} updateSection={updateSection} />
               ) : section.type === "cover" ? (
                 <div className="space-y-3">
                   <p className="text-xs text-gray-400">
@@ -1173,11 +1187,18 @@ export default function ProposalEditorPage() {
                       placeholder="Start typing the address…"
                       className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
                     />
-                    <button type="button" onClick={updateCoverAddress} disabled={updatingAddress}
-                      className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
-                      {updatingAddress ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
-                      Update location &amp; imagery
-                    </button>
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                      <button type="button" onClick={updateCoverAddress} disabled={updatingAddress}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
+                        {updatingAddress ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+                        Update location &amp; imagery
+                      </button>
+                      <a href={`/surveys/${proposal.survey.id}?editAddress=1`}
+                        className="text-sm font-medium text-brand-blue hover:underline"
+                        title="Move the pin, rotate Street View and re-shoot the aerial on the survey's map">
+                        Fine-tune Street View &amp; aerial →
+                      </a>
+                    </div>
                   </div>
                   <div className="pt-1 border-t">
                     <label className="block text-sm font-medium text-gray-700 mb-1 mt-2">Who this proposal is from</label>
@@ -1263,6 +1284,10 @@ export default function ProposalEditorPage() {
             <button onClick={addGallerySection}
               className="border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
               <Plus className="w-5 h-5" /> Add gallery photos
+            </button>
+            <button onClick={addTestimonialsSection}
+              className="border-2 border-dashed border-gray-300 rounded-xl py-4 text-gray-500 font-medium hover:border-brand-blue hover:text-brand-blue transition inline-flex items-center justify-center gap-2">
+              <Plus className="w-5 h-5" /> Add testimonials
             </button>
           </div>
 
@@ -1603,14 +1628,32 @@ function PhotoPicker({
   section,
   updateSection,
   onPhotosUploaded,
+  onCaption,
 }: {
   proposal: ProposalData
   section: Section
   updateSection: (id: string, patch: SectionPatch) => void
   onPhotosUploaded: (photos: UploadedPhoto[]) => void
+  onCaption: (photoId: string, caption: string) => void
 }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const capTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+
+  // Caption edits save to the survey photo (shared with the survey page) and
+  // show under the picture on the finished proposal.
+  const setCaption = (photoId: string, caption: string) => {
+    onCaption(photoId, caption)
+    if (capTimers.current[photoId]) clearTimeout(capTimers.current[photoId])
+    capTimers.current[photoId] = setTimeout(async () => {
+      const res = await fetch(`/api/surveys/${proposal.survey.id}/photos/${photoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ caption }),
+      })
+      if (!res.ok) toast.error("Couldn't save the caption")
+    }, 700)
+  }
 
   // Default (photoIds null) = every survey photo is included. The user deselects to
   // drop one; that's when photoIds becomes the explicit kept set.
@@ -1670,26 +1713,129 @@ function PhotoPicker({
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {proposal.survey.photos.map((photo) => {
           const on = selected.includes(photo.id)
           return (
-            <button key={photo.id} type="button" onClick={() => toggle(photo.id)}
-              className={`relative rounded-lg overflow-hidden border-2 transition ${
-                on ? "border-brand-blue" : "border-transparent opacity-50"
-              }`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photo.fileUrl} alt={photo.caption || ""} className="aspect-square object-cover w-full" />
+            <div key={photo.id}>
+              <button type="button" onClick={() => toggle(photo.id)}
+                className={`relative w-full rounded-lg overflow-hidden border-2 transition ${
+                  on ? "border-brand-blue" : "border-transparent opacity-50"
+                }`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photo.fileUrl} alt={photo.caption || ""} className="aspect-square object-cover w-full" />
+                {on && (
+                  <span className="absolute top-1 right-1 bg-brand-blue text-white rounded-full p-0.5">
+                    <Check className="w-3 h-3" />
+                  </span>
+                )}
+              </button>
               {on && (
-                <span className="absolute top-1 right-1 bg-brand-blue text-white rounded-full p-0.5">
-                  <Check className="w-3 h-3" />
-                </span>
+                <input value={photo.caption || ""} placeholder="Caption…" spellCheck
+                  onChange={(e) => setCaption(photo.id, e.target.value)}
+                  className="mt-1 w-full px-2 py-1 border rounded text-xs focus:outline-none focus:ring-1 focus:ring-brand-blue" />
               )}
-            </button>
+            </div>
           )
         })}
       </div>
       {uploadButton}
+    </div>
+  )
+}
+
+// Items are stored serialized in section.content (same shape the document
+// renders), so the public page never needs an extra fetch.
+type TestimonialPick = {
+  id: string
+  kind: string
+  title: string | null
+  text: string | null
+  author: string | null
+  rating: number | null
+  fileUrl: string | null
+  youtubeUrl: string | null
+  serviceTags?: string | null
+  audience?: string
+}
+
+function TestimonialPicker({
+  section,
+  updateSection,
+}: {
+  section: Section
+  updateSection: (id: string, patch: SectionPatch) => void
+}) {
+  const [all, setAll] = useState<TestimonialPick[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch("/api/testimonials")
+      .then(async (r) => {
+        const data = await r.json()
+        if (!r.ok) throw new Error(data.error)
+        setAll(data)
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load testimonials"))
+  }, [])
+
+  let selected: TestimonialPick[] = []
+  try {
+    selected = JSON.parse(section.content || "[]")
+  } catch {
+    selected = []
+  }
+
+  const toggle = (t: TestimonialPick) => {
+    const on = selected.some((s) => s.id === t.id)
+    const next = on
+      ? selected.filter((s) => s.id !== t.id)
+      : [...selected, {
+          id: t.id, kind: t.kind, title: t.title, text: t.text, author: t.author,
+          rating: t.rating, fileUrl: t.fileUrl, youtubeUrl: t.youtubeUrl,
+        }]
+    updateSection(section.id, { content: JSON.stringify(next) })
+  }
+
+  if (error) return <p className="text-sm text-amber-600">{error}</p>
+  if (!all) {
+    return (
+      <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
+        <Loader2 className="w-4 h-4 animate-spin" /> Loading testimonials…
+      </div>
+    )
+  }
+  if (!all.length) {
+    return (
+      <p className="text-sm text-gray-400">
+        No reviews or testimonial videos yet — add them in{" "}
+        <a href="/settings" className="font-semibold text-brand-blue underline">Settings → Reviews &amp; testimonials</a>.
+      </p>
+    )
+  }
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-gray-500">
+        Tick the reviews and videos to show on this proposal ({selected.length} selected).
+      </p>
+      {all.map((t) => {
+        const on = selected.some((s) => s.id === t.id)
+        return (
+          <button key={t.id} type="button" onClick={() => toggle(t)}
+            className={`w-full text-left border rounded-lg p-3 transition ${
+              on ? "border-brand-blue ring-1 ring-brand-blue bg-blue-50/40" : "opacity-70 hover:opacity-100 hover:border-gray-400"
+            }`}>
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
+              {on && <Check className="w-4 h-4 text-brand-blue shrink-0" />}
+              <span className="truncate">
+                {t.kind === "video" ? "🎬 " : ""}{t.title || t.author || "Untitled"}
+              </span>
+              {t.rating ? <span className="text-amber-400 text-xs shrink-0">{"★".repeat(t.rating)}</span> : null}
+            </div>
+            {t.text && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{t.text}</p>}
+          </button>
+        )
+      })}
     </div>
   )
 }

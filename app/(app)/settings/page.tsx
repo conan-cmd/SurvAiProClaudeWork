@@ -11,6 +11,7 @@ import { PipedriveConnect } from "@/components/pipedrive-connect"
 import { HIDEABLE_SECTIONS, visibleSectionKeys } from "@/lib/nav-sections"
 import { parseNudgeTemplates, type NudgeTemplate } from "@/lib/nudge"
 import { DropZone } from "@/components/drop-zone"
+import { TestimonialsManager } from "@/components/testimonials-manager"
 
 type Org = {
   id: string
@@ -544,6 +545,8 @@ export default function SettingsPage() {
           </a>
         )}
       </section>
+
+      <TestimonialsManager orgId={org.id} />
 
       <DropZone onFiles={uploadDoc} accept="application/pdf,image/*,.doc,.docx" disabled={uploadingDoc}
         className="bg-white rounded-xl shadow-sm">

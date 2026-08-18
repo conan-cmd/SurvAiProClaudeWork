@@ -39,6 +39,8 @@ const updateOrgSchema = z.object({
   nudgeMessage: z.string().max(1000).optional(),
   // JSON NudgeTemplate[] (lib/nudge.ts). "" clears back to the app defaults.
   nudgeTemplates: z.string().max(8000).optional(),
+  // JSON PipelineStage[] (lib/pipeline.ts). "" clears back to the app defaults.
+  pipelineStages: z.string().max(4000).optional(),
   youtubeChannelUrl: z.string().optional(),
   depositRules: z.string().max(500).optional(),
   signOffName: z.string().max(100).optional(),

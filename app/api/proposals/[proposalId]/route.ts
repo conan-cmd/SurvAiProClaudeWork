@@ -15,6 +15,8 @@ const updateProposalSchema = z.object({
   identityUserId: z.string().nullable().optional(),
   // Records a verbal / on-paper acceptance the client won't be signing digitally.
   markAccepted: z.boolean().optional(),
+  // Pipeline board column; null returns the card to auto-bucketing.
+  pipelineStageId: z.string().max(100).nullable().optional(),
 })
 
 export async function GET(

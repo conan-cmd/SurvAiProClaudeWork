@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Eye, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing } from "lucide-react"
+import { Eye, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing, KanbanSquare } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { isApprover } from "@/lib/permissions"
@@ -101,7 +101,13 @@ export default async function ProposalsPage({
 
   return (
     <div className="space-y-6 overflow-x-hidden">
-      <h1 className="text-2xl font-bold text-brand-navy">Proposals</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-brand-navy">Proposals</h1>
+        <Link href="/proposals/pipeline"
+          className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+          <KanbanSquare className="w-4 h-4" /> Pipeline
+        </Link>
+      </div>
 
       <ListSearch placeholder="Search by job, client, company, email or address…" />
 
