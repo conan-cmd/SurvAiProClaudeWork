@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { toast } from "sonner"
-import { Loader2, Check, Printer, Send, Plus, Trash2, Eye, Pencil, Link2, Copy, Share2, MessageCircle, X } from "lucide-react"
+import { Loader2, Check, Printer, Send, Plus, Trash2, Eye, Pencil, Link2, Copy, Share2, MessageCircle, X, Mail } from "lucide-react"
 import { DictateButton } from "@/components/dictate-button"
 import { JobReportDocument, ReportDocData, REPORT_FIELDS } from "@/components/job-report-document"
 import { uploadJobReportPhotos } from "@/lib/report-photo-upload"
@@ -20,7 +20,7 @@ type Report = {
   signatureImage: string | null
   signedAt: string | null
   photos: Photo[]
-  site: { clientName: string; clientCompany: string | null; address: string }
+  site: { clientName: string; clientCompany: string | null; address: string; clientEmail: string | null; clientPhone: string | null }
   organization: { name: string; logoUrl: string | null; brandColor: string; phone: string | null; email: string | null }
 }
 
@@ -36,6 +36,8 @@ export default function JobReportEditor() {
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
   const [canShare, setCanShare] = useState(false)
+  const [emailTo, setEmailTo] = useState("")
+  const [emailing, setEmailing] = useState<false | "client" | "office">(false)
 
   useEffect(() => {
     setCanShare(typeof navigator !== "undefined" && !!navigator.share)
@@ -49,6 +51,7 @@ export default function JobReportEditor() {
       .then((r) => { if (!r.ok) throw new Error(); return r.json() })
       .then((d: Report) => {
         setReport(d)
+        setEmailTo(d.site.clientEmail || "")
         try { setFields(d.fields ? JSON.parse(d.fields) : {}) } catch { setFields({}) }
       })
       .catch(() => toast.error("Failed to load report"))
@@ -114,20 +117,42 @@ export default function JobReportEditor() {
   }
 
   const complete = async () => {
-    if (!confirm("Complete this report and send it to the office?")) return
+    if (!confirm("Complete this report? You can then share it with the client.")) return
     setBusy(true)
     try {
       const res = await fetch(`/api/job-reports/${reportId}/complete`, { method: "POST" })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error)
       setReport((r) => (r ? { ...r, status: "COMPLETED" } : r))
-      // Surface the client link straight away so it can be copied/forwarded.
+      // Straight into sharing: link + email + WhatsApp in the bar below.
       if (d.url) setShareUrl(d.url)
-      toast.success("Report completed and sent to the office")
+      toast.success("Report completed — share it below")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't complete the report")
     } finally {
       setBusy(false)
+    }
+  }
+
+  const sendReport = async (target: "client" | "office") => {
+    if (target === "client" && !/.+@.+\..+/.test(emailTo.trim())) {
+      toast.error("Enter the client's email address first")
+      return
+    }
+    setEmailing(target)
+    try {
+      const res = await fetch(`/api/job-reports/${reportId}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(target === "client" ? { email: emailTo.trim() } : { office: true }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      toast.success(target === "client" ? `Report emailed to ${emailTo.trim()}` : "Report emailed to the office")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't send the email")
+    } finally {
+      setEmailing(false)
     }
   }
 
@@ -204,7 +229,7 @@ export default function JobReportEditor() {
           <button
             onClick={() => {
               if (report.status !== "COMPLETED") {
-                toast.info("The client link works once the report is completed — tap \"Complete & send\" first.")
+                toast.info("The client link works once the report is completed — tap \"Complete\" first.")
                 return
               }
               getShareLink()
@@ -212,45 +237,67 @@ export default function JobReportEditor() {
             disabled={sharing}
             title={report.status === "COMPLETED"
               ? "Copy the read-only client link for this report"
-              : "Available after Complete & send — clients can't see draft reports"}
+              : "Available once completed — clients can't see draft reports"}
             className={`inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50 ${
               report.status === "COMPLETED" ? "" : "text-gray-400"
             }`}>
             {sharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />} Share link
           </button>
           <button onClick={complete} disabled={busy} className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
-            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Complete &amp; send
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Complete
           </button>
         </div>
       </div>
 
       {shareUrl && (
-        <div className="no-print flex flex-wrap items-center gap-2 rounded-lg border border-brand-blue/30 bg-blue-50 px-3 py-2">
-          <input
-            readOnly
-            value={shareUrl}
-            onFocus={(e) => e.currentTarget.select()}
-            className="flex-1 min-w-0 bg-white border rounded-md px-2 py-1.5 text-sm text-gray-700"
-          />
-          <button onClick={copyShareUrl}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
-            <Copy className="w-4 h-4" /> Copy
-          </button>
-          <a href={`https://wa.me/?text=${encodeURIComponent(`Job report for ${report.site.clientName} (${report.site.address}): ${shareUrl}`)}`}
-            target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-[#25D366] text-white hover:brightness-95">
-            <MessageCircle className="w-4 h-4" /> WhatsApp
-          </a>
-          {canShare && (
-            <button onClick={nativeShareUrl}
+        <div className="no-print space-y-2 rounded-lg border border-brand-blue/30 bg-blue-50 px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              readOnly
+              value={shareUrl}
+              onFocus={(e) => e.currentTarget.select()}
+              className="flex-1 min-w-0 bg-white border rounded-md px-2 py-1.5 text-sm text-gray-700"
+            />
+            <button onClick={copyShareUrl}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
-              <Share2 className="w-4 h-4" /> Share
+              <Copy className="w-4 h-4" /> Copy
             </button>
-          )}
-          <button onClick={() => setShareUrl(null)} aria-label="Dismiss"
-            className="inline-flex items-center justify-center p-1.5 text-gray-400 hover:text-gray-600">
-            <X className="w-4 h-4" />
-          </button>
+            <a href={`https://wa.me/?text=${encodeURIComponent(`Hi ${report.site.clientName}, here's the report from our visit to ${report.site.address}: ${shareUrl}`)}`}
+              target="_blank" rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-[#25D366] text-white hover:brightness-95">
+              <MessageCircle className="w-4 h-4" /> WhatsApp
+            </a>
+            {canShare && (
+              <button onClick={nativeShareUrl}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+                <Share2 className="w-4 h-4" /> Share
+              </button>
+            )}
+            <button onClick={() => setShareUrl(null)} aria-label="Dismiss"
+              className="inline-flex items-center justify-center p-1.5 text-gray-400 hover:text-gray-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          {/* Email straight to the client — address prefilled from the site and
+              saved back to it, so next visit it's already there. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              type="email"
+              value={emailTo}
+              onChange={(e) => setEmailTo(e.target.value)}
+              placeholder="client@email.com"
+              className="flex-1 min-w-0 bg-white border rounded-md px-2 py-1.5 text-sm text-gray-700"
+            />
+            <button onClick={() => sendReport("client")} disabled={emailing !== false}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+              {emailing === "client" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />} Email to client
+            </button>
+            <button onClick={() => sendReport("office")} disabled={emailing !== false}
+              title="Emails the link to the office contact so they can forward it at invoicing"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
+              {emailing === "office" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />} Send to office
+            </button>
+          </div>
         </div>
       )}
 
