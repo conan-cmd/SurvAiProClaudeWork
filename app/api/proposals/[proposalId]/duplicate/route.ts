@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
+import { duplicateSurvey } from "@/lib/duplicate"
 
-// Deep-copies a proposal AND its underlying survey (details + photos) as a
-// fresh draft — sections and pricing included, signatures/links/nudges not.
-// Section photo references are remapped onto the copied photos.
+// Copies a proposal together with its survey (proposals are 1:1 with surveys)
+// as a fresh unsent draft: content, pricing and settings carry over; send,
+// signature, payment, nudge and share-link state intentionally don't.
 export async function POST(
   _request: NextRequest,
   { params }: { params: { proposalId: string } }
@@ -17,101 +18,64 @@ export async function POST(
     include: {
       sections: { orderBy: { order: "asc" } },
       pricingLineItems: { orderBy: { order: "asc" } },
-      survey: { include: { photos: { orderBy: { order: "asc" } } } },
     },
   })
   if (!source) return NextResponse.json({ error: "Not found" }, { status: 404 })
-  const s = source.survey
 
-  const surveyCopy = await db.siteSurvey.create({
-    data: {
-      organizationId: user.organizationId,
-      createdById: user.id,
-      clientName: s.clientName,
-      clientCompany: s.clientCompany,
-      clientEmail: s.clientEmail,
-      clientPhone: s.clientPhone,
-      clientAddress: s.clientAddress,
-      latitude: s.latitude,
-      longitude: s.longitude,
-      what3words: s.what3words,
-      title: `Copy of ${s.title}`,
-      serviceType: s.serviceType,
-      isResidential: s.isResidential,
-      clientPriorities: s.clientPriorities,
-      accessNotes: s.accessNotes,
-      measurements: s.measurements,
-      exclusions: s.exclusions,
-      writtenDescription: s.writtenDescription,
-    },
-  })
+  const survey = await duplicateSurvey(source.surveyId, user)
+  if (!survey) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
-  // Photos one-by-one so old→new ids can be remapped in section photoIds.
-  const photoIdMap = new Map<string, string>()
-  for (const ph of s.photos) {
-    const copy = await db.surveyPhoto.create({
-      data: {
-        surveyId: surveyCopy.id,
-        fileUrl: ph.fileUrl,
-        fileName: ph.fileName,
-        fileSize: ph.fileSize,
-        caption: ph.caption,
-        order: ph.order,
-        isCoverImage: ph.isCoverImage,
-        includeInProposal: ph.includeInProposal,
-        internalOnly: ph.internalOnly,
-      },
-    })
-    photoIdMap.set(ph.id, copy.id)
-  }
-
-  const remapPhotoIds = (json: string | null): string | null => {
-    if (!json) return null
+  // An explicit photo selection must point at the new survey's photo copies
+  // (null = "all survey photos", which needs no remapping).
+  const remapPhotoIds = (raw: string | null) => {
+    if (!raw) return null
     try {
-      const ids = JSON.parse(json)
+      const ids = JSON.parse(raw)
       if (!Array.isArray(ids)) return null
-      const mapped = ids.map((id) => photoIdMap.get(id)).filter(Boolean)
-      return mapped.length ? JSON.stringify(mapped) : null
+      return JSON.stringify(
+        ids.map((pid) => survey.photoIdMap.get(pid)).filter(Boolean)
+      )
     } catch {
       return null
     }
   }
 
-  const proposalCopy = await db.proposal.create({
+  const copy = await db.proposal.create({
     data: {
       organizationId: user.organizationId,
-      surveyId: surveyCopy.id,
+      surveyId: survey.id,
       createdById: user.id,
       clientName: source.clientName,
       clientEmail: source.clientEmail,
       templateName: source.templateName,
-      status: "DRAFT",
       identityMode: source.identityMode,
       identityUserId: source.identityUserId,
+      markupType: source.markupType,
+      markupValue: source.markupValue,
       sections: {
-        create: source.sections.map((sec) => ({
-          type: sec.type,
-          title: sec.title,
-          content: sec.content,
-          order: sec.order,
-          isEditable: sec.isEditable,
-          photoIds: remapPhotoIds(sec.photoIds),
+        create: source.sections.map((s) => ({
+          type: s.type,
+          title: s.title,
+          content: s.content,
+          order: s.order,
+          isEditable: s.isEditable,
+          photoIds: remapPhotoIds(s.photoIds),
         })),
       },
       pricingLineItems: {
-        create: source.pricingLineItems.map((i) => ({
-          description: i.description,
-          quantity: i.quantity,
-          unit: i.unit,
-          unitPrice: i.unitPrice,
-          vat: i.vat,
-          discount: i.discount,
-          isOptional: i.isOptional,
-          order: i.order,
+        create: source.pricingLineItems.map((li) => ({
+          description: li.description,
+          quantity: li.quantity,
+          unit: li.unit,
+          unitPrice: li.unitPrice,
+          vat: li.vat,
+          discount: li.discount,
+          isOptional: li.isOptional,
+          order: li.order,
         })),
       },
     },
   })
 
-  return NextResponse.json({ id: proposalCopy.id }, { status: 201 })
+  return NextResponse.json({ id: copy.id, surveyId: survey.id }, { status: 201 })
 }

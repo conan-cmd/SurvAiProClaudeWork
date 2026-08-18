@@ -9,8 +9,8 @@ import {
 
 type FolderOption = { id: string; name: string }
 
-// Row action menu for survey/proposal lists: rename, duplicate (surveys),
-// move to folder, delete. Sits alongside the row link; its clicks don't navigate.
+// Row action menu for survey/proposal lists: rename, duplicate, move to
+// folder, delete. Sits alongside the row link; its clicks don't navigate.
 export function ItemActions({
   kind,
   id,

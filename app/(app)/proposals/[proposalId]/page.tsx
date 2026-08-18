@@ -6,8 +6,9 @@ import { toast } from "sonner"
 import {
   Loader2, Sparkles, ChevronUp, ChevronDown, Trash2, Plus, Eye,
   Pencil, Link2, Printer, Check, Send, Copy, Share2, X, MessageCircle, MessageSquare,
-  ShieldCheck, ClipboardCheck, Clock, AlertTriangle, BellRing, MapPin, Play,
+  ShieldCheck, ClipboardCheck, Clock, AlertTriangle, BellRing, MapPin, Play, PenLine,
 } from "lucide-react"
+import { formatCurrency } from "@/lib/utils"
 import { ProposalDocument } from "@/components/proposal-document"
 import { AddressInput } from "@/components/address-input"
 import { DropZone } from "@/components/drop-zone"
@@ -32,6 +33,12 @@ type ProposalData = {
   templateName: string
   status: string
   signedAt: string | null
+  signedName: string | null
+  signedPosition: string | null
+  signedCompany: string | null
+  signatureImage: string | null
+  agreedTotal: number | null
+  depositPaidAt: string | null
   lastNudgeAt: string | null
   nudgeHistory: string | null
   sections: Section[]
@@ -714,7 +721,7 @@ export default function ProposalEditorPage() {
             <span className={`inline-flex items-center whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full border ${
               proposal.signedAt ? "border-emerald-300 text-emerald-700 bg-white" : "border-amber-300 text-amber-700 bg-amber-50"
             }`}
-              title={proposal.signedAt ? `Signed ${new Date(proposal.signedAt).toLocaleDateString("en-GB")}` : "No signature on record — nudge them to sign"}>
+              title={proposal.signedAt ? `Signed ${new Date(proposal.signedAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}` : "No signature on record — nudge them to sign"}>
               {proposal.signedAt ? "Signed" : "Not signed"}
             </span>
           )}
@@ -954,6 +961,50 @@ export default function ProposalEditorPage() {
             className="inline-flex items-center justify-center p-1.5 text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {/* Who signed, when (to the minute) and what for — the in-app record of
+          the client's e-signature captured on the public proposal page. */}
+      {proposal.signedAt && (
+        <div className="no-print bg-white rounded-xl shadow-sm p-4 text-sm">
+          <div className="font-semibold text-brand-navy mb-3 flex items-center gap-1.5">
+            <PenLine className="w-4 h-4" /> Client signature
+          </div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            {proposal.signatureImage && (
+              <img src={proposal.signatureImage}
+                alt={`Signature of ${proposal.signedName || proposal.clientName}`}
+                className="h-16 px-3 py-1 border rounded-lg bg-white" />
+            )}
+            <div className="space-y-0.5">
+              <div className="font-medium text-gray-800">
+                {proposal.signedName || proposal.clientName}
+                {proposal.signedPosition ? `, ${proposal.signedPosition}` : ""}
+                {proposal.signedCompany ? ` — ${proposal.signedCompany}` : ""}
+              </div>
+              <div className="text-gray-500">
+                Signed{" "}
+                <strong className="text-gray-700">
+                  {new Date(proposal.signedAt).toLocaleString("en-GB", {
+                    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+                  })}
+                </strong>
+              </div>
+              {proposal.agreedTotal != null && (
+                <div className="text-gray-500">
+                  Agreed total <strong className="text-gray-700">{formatCurrency(proposal.agreedTotal)}</strong> inc VAT
+                </div>
+              )}
+              {proposal.depositPaidAt && (
+                <div className="text-emerald-700">
+                  Deposit paid {new Date(proposal.depositPaidAt).toLocaleString("en-GB", {
+                    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

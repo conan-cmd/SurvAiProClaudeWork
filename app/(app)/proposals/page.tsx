@@ -231,7 +231,9 @@ export default async function ProposalsPage({
                     <span className={`whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full border ${
                       p.signedAt ? "border-emerald-300 text-emerald-700 bg-white" : "border-amber-300 text-amber-700 bg-amber-50"
                     }`}
-                      title={p.signedAt ? `Signed ${new Date(p.signedAt).toLocaleDateString("en-GB")}` : "No signature on record"}>
+                      title={p.signedAt
+                        ? `Signed${p.signedName ? ` by ${p.signedName}` : ""} ${new Date(p.signedAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })} — open for the signature`
+                        : "No signature on record"}>
                       {p.signedAt ? "Signed" : "Not signed"}
                     </span>
                   )}
