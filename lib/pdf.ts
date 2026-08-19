@@ -83,8 +83,8 @@ export async function elementToPdfBlob(el: HTMLElement, opts?: { width?: number 
 // share sheet is how you get a file into WhatsApp/Files), or download it. Desktop
 // browsers can also expose navigator.share (e.g. the Windows share dialog), but
 // there a straight download is what users expect — so share is mobile-only.
-export async function sharePdf(blob: Blob, filename: string, title: string): Promise<void> {
-  const file = new File([blob], filename, { type: "application/pdf" })
+export async function shareFile(blob: Blob, filename: string, title: string, mime: string): Promise<void> {
+  const file = new File([blob], filename, { type: mime })
   const nav = navigator as Navigator & {
     canShare?: (data: { files: File[] }) => boolean
     share?: (data: { files: File[]; title?: string }) => Promise<void>
@@ -110,6 +110,10 @@ export async function sharePdf(blob: Blob, filename: string, title: string): Pro
   a.click()
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 4000)
+}
+
+export async function sharePdf(blob: Blob, filename: string, title: string): Promise<void> {
+  return shareFile(blob, filename, title, "application/pdf")
 }
 
 // Convenience: build the PDF from an element and share/download it.
