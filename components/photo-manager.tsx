@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
-  Camera, Trash2, Star, ChevronUp, ChevronDown, EyeOff, Loader2, Check,
+  Camera, Trash2, Star, ChevronUp, ChevronDown, EyeOff, Loader2, Check, Download,
 } from "lucide-react"
 import { uploadSurveyPhotos } from "@/lib/photo-upload"
 import { DropZone } from "@/components/drop-zone"
@@ -31,6 +31,25 @@ export function PhotoManager({
 }) {
   const fileInput = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [zipping, setZipping] = useState(false)
+
+  // All originals as one zip — built in the browser, shared/saved like the PDFs.
+  const downloadAll = async () => {
+    setZipping(true)
+    try {
+      const [{ photosToZip }, { shareFile }] = await Promise.all([
+        import("@/lib/photo-zip"),
+        import("@/lib/pdf"),
+      ])
+      const { blob, failed } = await photosToZip(photos)
+      await shareFile(blob, "survey-photos.zip", "Survey photos", "application/zip")
+      if (failed > 0) toast.warning(`${failed} photo${failed > 1 ? "s" : ""} couldn't be included`)
+    } catch {
+      toast.error("Couldn't prepare the download")
+    } finally {
+      setZipping(false)
+    }
+  }
 
   const upload = async (files: FileList | null) => {
     if (!files?.length) return
@@ -143,6 +162,17 @@ export function PhotoManager({
           <span className="text-xs">JPG, PNG, WebP or HEIC — up to 15MB each. Drag &amp; drop works too.</span>
         </button>
       </DropZone>
+
+      {photos.length > 0 && (
+        <div className="flex justify-end">
+          <button type="button" onClick={downloadAll} disabled={zipping}
+            title="Download every photo on this survey as a zip"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-brand-blue disabled:opacity-50">
+            {zipping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            {zipping ? "Preparing zip…" : `Download all (${photos.length})`}
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {photos.map((photo, index) => (
