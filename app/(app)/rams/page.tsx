@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ShieldAlert, Check } from "lucide-react"
+import { ShieldAlert, Check, MapPin } from "lucide-react"
 import { getCurrentUser } from "@/lib/session"
 import { db } from "@/lib/db"
 import { ListSearch } from "@/components/list-search"
@@ -44,7 +44,7 @@ export default async function RamsListPage({
         : {}),
     },
     orderBy: [{ sortIndex: { sort: "asc", nulls: "first" } }, { updatedAt: "desc" }],
-    include: { survey: { select: { title: true, clientName: true } } },
+    include: { survey: { select: { title: true, clientName: true, clientAddress: true } } },
   })
 
   return (
@@ -85,6 +85,11 @@ export default async function RamsListPage({
                 <div className="min-w-0">
                   <div className="font-semibold text-brand-navy truncate">{r.survey.title}</div>
                   <div className="text-sm text-gray-500 truncate">{r.survey.clientName}</div>
+                  {r.survey.clientAddress && (
+                    <div className="text-xs text-gray-400 mt-0.5 truncate flex items-center gap-1">
+                      <MapPin className="w-3 h-3 shrink-0" /> {r.survey.clientAddress}
+                    </div>
+                  )}
                 </div>
                 <div className="shrink-0 text-right">
                   {total > 0 ? (
