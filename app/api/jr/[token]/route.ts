@@ -8,7 +8,7 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
     include: {
       site: true,
       photos: { orderBy: { order: "asc" } },
-      organization: { select: { name: true, logoUrl: true, brandColor: true, phone: true, email: true } },
+      organization: { select: { name: true, logoUrl: true, brandColor: true, phone: true, email: true, website: true } },
     },
   })
   if (!report || report.status !== "COMPLETED") {
