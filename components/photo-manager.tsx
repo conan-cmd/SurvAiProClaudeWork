@@ -7,6 +7,7 @@ import {
 } from "lucide-react"
 import { uploadSurveyPhotos } from "@/lib/photo-upload"
 import { DropZone } from "@/components/drop-zone"
+import { ZoomableImage } from "@/components/zoomable-image"
 
 export type Photo = {
   id: string
@@ -147,10 +148,10 @@ export function PhotoManager({
         {photos.map((photo, index) => (
           <div key={photo.id} className="bg-white border rounded-xl overflow-hidden">
             <div className="relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <ZoomableImage
                 src={photo.fileUrl}
                 alt={photo.caption || photo.fileName}
+                caption={photo.caption}
                 className="w-full aspect-[4/3] object-cover"
               />
               {photo.isCoverImage && (

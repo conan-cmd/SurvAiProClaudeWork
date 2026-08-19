@@ -1,4 +1,5 @@
 import { formatCurrency, calculateProposalTotals, lineNet, PricingItem } from "@/lib/utils"
+import { ZoomableImage } from "@/components/zoomable-image"
 
 type Photo = {
   id: string
@@ -163,10 +164,10 @@ function PhotosSection({ data, section }: { data: ProposalDocumentData; section:
     <div className="grid grid-cols-2 gap-4">
       {photos.map((photo) => (
         <figure key={photo.id} className="break-inside-avoid">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <ZoomableImage
             src={photo.fileUrl}
             alt={photo.caption || "Site photo"}
+            caption={photo.caption}
             className="w-full rounded-lg object-cover aspect-[4/3]"
           />
           {photo.caption && (
@@ -368,8 +369,8 @@ function GallerySection({ section }: { section: Section }) {
     <div className="grid grid-cols-2 gap-4">
       {photos.map((p) => (
         <figure key={p.id} className="break-inside-avoid">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={p.fileUrl} alt={p.caption || "Similar project"} className="w-full rounded-lg object-cover aspect-[4/3]" />
+          <ZoomableImage src={p.fileUrl} alt={p.caption || "Similar project"} caption={p.caption}
+            className="w-full rounded-lg object-cover aspect-[4/3]" />
           {p.caption && (
             <figcaption className="text-sm text-gray-500 mt-1.5">{p.caption}</figcaption>
           )}
