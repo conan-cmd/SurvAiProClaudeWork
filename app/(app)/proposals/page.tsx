@@ -33,7 +33,7 @@ const STATUS_STYLES: Record<string, string> = {
 export default async function ProposalsPage({
   searchParams,
 }: {
-  searchParams: { folder?: string; scope?: string; status?: string; q?: string }
+  searchParams: { folder?: string; scope?: string; status?: string; q?: string; member?: string }
 }) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
@@ -54,9 +54,12 @@ export default async function ProposalsPage({
     : statusFilter
       ? { status: statusFilter }
       : {}
-  const buildLink = (folder?: string, all?: boolean, status?: string) => {
+  // Per-member filter — only meaningful when viewing everyone's proposals.
+  const memberId = viewingAll ? searchParams.member : undefined
+  const buildLink = (folder?: string, all?: boolean, status?: string, member?: string) => {
     const p = new URLSearchParams()
     if (all) p.set("scope", "all")
+    if (all && member) p.set("member", member)
     if (folder) p.set("folder", folder)
     if (status) p.set("status", status)
     if (searchParams.q) p.set("q", searchParams.q)
@@ -65,16 +68,23 @@ export default async function ProposalsPage({
   }
   const currentStatus = wonFilter ? "won" : statusFilter
 
-  const [folders, proposals] = await Promise.all([
+  const [folders, teamMembers, proposals] = await Promise.all([
     db.folder.findMany({
       where: { organizationId: user.organizationId },
       orderBy: { name: "asc" },
     }),
+    canViewAll
+      ? db.user.findMany({
+          where: { organizationId: user.organizationId },
+          select: { id: true, name: true, email: true },
+          orderBy: { createdAt: "asc" },
+        })
+      : Promise.resolve([]),
     db.proposal.findMany({
       where: {
         organizationId: user.organizationId,
         ...(folderId ? { survey: { folderId } } : {}),
-        ...(viewingAll ? {} : { createdById: user.id }),
+        ...(viewingAll ? (memberId ? { createdById: memberId } : {}) : { createdById: user.id }),
         ...statusWhere,
         ...(q
           ? {
@@ -118,20 +128,27 @@ export default async function ProposalsPage({
             Mine
           </Link>
           <Link href={buildLink(folderId, true)}
-            className={`px-3 py-1.5 rounded-full font-medium border transition ${viewingAll ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
+            className={`px-3 py-1.5 rounded-full font-medium border transition ${viewingAll && !memberId ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
             Everyone
           </Link>
+          {/* One chip per team member — each person's proposals at a glance. */}
+          {teamMembers.length > 1 && teamMembers.map((m) => (
+            <Link key={m.id} href={buildLink(folderId, true, currentStatus, m.id)}
+              className={`px-3 py-1.5 rounded-full font-medium border transition ${memberId === m.id ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
+              {(m.name || m.email).split(" ")[0]}
+            </Link>
+          ))}
         </div>
       )}
 
       {folders.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Link href={buildLink(undefined, viewingAll)}
+          <Link href={buildLink(undefined, viewingAll, undefined, memberId)}
             className={`px-3 py-1.5 rounded-full font-medium border transition ${!folderId ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"}`}>
             All
           </Link>
           {folders.map((f) => (
-            <Link key={f.id} href={buildLink(f.id, viewingAll)}
+            <Link key={f.id} href={buildLink(f.id, viewingAll, undefined, memberId)}
               className={`px-3 py-1.5 rounded-full font-medium border transition ${folderId === f.id ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"}`}>
               {f.name}
             </Link>
@@ -151,7 +168,7 @@ export default async function ProposalsPage({
           ["WON", "Won"],
           ["LOST", "Lost"],
         ] as const).map(([value, label]) => (
-          <Link key={value || "all"} href={buildLink(folderId, viewingAll, value || undefined)}
+          <Link key={value || "all"} href={buildLink(folderId, viewingAll, value || undefined, memberId)}
             className={`px-3 py-1.5 rounded-full font-medium border transition ${
               (currentStatus || "") === value
                 ? "bg-brand-blue text-white border-brand-blue"
@@ -165,7 +182,7 @@ export default async function ProposalsPage({
         <div className="text-sm">
           <span className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-brand-blue font-medium">
             Showing won deals (signed, deposit paid &amp; won)
-            <Link href={buildLink(folderId, viewingAll)} className="text-gray-400 hover:text-gray-600" aria-label="Clear filter">✕</Link>
+            <Link href={buildLink(folderId, viewingAll, undefined, memberId)} className="text-gray-400 hover:text-gray-600" aria-label="Clear filter">✕</Link>
           </span>
         </div>
       )}
