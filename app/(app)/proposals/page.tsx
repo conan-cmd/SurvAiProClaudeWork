@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Eye, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing, KanbanSquare } from "lucide-react"
+import { Eye, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing, KanbanSquare, MapPin } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { isApprover } from "@/lib/permissions"
@@ -101,7 +101,7 @@ export default async function ProposalsPage({
       orderBy: [{ sortIndex: { sort: "asc", nulls: "first" } }, { updatedAt: "desc" }],
       include: {
         pricingLineItems: true,
-        survey: { select: { title: true } },
+        survey: { select: { title: true, clientAddress: true } },
         createdBy: { select: { name: true, email: true } },
         _count: { select: { views: true } },
         views: { select: { updatedAt: true }, orderBy: { updatedAt: "desc" }, take: 1 },
@@ -203,6 +203,11 @@ export default async function ProposalsPage({
                     {p.clientName} · {formatNetPlusVat(calculateProposalTotals(p.pricingLineItems))} · {formatDate(p.updatedAt)}
                     {viewingAll && p.createdBy && ` · by ${p.createdBy.name || p.createdBy.email}`}
                   </div>
+                  {p.survey.clientAddress && (
+                    <div className="text-xs text-gray-400 mt-0.5 truncate flex items-center gap-1">
+                      <MapPin className="w-3 h-3 shrink-0" /> {p.survey.clientAddress}
+                    </div>
+                  )}
                 </div>
                 {/* Chips wrap onto their own line on mobile so the title keeps full width */}
                 <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0 sm:justify-end [&>span]:text-[11px] sm:[&>span]:text-xs">

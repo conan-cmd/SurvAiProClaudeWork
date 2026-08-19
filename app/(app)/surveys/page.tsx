@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Plus } from "lucide-react"
+import { Plus, MapPin } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { formatDate } from "@/lib/utils"
@@ -114,6 +114,11 @@ export default async function SurveysPage({
                     {s.clientName} · {s.serviceType} · {formatDate(s.updatedAt)}
                     {viewingAll && s.createdBy && ` · by ${s.createdBy.name || s.createdBy.email}`}
                   </div>
+                  {s.clientAddress && (
+                    <div className="text-xs text-gray-400 mt-0.5 truncate flex items-center gap-1">
+                      <MapPin className="w-3 h-3 shrink-0" /> {s.clientAddress}
+                    </div>
+                  )}
                   <div className="text-xs text-gray-400 mt-0.5">
                     {s._count.photos} photos · {s._count.voiceNotes} voice notes
                   </div>
