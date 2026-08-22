@@ -31,13 +31,21 @@ export default function NewSurveyPage() {
   const [services, setServices] = useState<string[]>(GENERIC_SERVICES)
   const [customService, setCustomService] = useState("")
 
-  // Pipedrive "import a contact" state.
+  // Pipedrive import state — deals (prefill everything + auto-link the eventual
+  // proposal) or bare contacts.
   type PdPerson = { id: number; name: string; email: string; phone: string; company: string }
+  type PdDealRow = { id: number; title: string; value: number; currency: string; status: string; personName: string; orgName: string }
   const [pipedriveOn, setPipedriveOn] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
+  const [importMode, setImportMode] = useState<"deals" | "contacts">("deals")
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<PdPerson[]>([])
+  const [dealResults, setDealResults] = useState<PdDealRow[]>([])
+  const [dealListLabel, setDealListLabel] = useState("")
   const [searching, setSearching] = useState(false)
+  // The deal this survey came from — handed to the proposal editor (via
+  // localStorage) so the generated proposal auto-links back to it.
+  const [fromDealId, setFromDealId] = useState<number | null>(null)
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -61,23 +69,33 @@ export default function NewSurveyPage() {
   useEffect(() => {
     if (!importOpen) return
     if (searchTimer.current) clearTimeout(searchTimer.current)
-    if (query.trim().length < 2) {
+    if (importMode === "contacts" && query.trim().length < 2) {
       setResults([])
       return
     }
     searchTimer.current = setTimeout(async () => {
       setSearching(true)
       try {
-        const res = await fetch(`/api/pipedrive/persons?q=${encodeURIComponent(query)}`)
-        const d = await res.json()
-        setResults(res.ok && Array.isArray(d) ? d : [])
+        if (importMode === "deals") {
+          // Empty query → the newest open deals; otherwise a title search.
+          const qs = query.trim().length >= 2 ? `?q=${encodeURIComponent(query)}` : ""
+          const res = await fetch(`/api/pipedrive/deals${qs}`)
+          const d = await res.json()
+          setDealResults(res.ok && Array.isArray(d.deals) ? d.deals : [])
+          setDealListLabel(qs ? "Search results" : "Recent open deals")
+        } else {
+          const res = await fetch(`/api/pipedrive/persons?q=${encodeURIComponent(query)}`)
+          const d = await res.json()
+          setResults(res.ok && Array.isArray(d) ? d : [])
+        }
       } catch {
-        setResults([])
+        if (importMode === "deals") setDealResults([])
+        else setResults([])
       } finally {
         setSearching(false)
       }
     }, 350)
-  }, [query, importOpen])
+  }, [query, importOpen, importMode])
   const [form, setForm] = useState({
     clientName: "",
     clientCompany: "",
@@ -112,6 +130,32 @@ export default function NewSurveyPage() {
     toast.success("Contact imported from Pipedrive")
   }
 
+  const pickDeal = async (d: PdDealRow) => {
+    setSearching(true)
+    try {
+      const res = await fetch(`/api/pipedrive/deals/${d.id}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Couldn't load the deal")
+      setForm((prev) => ({
+        ...prev,
+        title: data.title || prev.title,
+        clientName: data.clientName || prev.clientName,
+        clientCompany: data.clientCompany || prev.clientCompany,
+        clientEmail: data.clientEmail || prev.clientEmail,
+        clientPhone: data.clientPhone || prev.clientPhone,
+        clientAddress: data.clientAddress || prev.clientAddress,
+      }))
+      setFromDealId(d.id)
+      setImportOpen(false)
+      setQuery("")
+      toast.success("Deal imported — details prefilled from Pipedrive")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't load the deal")
+    } finally {
+      setSearching(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.clientName || !form.clientAddress || !form.title || !form.serviceType) {
@@ -134,6 +178,11 @@ export default function NewSurveyPage() {
       })
       if (!res.ok) throw new Error((await res.json()).error || "Failed to create survey")
       const survey = await res.json()
+      // Remember which deal this job came from so the proposal generated from
+      // this survey auto-links to it (picked up by the proposal editor).
+      if (fromDealId) {
+        try { localStorage.setItem(`pd-deal-for-survey-${survey.id}`, String(fromDealId)) } catch { /* best effort */ }
+      }
       toast.success("Survey created — now add photos and a voice note")
       router.push(`/surveys/${survey.id}`)
     } catch (err) {
@@ -293,19 +342,54 @@ export default function NewSurveyPage() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-3"
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-brand-navy">Import a Pipedrive contact</h3>
+              <h3 className="font-bold text-brand-navy">Import from Pipedrive</h3>
               <button type="button" onClick={() => setImportOpen(false)} aria-label="Close"
                 className="p-1 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+            </div>
+            <div className="flex gap-1.5 text-sm">
+              {([["deals", "Deals"], ["contacts", "Contacts"]] as const).map(([mode, label]) => (
+                <button key={mode} type="button" onClick={() => { setImportMode(mode); setQuery("") }}
+                  className={`px-3 py-1.5 rounded-full font-medium border transition ${
+                    importMode === mode ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"
+                  }`}>
+                  {label}
+                </button>
+              ))}
             </div>
             <div className="relative">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by name or email…"
+                placeholder={importMode === "deals" ? "Search deals by title…" : "Search by name or email…"}
                 className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" />
             </div>
             <div className="max-h-72 overflow-y-auto -mx-1">
               {searching ? (
                 <div className="flex items-center gap-2 text-sm text-gray-400 p-3"><Loader2 className="w-4 h-4 animate-spin" /> Searching…</div>
+              ) : importMode === "deals" ? (
+                dealResults.length === 0 ? (
+                  <p className="text-sm text-gray-400 p-3">No deals found.</p>
+                ) : (
+                  <>
+                    <p className="px-3 pt-1 pb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">{dealListLabel}</p>
+                    {dealResults.map((d) => (
+                      <button key={d.id} type="button" onClick={() => pickDeal(d)}
+                        className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50">
+                        <div className="font-medium text-gray-900 text-sm flex items-center justify-between gap-2">
+                          <span className="truncate">{d.title}</span>
+                          <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                            d.status === "open" ? "bg-blue-50 text-blue-700"
+                            : d.status === "won" ? "bg-emerald-50 text-emerald-700"
+                            : "bg-gray-100 text-gray-500"}`}>
+                            {d.status}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {[d.personName, d.orgName, d.value ? `${d.currency} ${d.value.toLocaleString()}` : ""].filter(Boolean).join(" · ") || `#${d.id}`}
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                )
               ) : query.trim().length < 2 ? (
                 <p className="text-sm text-gray-400 p-3">Type at least 2 characters to search your Pipedrive contacts.</p>
               ) : results.length === 0 ? (
