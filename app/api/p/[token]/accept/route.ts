@@ -39,7 +39,7 @@ export async function POST(
       },
     },
   })
-  if (!link || link.revoked || link.expiresAt < new Date()) {
+  if (!link || link.revoked) { // expiry off (2026-08-22); revoke still applies
     return NextResponse.json({ error: "This link is no longer valid" }, { status: 404 })
   }
   // Block re-signing only when a signature actually exists. A WON-but-unsigned

@@ -78,7 +78,9 @@ export default async function SharedProposalPage({
     },
   })
 
-  if (!link || link.revoked || link.expiresAt < new Date()) {
+  // Expiry is off (2026-08-22) — old links keep working, including ones minted
+  // with the previous 30-day expiresAt. Revoking a link still kills it.
+  if (!link || link.revoked) {
     notFound()
   }
 

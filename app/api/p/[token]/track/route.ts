@@ -21,7 +21,7 @@ export async function POST(
     where: { token: params.token },
     select: { proposalId: true, revoked: true, expiresAt: true },
   })
-  if (!link || link.revoked || link.expiresAt < new Date()) {
+  if (!link || link.revoked) { // expiry off (2026-08-22); revoke still applies
     return NextResponse.json({ ok: false })
   }
 
