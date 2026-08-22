@@ -147,6 +147,29 @@ export default function ProposalEditorPage() {
     setCanShare(typeof navigator !== "undefined" && typeof navigator.share === "function")
   }, [])
 
+  // If this job was started from a Pipedrive deal (new-survey stashes the deal
+  // id per survey), auto-link the proposal to that deal on first open.
+  useEffect(() => {
+    if (!proposal || proposal.pipedriveDealId) return
+    let dealId: string | null = null
+    try { dealId = localStorage.getItem(`pd-deal-for-survey-${proposal.survey.id}`) } catch { /* storage blocked */ }
+    if (!dealId) return
+    const key = `pd-deal-for-survey-${proposal.survey.id}`
+    fetch(`/api/proposals/${proposalId}/pipedrive-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dealId: Number(dealId) }),
+    })
+      .then((res) => {
+        if (!res.ok) return
+        setProposal((p) => (p ? { ...p, pipedriveDealId: dealId } : p))
+        toast.success(`Linked to the Pipedrive deal this job came from (#${dealId})`)
+        try { localStorage.removeItem(key) } catch { /* fine */ }
+      })
+      .catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposal?.id])
+
   // Team members for the "who this proposal is from" override picker.
   useEffect(() => {
     fetch("/api/team").then((r) => r.json()).then((d) => setMembers(d.users || [])).catch(() => {})

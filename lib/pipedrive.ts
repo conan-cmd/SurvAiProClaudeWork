@@ -409,3 +409,54 @@ export async function recentOpenDeals(org: PdOrg): Promise<PdDeal[]> {
   const data = await pd(org, `/deals?status=open&sort=${encodeURIComponent("update_time DESC")}&limit=15`)
   return (((data as unknown as RawDeal[] | null) || [])).map(mapRawDeal)
 }
+
+export type PdDealPrefill = {
+  dealId: number
+  title: string
+  clientName: string
+  clientCompany: string
+  clientEmail: string
+  clientPhone: string
+  clientAddress: string
+}
+
+// Everything Pipedrive knows about a deal that a new survey can start from:
+// deal title + the person's contact details + the organisation (and its
+// address, fetched separately since the deal embeds only the org name).
+export async function dealPrefill(org: PdOrg, dealId: number): Promise<PdDealPrefill> {
+  const deal = await pd(org, `/deals/${dealId}`)
+  if (!deal) throw new Error("Deal not found in Pipedrive")
+  const d = deal as {
+    id?: number
+    title?: string
+    person_id?: {
+      value?: number
+      name?: string
+      email?: { value?: string; primary?: boolean }[]
+      phone?: { value?: string; primary?: boolean }[]
+    } | null
+    org_id?: { value?: number; name?: string; address?: string } | null
+  }
+  const primary = (arr?: { value?: string; primary?: boolean }[]) =>
+    arr?.find((x) => x.primary)?.value || arr?.[0]?.value || ""
+
+  let address = d.org_id?.address || ""
+  if (!address && d.org_id?.value) {
+    try {
+      const o = await pd(org, `/organizations/${d.org_id.value}`)
+      address = ((o as { address?: string } | null)?.address) || ""
+    } catch {
+      // Address is a nice-to-have; the survey form asks for it anyway.
+    }
+  }
+
+  return {
+    dealId: d.id ?? dealId,
+    title: d.title || "",
+    clientName: d.person_id?.name || "",
+    clientCompany: d.org_id?.name || "",
+    clientEmail: primary(d.person_id?.email),
+    clientPhone: primary(d.person_id?.phone),
+    clientAddress: address,
+  }
+}
