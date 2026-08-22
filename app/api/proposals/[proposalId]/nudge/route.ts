@@ -72,7 +72,8 @@ export async function POST(
 
   // Fresh secure link, same as a normal send.
   const token = randomBytes(16).toString("base64url")
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+  // Links no longer expire — far-future date satisfies the non-null column.
+  const expiresAt = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000)
   await db.shareLink.create({ data: { proposalId: proposal.id, token, expiresAt } })
   const origin = publicBaseUrl(request.nextUrl.origin)
   const url = `${origin}/p/${slugify(proposal.survey.title || "proposal")}/${token}`

@@ -7,6 +7,7 @@ import {
   Loader2, Sparkles, ChevronUp, ChevronDown, Trash2, Plus, Eye,
   Pencil, Link2, Printer, Check, Send, Copy, Share2, X, MessageCircle, MessageSquare,
   ShieldCheck, ClipboardCheck, Clock, AlertTriangle, BellRing, MapPin, Play, PenLine,
+  ExternalLink,
 } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
 import { ProposalDocument } from "@/components/proposal-document"
@@ -39,6 +40,7 @@ type ProposalData = {
   signatureImage: string | null
   agreedTotal: number | null
   depositPaidAt: string | null
+  pipedriveDealId: string | null
   lastNudgeAt: string | null
   nudgeHistory: string | null
   sections: Section[]
@@ -100,6 +102,16 @@ type SectionPatch = Partial<Omit<Section, "photoIds">> & {
   photoIds?: string[] | string | null
 }
 
+type PdDealHit = {
+  id: number
+  title: string
+  value: number
+  currency: string
+  status: string
+  personName: string
+  orgName: string
+}
+
 export default function ProposalEditorPage() {
   const { proposalId } = useParams<{ proposalId: string }>()
   const [proposal, setProposal] = useState<ProposalData | null>(null)
@@ -108,6 +120,11 @@ export default function ProposalEditorPage() {
   const [sharing, setSharing] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [canShare, setCanShare] = useState(false)
+  const [pdOpen, setPdOpen] = useState(false)
+  const [pdQuery, setPdQuery] = useState("")
+  const [pdResults, setPdResults] = useState<PdDealHit[] | null>(null)
+  const [pdLoading, setPdLoading] = useState(false)
+  const [pdBusy, setPdBusy] = useState(false)
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle")
   const [updatingAddress, setUpdatingAddress] = useState(false)
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
@@ -591,6 +608,52 @@ export default function ProposalEditorPage() {
     }
   }
 
+  // --- Pipedrive: link this proposal to an existing deal ---
+  const searchPdDeals = async (q: string) => {
+    setPdLoading(true)
+    try {
+      const res = await fetch(`/api/pipedrive/deals?q=${encodeURIComponent(q)}`)
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || "Search failed")
+      setPdResults(d)
+    } catch (e) {
+      setPdResults([])
+      toast.error(e instanceof Error ? e.message : "Search failed")
+    } finally {
+      setPdLoading(false)
+    }
+  }
+
+  const openPipedrive = () => {
+    setPdOpen(true)
+    // Pre-search with the client's name — the deal is usually named after them.
+    if (proposal && pdResults === null) {
+      const q = proposal.clientName || proposal.survey.title
+      setPdQuery(q)
+      searchPdDeals(q)
+    }
+  }
+
+  const linkPdDeal = async (dealId: number | null) => {
+    setPdBusy(true)
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/pipedrive-link`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dealId }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      setProposal((p) => (p ? { ...p, pipedriveDealId: dealId ? String(dealId) : null } : p))
+      toast.success(dealId ? "Linked — that deal now tracks this proposal" : "Unlinked from Pipedrive")
+      setPdOpen(false)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't update the link")
+    } finally {
+      setPdBusy(false)
+    }
+  }
+
   if (!proposal) {
     return (
       <div className="flex justify-center py-20">
@@ -744,6 +807,72 @@ export default function ProposalEditorPage() {
               className="inline-flex items-center gap-1.5 px-3 py-2 border border-emerald-300 text-emerald-700 rounded-lg text-sm font-medium bg-emerald-50 hover:bg-emerald-100">
               <Check className="w-4 h-4" /> Mark as won
             </button>
+          )}
+          <button onClick={openPipedrive}
+            title={proposal.pipedriveDealId
+              ? `Linked to Pipedrive deal #${proposal.pipedriveDealId} — click to change`
+              : "Link this proposal to an existing Pipedrive deal"}
+            className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+            <ExternalLink className="w-4 h-4" />
+            {proposal.pipedriveDealId ? `Deal #${proposal.pipedriveDealId}` : "Link deal"}
+          </button>
+          {pdOpen && (
+            <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4"
+              onClick={() => !pdBusy && setPdOpen(false)}>
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-4 max-h-[85vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-brand-navy">Link to a Pipedrive deal</h3>
+                  <button onClick={() => setPdOpen(false)} disabled={pdBusy} aria-label="Close"
+                    className="p-1 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+                </div>
+                {proposal.pipedriveDealId && (
+                  <div className="flex items-center justify-between gap-2 text-sm bg-gray-50 border rounded-lg px-3 py-2">
+                    <span>Linked to deal <strong>#{proposal.pipedriveDealId}</strong></span>
+                    <button onClick={() => linkPdDeal(null)} disabled={pdBusy}
+                      className="text-xs font-medium text-red-600 hover:underline shrink-0">Unlink</button>
+                  </div>
+                )}
+                <form onSubmit={(e) => { e.preventDefault(); searchPdDeals(pdQuery) }} className="flex gap-2">
+                  <input value={pdQuery} onChange={(e) => setPdQuery(e.target.value)}
+                    placeholder="Search deals by title…"
+                    className="flex-1 min-w-0 px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+                  <button type="submit" disabled={pdLoading}
+                    className="px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
+                    {pdLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
+                  </button>
+                </form>
+                {pdResults !== null && pdResults.length === 0 && !pdLoading && (
+                  <p className="text-sm text-gray-400">No matching deals found.</p>
+                )}
+                <div className="space-y-1.5">
+                  {(pdResults || []).map((d) => (
+                    <button key={d.id} type="button" onClick={() => linkPdDeal(d.id)} disabled={pdBusy}
+                      className="w-full text-left border rounded-lg px-3 py-2 hover:border-brand-blue disabled:opacity-50">
+                      <div className="text-sm font-semibold text-gray-900 flex items-center justify-between gap-2">
+                        <span className="truncate">{d.title}</span>
+                        <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                          d.status === "open" ? "bg-blue-50 text-blue-700"
+                          : d.status === "won" ? "bg-emerald-50 text-emerald-700"
+                          : "bg-gray-100 text-gray-500"}`}>
+                          {d.status}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-500 truncate">
+                        #{d.id}
+                        {d.personName ? ` · ${d.personName}` : ""}
+                        {d.orgName ? ` · ${d.orgName}` : ""}
+                        {d.value ? ` · ${d.currency} ${d.value.toLocaleString()}` : ""}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400">
+                  Linking pins a note with this proposal&apos;s link on the deal, and keeps the deal&apos;s
+                  value and status in sync from now on — no duplicate deal is created.
+                </p>
+              </div>
+            </div>
           )}
           {nudgeOpen && (
             <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4"

@@ -5,7 +5,9 @@ import { getCurrentUser } from "@/lib/session"
 import { slugify } from "@/lib/utils"
 import { publicBaseUrl } from "@/lib/public-url"
 
-const SHARE_LINK_DAYS = 30
+// Links no longer expire (Conan, 2026-08-22): far-future expiry satisfies the
+// non-null column without a schema migration. Revoke still works as before.
+const SHARE_LINK_DAYS = 365 * 100
 
 export async function POST(
   request: NextRequest,

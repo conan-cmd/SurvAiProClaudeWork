@@ -253,3 +253,89 @@ export async function syncProposalToPipedrive(proposalId: string): Promise<void>
     console.error("Pipedrive sync failed:", err)
   }
 }
+
+export type PdDeal = {
+  id: number
+  title: string
+  value: number
+  currency: string
+  status: string
+  personName: string
+  orgName: string
+}
+
+export async function searchDeals(org: PdOrg, term: string): Promise<PdDeal[]> {
+  if (!term.trim()) return []
+  const data = await pd(org, `/deals/search?term=${encodeURIComponent(term)}&fields=title&limit=15`)
+  const items = ((data as { items?: unknown[] } | null)?.items || []) as Array<{
+    item: {
+      id: number; title?: string; value?: number; currency?: string; status?: string
+      person?: { name?: string } | null
+      organization?: { name?: string } | null
+    }
+  }>
+  return items.map((i) => ({
+    id: i.item.id,
+    title: i.item.title || `Deal ${i.item.id}`,
+    value: i.item.value || 0,
+    currency: i.item.currency || "GBP",
+    status: i.item.status || "open",
+    personName: i.item.person?.name || "",
+    orgName: i.item.organization?.name || "",
+  }))
+}
+
+// Pipedrive represents person_id/org_id as either a bare id or {value} object.
+function pdRefId(v: unknown): string | null {
+  if (v == null) return null
+  if (typeof v === "number") return String(v)
+  const val = (v as { value?: number }).value
+  return val != null ? String(val) : null
+}
+
+// Attach a proposal to an EXISTING Pipedrive deal: store the deal (and its
+// person/org) on the proposal, pin a link-back note on the deal, then sync so
+// value/status update that deal instead of a fresh one being created.
+export async function linkProposalToDeal(proposalId: string, dealId: number): Promise<void> {
+  const proposal = await db.proposal.findUnique({
+    where: { id: proposalId },
+    include: {
+      organization: { select: PIPEDRIVE_SELECT },
+      survey: { select: { title: true } },
+    },
+  })
+  if (!proposal) throw new Error("Proposal not found")
+  const org = proposal.organization
+  if (!pipedriveConfigured(org)) throw new Error("Pipedrive isn't connected")
+
+  const deal = await pd(org, `/deals/${dealId}`)
+  if (!deal) throw new Error("That deal wasn't found in Pipedrive")
+  const d = deal as { id?: number; person_id?: unknown; org_id?: unknown }
+
+  await db.proposal.update({
+    where: { id: proposalId },
+    data: {
+      pipedriveDealId: String(d.id ?? dealId),
+      pipedrivePersonId: pdRefId(d.person_id),
+      pipedriveOrgId: pdRefId(d.org_id),
+    },
+  })
+
+  const link = `${publicBaseUrl("")}/proposals/${proposalId}`
+  await pd(org, "/notes", {
+    method: "POST",
+    body: {
+      deal_id: dealId,
+      content: `SurvAIPro proposal: <a href="${link}">${proposal.survey.title || "View proposal"}</a>`,
+    },
+  }).catch(() => {})
+
+  await syncProposalToPipedrive(proposalId)
+}
+
+export async function unlinkProposalDeal(proposalId: string): Promise<void> {
+  await db.proposal.update({
+    where: { id: proposalId },
+    data: { pipedriveDealId: null, pipedrivePersonId: null, pipedriveOrgId: null },
+  })
+}
