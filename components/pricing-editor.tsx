@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Plus, Trash2 } from "lucide-react"
+import { Plus, Trash2, Copy } from "lucide-react"
 import { formatCurrency, calculateProposalTotals, lineNet } from "@/lib/utils"
 
 export type EditableLineItem = {
@@ -92,6 +92,15 @@ export function PricingEditor({
   const removeItem = (id: string) =>
     setItems((prev) => prev.filter((i) => i.id !== id))
 
+  // Copy a line directly below itself — for breakdowns with near-identical rows.
+  const duplicateItem = (id: string) =>
+    setItems((prev) => {
+      const idx = prev.findIndex((i) => i.id === id)
+      if (idx === -1) return prev
+      const copy = { ...prev[idx], id: `new-${Date.now()}` }
+      return [...prev.slice(0, idx + 1), copy, ...prev.slice(idx + 1)].map((i, n) => ({ ...i, order: n }))
+    })
+
   // Insert a line item pre-filled with a measured quantity + unit (rate left to the user).
   const addMeasuredItem = (quantity: number, unit: string) =>
     setItems((prev) => [
@@ -145,7 +154,11 @@ export function PricingEditor({
                 value={item.description}
                 onChange={(e) => update(item.id, { description: e.target.value })}
               />
-              <button type="button" onClick={() => removeItem(item.id)}
+              <button type="button" onClick={() => duplicateItem(item.id)} title="Duplicate this line"
+                className="p-2 text-gray-400 hover:text-brand-blue hover:bg-blue-50 rounded-lg shrink-0">
+                <Copy className="w-4 h-4" />
+              </button>
+              <button type="button" onClick={() => removeItem(item.id)} title="Remove this line"
                 className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg shrink-0">
                 <Trash2 className="w-4 h-4" />
               </button>
