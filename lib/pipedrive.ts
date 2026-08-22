@@ -339,3 +339,73 @@ export async function unlinkProposalDeal(proposalId: string): Promise<void> {
     data: { pipedriveDealId: null, pipedrivePersonId: null, pipedriveOrgId: null },
   })
 }
+
+type RawDeal = {
+  id: number
+  title?: string
+  value?: number
+  currency?: string
+  status?: string
+  person_id?: { name?: string } | null
+  org_id?: { name?: string } | null
+}
+
+function mapRawDeal(d: RawDeal): PdDeal {
+  return {
+    id: d.id,
+    title: d.title || `Deal ${d.id}`,
+    value: d.value || 0,
+    currency: d.currency || "GBP",
+    status: d.status || "open",
+    personName: d.person_id?.name || "",
+    orgName: d.org_id?.name || "",
+  }
+}
+
+// Deal titles rarely contain the client's name — so match via the PERSON:
+// find Pipedrive persons by the client's email (strongest key) or name, then
+// list each person's deals. Open deals sort first.
+export async function suggestDealsForClient(
+  org: PdOrg,
+  name: string,
+  email?: string | null
+): Promise<PdDeal[]> {
+  const personIds: number[] = []
+  for (const term of [email?.trim(), name.trim()].filter((t): t is string => !!t && t.length >= 2)) {
+    try {
+      const data = await pd(org, `/persons/search?term=${encodeURIComponent(term)}&fields=name,email&limit=5`)
+      const items = ((data as { items?: unknown[] } | null)?.items || []) as Array<{ item: { id: number } }>
+      for (const i of items) if (!personIds.includes(i.item.id)) personIds.push(i.item.id)
+    } catch {
+      // One bad search term shouldn't kill the suggestions.
+    }
+    if (personIds.length >= 5) break
+  }
+
+  const deals: PdDeal[] = []
+  const seen = new Set<number>()
+  for (const pid of personIds.slice(0, 5)) {
+    try {
+      const data = await pd(org, `/persons/${pid}/deals?status=all_not_deleted&limit=10`)
+      for (const d of ((data as unknown as RawDeal[] | null) || [])) {
+        if (!seen.has(d.id)) {
+          seen.add(d.id)
+          deals.push(mapRawDeal(d))
+        }
+      }
+    } catch {
+      // Person with no deals endpoint hiccup — skip.
+    }
+  }
+  return deals
+    .sort((a, b) =>
+      (a.status === "open" ? 0 : 1) - (b.status === "open" ? 0 : 1) || b.id - a.id
+    )
+    .slice(0, 15)
+}
+
+// Newest open deals — the pick-from-a-list fallback when nothing matches.
+export async function recentOpenDeals(org: PdOrg): Promise<PdDeal[]> {
+  const data = await pd(org, `/deals?status=open&sort=${encodeURIComponent("update_time DESC")}&limit=15`)
+  return (((data as unknown as RawDeal[] | null) || [])).map(mapRawDeal)
+}
