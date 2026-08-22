@@ -123,6 +123,7 @@ export default function ProposalEditorPage() {
   const [pdOpen, setPdOpen] = useState(false)
   const [pdQuery, setPdQuery] = useState("")
   const [pdResults, setPdResults] = useState<PdDealHit[] | null>(null)
+  const [pdMode, setPdMode] = useState<"suggested" | "recent" | "search">("suggested")
   const [pdLoading, setPdLoading] = useState(false)
   const [pdBusy, setPdBusy] = useState(false)
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle")
@@ -609,13 +610,14 @@ export default function ProposalEditorPage() {
   }
 
   // --- Pipedrive: link this proposal to an existing deal ---
-  const searchPdDeals = async (q: string) => {
+  const fetchPdDeals = async (params: string) => {
     setPdLoading(true)
     try {
-      const res = await fetch(`/api/pipedrive/deals?q=${encodeURIComponent(q)}`)
+      const res = await fetch(`/api/pipedrive/deals?${params}`)
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || "Search failed")
-      setPdResults(d)
+      setPdResults(d.deals)
+      setPdMode(d.mode)
     } catch (e) {
       setPdResults([])
       toast.error(e instanceof Error ? e.message : "Search failed")
@@ -624,13 +626,16 @@ export default function ProposalEditorPage() {
     }
   }
 
+  const searchPdDeals = (q: string) => fetchPdDeals(`q=${encodeURIComponent(q)}`)
+
   const openPipedrive = () => {
     setPdOpen(true)
-    // Pre-search with the client's name — the deal is usually named after them.
+    // Match by PERSON, not deal title: the client's name/email finds their
+    // Pipedrive person(s) and lists those deals. Falls back to recent open deals.
     if (proposal && pdResults === null) {
-      const q = proposal.clientName || proposal.survey.title
-      setPdQuery(q)
-      searchPdDeals(q)
+      fetchPdDeals(
+        `name=${encodeURIComponent(proposal.clientName)}&email=${encodeURIComponent(proposal.clientEmail || "")}`
+      )
     }
   }
 
@@ -844,6 +849,13 @@ export default function ProposalEditorPage() {
                 </form>
                 {pdResults !== null && pdResults.length === 0 && !pdLoading && (
                   <p className="text-sm text-gray-400">No matching deals found.</p>
+                )}
+                {pdResults !== null && pdResults.length > 0 && (
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    {pdMode === "suggested" ? `${proposal.clientName}'s deals`
+                      : pdMode === "recent" ? "Recent open deals"
+                      : "Search results"}
+                  </p>
                 )}
                 <div className="space-y-1.5">
                   {(pdResults || []).map((d) => (
