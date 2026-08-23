@@ -13,7 +13,7 @@ export async function GET() {
   const [users, invites] = await Promise.all([
     db.user.findMany({
       where: { organizationId: user.organizationId },
-      select: { id: true, name: true, email: true, role: true, headshotUrl: true, canSendProposals: true, navSections: true },
+      select: { id: true, name: true, email: true, role: true, headshotUrl: true, canSendProposals: true, navSections: true, lastActiveAt: true },
       orderBy: { createdAt: "asc" },
     }),
     db.invite.findMany({

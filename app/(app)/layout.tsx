@@ -7,6 +7,7 @@ import { visibleSectionKeys } from "@/lib/nav-sections"
 import { isPlatformAdmin } from "@/lib/admin"
 import { db } from "@/lib/db"
 import { FeedbackButton } from "@/components/feedback-button"
+import { PresencePing } from "@/components/presence-ping"
 import { SignOutButton } from "@/components/sign-out-button"
 import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings, ShieldAlert, KeyRound, ClipboardCheck } from "lucide-react"
 
@@ -108,6 +109,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <main className="max-w-6xl mx-auto px-4 py-6 pb-24 md:pb-10">{children}</main>
 
       <FeedbackButton founding={user.organization.isFoundingMember} />
+      <PresencePing />
 
       {/* Bottom tab bar (mobile) */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t z-40 overflow-hidden">
