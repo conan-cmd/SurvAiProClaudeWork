@@ -114,8 +114,13 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="bg-gray-50 py-8 px-6 border-t">
-        <div className="max-w-6xl mx-auto text-center text-gray-600">
-          <p>&copy; 2024 SurvAIPro. All rights reserved.</p>
+        <div className="max-w-6xl mx-auto text-center text-gray-600 space-y-2">
+          <div className="flex items-center justify-center gap-4 text-sm">
+            <Link href="/privacy" className="hover:text-brand-blue hover:underline">Privacy Policy</Link>
+            <span className="text-gray-300">·</span>
+            <Link href="/terms" className="hover:text-brand-blue hover:underline">Terms of Service</Link>
+          </div>
+          <p>&copy; {new Date().getFullYear()} SurvAIPro. All rights reserved.</p>
         </div>
       </footer>
     </main>
