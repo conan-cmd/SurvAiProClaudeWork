@@ -418,6 +418,27 @@ export type PdDealPrefill = {
   clientEmail: string
   clientPhone: string
   clientAddress: string
+  // From a custom deal field like "Property type: Residential/Commercial".
+  // null = no such field / unrecognised value — leave the form's default alone.
+  isResidential: boolean | null
+}
+
+type PdFieldDef = {
+  key: string
+  name: string
+  field_type: string
+  options?: { id: number | string; label: string }[]
+}
+
+// Custom deal fields appear in the deal object under 40-char hash keys; the
+// /dealFields catalogue maps those keys to human names and option labels.
+async function dealFieldDefs(org: PdOrg): Promise<PdFieldDef[]> {
+  try {
+    const data = await pd(org, `/dealFields?limit=500`)
+    return ((data as unknown as PdFieldDef[] | null) || [])
+  } catch {
+    return []
+  }
 }
 
 // Everything Pipedrive knows about a deal that a new survey can start from:
@@ -440,7 +461,25 @@ export async function dealPrefill(org: PdOrg, dealId: number): Promise<PdDealPre
   const primary = (arr?: { value?: string; primary?: boolean }[]) =>
     arr?.find((x) => x.primary)?.value || arr?.[0]?.value || ""
 
-  let address = d.org_id?.address || ""
+  // Custom deal fields: read via the field catalogue so we can find fields by
+  // their human name ("Site address", "Property type", …) whatever the key.
+  const raw = deal as Record<string, unknown>
+  const fields = await dealFieldDefs(org)
+  const fieldValue = (f: PdFieldDef): string => {
+    const v = raw[f.key]
+    if (v == null || v === "") return ""
+    if (f.field_type === "enum" || f.field_type === "set") {
+      const label = (id: unknown) => f.options?.find((o) => String(o.id) === String(id))?.label || ""
+      return String(v).split(",").map(label).filter(Boolean).join(", ")
+    }
+    if (typeof v === "object") return String((v as { value?: unknown }).value ?? "")
+    return String(v)
+  }
+
+  // Address, most specific first: a deal field named like an address, then the
+  // organisation's Address, then the person's postal address.
+  const addrField = fields.find((f) => /address|location/i.test(f.name) && !/email/i.test(f.name) && fieldValue(f))
+  let address = (addrField && fieldValue(addrField)) || d.org_id?.address || ""
   if (!address && d.org_id?.value) {
     try {
       const o = await pd(org, `/organizations/${d.org_id.value}`)
@@ -448,6 +487,25 @@ export async function dealPrefill(org: PdOrg, dealId: number): Promise<PdDealPre
     } catch {
       // Address is a nice-to-have; the survey form asks for it anyway.
     }
+  }
+  if (!address && d.person_id?.value) {
+    try {
+      const p = await pd(org, `/persons/${d.person_id.value}`)
+      address = ((p as { postal_address?: string } | null)?.postal_address) || ""
+    } catch {
+      // Same — best effort.
+    }
+  }
+
+  // Residential vs commercial from a deal field named along those lines.
+  let isResidential: boolean | null = null
+  const propField = fields.find(
+    (f) => /property|residential|commercial|premises|sector|client type/i.test(f.name) && fieldValue(f)
+  )
+  if (propField) {
+    const val = fieldValue(propField).toLowerCase()
+    if (/commercial|business|b2b/.test(val)) isResidential = false
+    else if (/residential|domestic|home/.test(val)) isResidential = true
   }
 
   return {
@@ -458,5 +516,6 @@ export async function dealPrefill(org: PdOrg, dealId: number): Promise<PdDealPre
     clientEmail: primary(d.person_id?.email),
     clientPhone: primary(d.person_id?.phone),
     clientAddress: address,
+    isResidential,
   }
 }

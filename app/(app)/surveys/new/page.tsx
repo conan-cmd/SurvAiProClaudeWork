@@ -144,6 +144,8 @@ export default function NewSurveyPage() {
         clientEmail: data.clientEmail || prev.clientEmail,
         clientPhone: data.clientPhone || prev.clientPhone,
         clientAddress: data.clientAddress || prev.clientAddress,
+        // From a "Property type"-style custom field on the deal, when present.
+        ...(typeof data.isResidential === "boolean" ? { isResidential: data.isResidential } : {}),
       }))
       setFromDealId(d.id)
       setImportOpen(false)
