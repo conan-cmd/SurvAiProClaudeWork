@@ -130,10 +130,10 @@ export default function NewSurveyPage() {
     toast.success("Contact imported from Pipedrive")
   }
 
-  const pickDeal = async (d: PdDealRow) => {
+  const importDeal = async (dealId: number) => {
     setSearching(true)
     try {
-      const res = await fetch(`/api/pipedrive/deals/${d.id}`)
+      const res = await fetch(`/api/pipedrive/deals/${dealId}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Couldn't load the deal")
       setForm((prev) => ({
@@ -147,7 +147,7 @@ export default function NewSurveyPage() {
         // From a "Property type"-style custom field on the deal, when present.
         ...(typeof data.isResidential === "boolean" ? { isResidential: data.isResidential } : {}),
       }))
-      setFromDealId(d.id)
+      setFromDealId(dealId)
       setImportOpen(false)
       setQuery("")
       toast.success("Deal imported — details prefilled from Pipedrive")
@@ -157,6 +157,25 @@ export default function NewSurveyPage() {
       setSearching(false)
     }
   }
+
+  const pickDeal = (d: PdDealRow) => importDeal(d.id)
+
+  // Pipedrive link action lands here as /surveys/new?resource=deal&selectedIds=<id>
+  // (we also accept our own ?pdDeal=<id>): import that deal automatically.
+  const linkActionDone = useRef(false)
+  useEffect(() => {
+    if (linkActionDone.current) return
+    linkActionDone.current = true
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const raw = params.get("pdDeal") || (params.get("resource") === "deal" ? params.get("selectedIds") : null)
+      const dealId = raw ? parseInt(raw.split(",")[0], 10) : NaN
+      if (Number.isFinite(dealId) && dealId > 0) importDeal(dealId)
+    } catch {
+      // Malformed params — just show the blank form.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
