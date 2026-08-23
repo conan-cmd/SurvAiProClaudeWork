@@ -73,7 +73,7 @@ type Me = {
 }
 
 type TeamData = {
-  users: { id: string; name: string | null; email: string; role: string; headshotUrl: string | null; canSendProposals?: boolean; navSections?: string | null }[]
+  users: { id: string; name: string | null; email: string; role: string; headshotUrl: string | null; canSendProposals?: boolean; navSections?: string | null; lastActiveAt?: string | null }[]
   invites: { id: string; email: string; token: string }[]
 }
 
@@ -705,22 +705,47 @@ export default function SettingsPage() {
           {team?.users.map((u) => {
             const canManage = (me?.role === "OWNER" || me?.role === "ADMIN") && u.role !== "OWNER" && u.id !== me?.id
             const draftOnly = u.canSendProposals === false
+            // Presence (owner's view): the 5-min lastActiveAt throttle + 4-min
+            // heartbeat mean anyone active shows within a 6-minute window.
+            const showPresence = me?.role === "OWNER" && u.id !== me?.id
+            const lastActive = u.lastActiveAt ? new Date(u.lastActiveAt) : null
+            const online = !!lastActive && Date.now() - lastActive.getTime() < 6 * 60 * 1000
+            const lastSeenLabel = (() => {
+              if (!lastActive) return "never signed in"
+              const mins = Math.round((Date.now() - lastActive.getTime()) / 60000)
+              if (mins < 60) return `${Math.max(mins, 1)}m ago`
+              const hrs = Math.round(mins / 60)
+              if (hrs < 24) return `${hrs}h ago`
+              const days = Math.round(hrs / 24)
+              return days < 30 ? `${days}d ago` : lastActive.toLocaleDateString("en-GB")
+            })()
             return (
             <div key={u.id} className="space-y-1">
             <div className="flex items-center gap-3">
-              {u.headshotUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={u.headshotUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-brand-navy text-white flex items-center justify-center text-xs font-bold">
-                  {(u.name || u.email)[0].toUpperCase()}
-                </div>
-              )}
+              <div className="relative shrink-0">
+                {u.headshotUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={u.headshotUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-brand-navy text-white flex items-center justify-center text-xs font-bold">
+                    {(u.name || u.email)[0].toUpperCase()}
+                  </div>
+                )}
+                {showPresence && online && (
+                  <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white"
+                    title="Online now" />
+                )}
+              </div>
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium truncate">{u.name || u.email}</div>
                 <div className="text-xs text-gray-400 truncate">
                   {u.email} · {u.role.toLowerCase()}
                   {u.role !== "OWNER" && u.role !== "CONTRACTOR" && (draftOnly ? " · draft only" : " · can send")}
+                  {showPresence && (
+                    online
+                      ? <span className="text-emerald-600 font-medium"> · online</span>
+                      : <span> · last online {lastSeenLabel}</span>
+                  )}
                 </div>
               </div>
               {canManage && (
