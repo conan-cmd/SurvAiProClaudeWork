@@ -72,8 +72,8 @@ export default function WorksOrderPage() {
     setPdfBusy(true)
     try {
       const { exportAndShare } = await import("@/lib/pdf")
-      const base = `${data.survey.title}-works-order`.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "")
-      await exportAndShare(ref.current, `${base || "works-order"}.pdf`, "Works Order")
+      const base = `${data.survey.title}-scope-of-works`.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "")
+      await exportAndShare(ref.current, `${base || "scope-of-works"}.pdf`, "Scope of Works")
     } catch {
       toast.error("Couldn't create the PDF — try your browser's print.")
     } finally {
@@ -86,7 +86,7 @@ export default function WorksOrderPage() {
       <div className="min-h-screen flex items-center justify-center p-6 text-center">
         <div>
           <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto mb-3" />
-          <p className="text-gray-600">This works order link is no longer valid.</p>
+          <p className="text-gray-600">This scope link is no longer valid.</p>
         </div>
       </div>
     )
@@ -103,7 +103,7 @@ export default function WorksOrderPage() {
   const s = data.survey
   const sold = data.lineItems.filter((i) => i.selected)
   const notSold = data.lineItems.filter((i) => !i.selected)
-  const waMsg = `Works order — ${s.title}, ${s.clientAddress}: ${typeof window !== "undefined" ? window.location.href : ""}`
+  const waMsg = `Scope of works — ${s.title}, ${s.clientAddress}: ${typeof window !== "undefined" ? window.location.href : ""}`
 
   const Head = ({ children }: { children: string }) => (
     <div className="mt-7 mb-3">
@@ -131,7 +131,7 @@ export default function WorksOrderPage() {
             <MessageCircle className="w-4 h-4" /> WhatsApp
           </a>
           {typeof navigator !== "undefined" && !!navigator.share && (
-            <button onClick={() => navigator.share({ title: "Works order", url: window.location.href }).catch(() => {})}
+            <button onClick={() => navigator.share({ title: "Scope of works", url: window.location.href }).catch(() => {})}
               className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
               <Share2 className="w-4 h-4" /> Share
             </button>
@@ -155,8 +155,8 @@ export default function WorksOrderPage() {
                 <div className="font-bold text-xl">{org.name}</div>
               )}
               <div className="text-right">
-                <div className="text-xl font-extrabold tracking-[0.08em]">WORKS ORDER</div>
-                <div className="text-xs mt-0.5" style={{ opacity: 0.85 }}>Internal — scope of works for the team</div>
+                <div className="text-xl font-extrabold tracking-[0.08em]">SCOPE OF WORKS</div>
+                <div className="text-xs mt-0.5" style={{ opacity: 0.85 }}>Internal — for the team carrying out the job</div>
               </div>
             </div>
             <div className="h-1.5" style={{ backgroundColor: accent }} />
@@ -248,7 +248,7 @@ export default function WorksOrderPage() {
 
           <div className="mt-8 rounded-b-lg px-5 py-3 text-[11px] flex flex-wrap items-center justify-between gap-2"
             style={{ backgroundColor: brand, color: onBrand }}>
-            <span className="font-semibold">{org.name} — internal works order</span>
+            <span className="font-semibold">{org.name} — internal scope of works</span>
             <span style={{ opacity: 0.85 }}>{[org.phone, org.email].filter(Boolean).join(" · ")}</span>
           </div>
         </div>
