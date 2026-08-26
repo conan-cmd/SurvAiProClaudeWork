@@ -216,7 +216,8 @@ export async function syncProposalToPipedrive(proposalId: string): Promise<void>
       personId = (created as { id?: number } | null)?.id ?? null
     }
 
-    const value = calculateProposalTotals(proposal.pricingLineItems).total
+    // Deal value is quoted NET (ex VAT) — Pipedrive tracks the revenue figure.
+    const value = calculateProposalTotals(proposal.pricingLineItems).subtotal
     const status = dealStatusFor(proposal.status)
     let dealId = proposal.pipedriveDealId ? Number(proposal.pipedriveDealId) : null
     if (!dealId) {
