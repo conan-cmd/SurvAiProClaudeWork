@@ -39,6 +39,7 @@ model User {
   gmailRefreshToken     String?
 
   surveysCreated        SiteSurvey[]    @relation("SurveyCreator")
+  surveysAssigned       SiteSurvey[]    @relation("SurveyAssignee")
   proposalsCreated      Proposal[]      @relation("ProposalCreator")
   ramsCreated           Rams[]          @relation("RamsCreator")
   jobSitesCreated       JobSite[]       @relation("JobSiteCreator")
@@ -204,6 +205,11 @@ model Organization {
   // Show GPS coordinates + what3words on the proposal cover
   showCoordinatesOnProposal Boolean     @default(true)
 
+  // Accreditation names shown on documents (JSON string[], e.g. CHAS, IRATA)
+  accreditations        String?
+  // BigChange (JobWatch) API key for the survey-booking feed (encrypted at rest)
+  bigchangeApiKey       String?
+
   // Referral programme
   referralCode          String?         @unique
   referredByCode        String?
@@ -290,6 +296,14 @@ model SiteSurvey {
   // Proposal linkage
   proposal              Proposal?
   rams                  Rams?
+
+  // Scheduling: when the site survey is booked for and which surveyor has it.
+  scheduledAt           DateTime?
+  assignedToId          String?
+  assignedTo            User?           @relation("SurveyAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  // External booking reference (e.g. BigChange job id) so synced bookings
+  // aren't duplicated on re-import.
+  externalBookingRef    String?         @unique
 
   // Optional folder for organising jobs (proposals follow their survey)
   folderId              String?
