@@ -47,10 +47,24 @@ export async function PATCH(
       "title", "serviceType", "isResidential", "clientPriorities", "accessNotes",
       "measurements", "exclusions", "writtenDescription", "status", "folderId",
       "chemicalsRequired", "waterSupply", "surveyedInPerson",
+      "scheduledAt", "assignedToId",
     ]
     const data: Record<string, unknown> = {}
     for (const key of allowed) {
       if (key in body) data[key] = body[key]
+    }
+
+    // Booking fields: coerce/validate. Null clears; the assignee must be in-org.
+    if ("scheduledAt" in data) {
+      const d = data.scheduledAt ? new Date(String(data.scheduledAt)) : null
+      data.scheduledAt = d && !isNaN(d.getTime()) ? d : null
+    }
+    if (data.assignedToId) {
+      const assignee = await db.user.findFirst({
+        where: { id: String(data.assignedToId), organizationId: user.organizationId },
+        select: { id: true },
+      })
+      if (!assignee) return NextResponse.json({ error: "Surveyor not found" }, { status: 400 })
     }
 
     // A non-null folder must belong to the caller's organization.

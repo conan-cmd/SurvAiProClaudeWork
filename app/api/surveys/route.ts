@@ -17,6 +17,10 @@ const createSurveySchema = z.object({
   measurements: z.string().optional(),
   exclusions: z.string().optional(),
   writtenDescription: z.string().optional(),
+  surveyedInPerson: z.boolean().optional(),
+  // Booking: ISO datetime (client converts its local picker value) + surveyor.
+  scheduledAt: z.string().optional(),
+  assignedToId: z.string().optional(),
 })
 
 export async function GET() {
@@ -47,11 +51,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
     }
 
+    const { scheduledAt, assignedToId, ...rest } = parsed.data
+    const scheduled = scheduledAt ? new Date(scheduledAt) : null
+    // The assignee must be a member of the caller's organization.
+    const assignee = assignedToId
+      ? await db.user.findFirst({ where: { id: assignedToId, organizationId: user.organizationId }, select: { id: true } })
+      : null
+
     const survey = await db.siteSurvey.create({
       data: {
-        ...parsed.data,
+        ...rest,
         organizationId: user.organizationId,
         createdById: user.id,
+        scheduledAt: scheduled && !isNaN(scheduled.getTime()) ? scheduled : null,
+        assignedToId: assignee?.id ?? null,
       },
     })
 

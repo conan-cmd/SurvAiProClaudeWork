@@ -96,6 +96,16 @@ export default function NewSurveyPage() {
       }
     }, 350)
   }, [query, importOpen, importMode])
+  // Booking: when the survey visit is scheduled for, and which surveyor has it.
+  const [scheduledAt, setScheduledAt] = useState("")
+  const [assignedToId, setAssignedToId] = useState("")
+  const [team, setTeam] = useState<{ id: string; name: string | null; email: string }[]>([])
+  useEffect(() => {
+    fetch("/api/team").then((r) => r.json())
+      .then((d) => setTeam(Array.isArray(d.users) ? d.users.filter((u: { role: string }) => u.role !== "CONTRACTOR") : []))
+      .catch(() => {})
+  }, [])
+
   const [form, setForm] = useState({
     clientName: "",
     clientCompany: "",
@@ -191,6 +201,10 @@ export default function NewSurveyPage() {
           form.serviceType === "Other" && customService.trim()
             ? customService.trim()
             : form.serviceType,
+        // The picker value is local time — convert in the browser so the
+        // stored instant matches what the user meant.
+        ...(scheduledAt ? { scheduledAt: new Date(scheduledAt).toISOString() } : {}),
+        ...(assignedToId ? { assignedToId } : {}),
       }
       const res = await fetch("/api/surveys", {
         method: "POST",
@@ -266,6 +280,25 @@ export default function NewSurveyPage() {
             <AddressInput className={inputCls} value={form.clientAddress}
               onChange={(v) => set("clientAddress", v)}
               placeholder="Start typing the address…" />
+          </div>
+        </section>
+
+        <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+          <h2 className="font-semibold text-brand-navy">Booking <span className="text-xs text-gray-400 font-normal">(optional)</span></h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Survey date &amp; time</label>
+              <input type="datetime-local" className={inputCls} value={scheduledAt}
+                onChange={(e) => setScheduledAt(e.target.value)} />
+            </div>
+            <div>
+              <label className={labelCls}>Surveyor</label>
+              <select className={inputCls} value={assignedToId}
+                onChange={(e) => setAssignedToId(e.target.value)}>
+                <option value="">Unassigned</option>
+                {team.map((m) => <option key={m.id} value={m.id}>{m.name || m.email}</option>)}
+              </select>
+            </div>
           </div>
         </section>
 
