@@ -1048,7 +1048,7 @@ export default function ProposalEditorPage() {
           <button onClick={openWorksOrder} disabled={woBusy}
             title="Crew-facing scope of works: exactly what was sold (and what wasn't), access notes, internal photos — as a no-login link to share with the team"
             className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
-            {woBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardCheck className="w-4 h-4" />} Works order
+            {woBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardCheck className="w-4 h-4" />} Scope
           </button>
           <button onClick={createShareLink} disabled={sharing}
             className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
