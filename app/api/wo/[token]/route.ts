@@ -22,12 +22,15 @@ export async function GET(_request: NextRequest, { params }: { params: { token: 
             select: {
               title: true,
               clientAddress: true,
+              clientPhone: true,
               what3words: true,
               accessNotes: true,
               waterSupply: true,
               chemicalsRequired: true,
               measurements: true,
               exclusions: true,
+              writtenDescription: true,
+              clientPriorities: true,
               areaSqm: true,
               linearMeters: true,
               photos: {
