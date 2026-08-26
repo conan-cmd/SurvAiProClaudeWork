@@ -21,7 +21,7 @@ type Report = {
   signedAt: string | null
   photos: Photo[]
   site: { clientName: string; clientCompany: string | null; address: string; clientEmail: string | null; clientPhone: string | null }
-  organization: { name: string; logoUrl: string | null; brandColor: string; phone: string | null; email: string | null }
+  organization: { name: string; logoUrl: string | null; brandColor: string; secondaryColor: string | null; phone: string | null; email: string | null; website: string | null }
 }
 
 export default function JobReportEditor() {
@@ -196,6 +196,8 @@ export default function JobReportEditor() {
   if (!report) return <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-blue" /></div>
 
   const docData: ReportDocData = {
+    id: reportId,
+    status: report.status,
     organization: report.organization,
     site: report.site,
     visitDate: report.visitDate,
