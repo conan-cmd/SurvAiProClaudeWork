@@ -185,8 +185,15 @@ function dealStatusFor(status: string): "open" | "won" | "lost" {
   return "open"
 }
 
-// Creates/updates the Pipedrive person + organization + deal for a proposal.
-export async function syncProposalToPipedrive(proposalId: string): Promise<void> {
+// Updates the Pipedrive deal a proposal is linked to; creates the person +
+// organization + deal only when createIfMissing is set (the explicit "Push to
+// Pipedrive" action). Automatic syncs (send / status change / sign) are
+// update-only — auto-creating duplicated deals that already existed in
+// Pipedrive, so unlinked proposals are now left alone until pushed or linked.
+export async function syncProposalToPipedrive(
+  proposalId: string,
+  opts?: { createIfMissing?: boolean }
+): Promise<void> {
   const proposal = await db.proposal.findUnique({
     where: { id: proposalId },
     include: {
@@ -196,6 +203,7 @@ export async function syncProposalToPipedrive(proposalId: string): Promise<void>
     },
   })
   if (!proposal) return
+  if (!proposal.pipedriveDealId && !opts?.createIfMissing) return
   const org = proposal.organization
   if (!pipedriveConfigured(org)) return
 
