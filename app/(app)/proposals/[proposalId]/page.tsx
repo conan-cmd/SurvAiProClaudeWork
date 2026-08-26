@@ -632,6 +632,23 @@ export default function ProposalEditorPage() {
     }
   }
 
+  // Crew-facing works order: mint (or reuse) the no-login link and open it —
+  // the page itself carries copy/WhatsApp/PDF controls.
+  const [woBusy, setWoBusy] = useState(false)
+  const openWorksOrder = async () => {
+    setWoBusy(true)
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/works-order-link`, { method: "POST" })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      window.open(d.url, "_blank", "noopener")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't open the works order")
+    } finally {
+      setWoBusy(false)
+    }
+  }
+
   // --- Pipedrive: link this proposal to an existing deal ---
   const fetchPdDeals = async (params: string) => {
     setPdLoading(true)
@@ -1028,6 +1045,11 @@ export default function ProposalEditorPage() {
           </button>
           <RamsButton surveyId={proposal.survey.id}
             className="inline-flex items-center gap-1.5 px-3 py-2 border border-amber-200 rounded-lg text-sm font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50" />
+          <button onClick={openWorksOrder} disabled={woBusy}
+            title="Crew-facing scope of works: exactly what was sold (and what wasn't), access notes, internal photos — as a no-login link to share with the team"
+            className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
+            {woBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ClipboardCheck className="w-4 h-4" />} Works order
+          </button>
           <button onClick={createShareLink} disabled={sharing}
             className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50 disabled:opacity-50">
             <Link2 className="w-4 h-4" /> Share
