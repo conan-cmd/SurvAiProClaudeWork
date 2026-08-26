@@ -15,12 +15,15 @@ type WoData = {
   survey: {
     title: string
     clientAddress: string
+    clientPhone: string | null
     what3words: string | null
     accessNotes: string | null
     waterSupply: string | null
     chemicalsRequired: string | null
     measurements: string | null
     exclusions: string | null
+    writtenDescription: string | null
+    clientPriorities: string | null
     areaSqm: number | null
     linearMeters: number | null
     photos: { id: string; fileUrl: string; caption: string | null; internalOnly: boolean }[]
@@ -221,13 +224,30 @@ export default function WorksOrderPage() {
 
           <Head>Site &amp; job information</Head>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {s.accessNotes?.trim() && <InfoRow label="Access" value={s.accessNotes} />}
+            <InfoRow label="Client contact"
+              value={`${data.clientName}${s.clientPhone ? ` · ${s.clientPhone}` : ""}`} />
+            {s.accessNotes?.trim() && <InfoRow label="Access & parking" value={s.accessNotes} />}
             {s.waterSupply?.trim() && <InfoRow label="Water supply" value={s.waterSupply} />}
             {s.chemicalsRequired?.trim() && <InfoRow label="Chemicals required" value={s.chemicalsRequired} />}
             {s.measurements?.trim() && <InfoRow label="Measurements (surveyor notes)" value={s.measurements} />}
             {!!s.areaSqm && <InfoRow label="Measured area" value={`${Math.round(s.areaSqm).toLocaleString()} m²`} />}
             {!!s.linearMeters && <InfoRow label="Measured length" value={`${Math.round(s.linearMeters).toLocaleString()} m`} />}
           </div>
+
+          {(s.writtenDescription?.trim() || s.clientPriorities?.trim()) && (
+            <>
+              <Head>Surveyor&apos;s notes</Head>
+              {s.writtenDescription?.trim() && (
+                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{s.writtenDescription}</p>
+              )}
+              {s.clientPriorities?.trim() && (
+                <div className="mt-3 rounded-r-lg border-l-4 px-4 py-3" style={{ borderColor: brand, backgroundColor: `${brand}10` }}>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-gray-700">What matters to the client</div>
+                  <p className="text-sm whitespace-pre-wrap mt-1 mb-0">{s.clientPriorities}</p>
+                </div>
+              )}
+            </>
+          )}
 
           {s.photos.length > 0 && (
             <>
