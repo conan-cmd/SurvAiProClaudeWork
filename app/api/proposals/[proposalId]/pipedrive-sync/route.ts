@@ -18,7 +18,7 @@ export async function POST(
   })
   if (!proposal) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
-  await syncProposalToPipedrive(proposal.id)
+  await syncProposalToPipedrive(proposal.id, { createIfMissing: true })
 
   // The sync is best-effort and swallows errors — verify the outcome so the
   // user gets an honest answer instead of a fake success.
