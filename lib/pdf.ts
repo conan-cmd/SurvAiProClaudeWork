@@ -8,11 +8,38 @@
 // print-only content, and swap form fields for plain text so nothing is clipped.
 function cleanCloneForPrint(clonedDoc: Document) {
   const style = clonedDoc.createElement("style")
+  // The plain-font override matters: html2canvas mis-measures spaces with the
+  // app's adjusted web fonts, silently gluing words together in the PDF.
   style.textContent = `
     .no-print,[class~="print:hidden"]{display:none !important}
     [class~="print:block"]{display:block !important}
+    *{font-family:Arial,Helvetica,sans-serif !important;font-kerning:none !important;font-variant-ligatures:none !important}
   `
   clonedDoc.head.appendChild(style)
+
+  // Push blocks (photos, cards, callouts, headings) that would straddle an A4
+  // page boundary down onto the next page, so the raster slicing never cuts an
+  // element in half. Runs on the laid-out clone; measured in document order so
+  // each push reflows what follows before it's measured.
+  const root = clonedDoc.querySelector<HTMLElement>('[data-pdf-root="1"]')
+  if (root) {
+    const pageH = root.getBoundingClientRect().width * (297 / 210)
+    root
+      .querySelectorAll<HTMLElement>(".break-inside-avoid, figure, section, h2")
+      .forEach((c) => {
+        const rootTop = root.getBoundingClientRect().top
+        const r = c.getBoundingClientRect()
+        const top = r.top - rootTop
+        if (r.height >= pageH * 0.9) return // taller than a page — let it split
+        const startPage = Math.floor(top / pageH)
+        const endPage = Math.floor((top + r.height - 2) / pageH)
+        if (endPage > startPage) {
+          const delta = (startPage + 1) * pageH - top + 10
+          const cur = parseFloat(clonedDoc.defaultView?.getComputedStyle(c).marginTop || "0") || 0
+          c.style.marginTop = `${cur + delta}px`
+        }
+      })
+  }
 
   clonedDoc.querySelectorAll("textarea,input,select").forEach((node) => {
     const el = node as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
@@ -47,6 +74,7 @@ export async function elementToPdfBlob(el: HTMLElement, opts?: { width?: number 
   }
 
   let canvas: HTMLCanvasElement
+  el.setAttribute("data-pdf-root", "1") // pagination marker for the clone pass
   try {
     canvas = await html2canvas(el, {
       useCORS: true,
@@ -56,6 +84,7 @@ export async function elementToPdfBlob(el: HTMLElement, opts?: { width?: number 
       onclone: (doc) => cleanCloneForPrint(doc),
     })
   } finally {
+    el.removeAttribute("data-pdf-root")
     if (wasHidden) el.setAttribute("style", prevStyle)
   }
 
@@ -70,7 +99,8 @@ export async function elementToPdfBlob(el: HTMLElement, opts?: { width?: number 
   let position = 0
   pdf.addImage(img, "JPEG", 0, position, imgW, imgH)
   heightLeft -= pageH
-  while (heightLeft > 0) {
+  // The 6pt tolerance stops a rounding sliver becoming a blank trailing page.
+  while (heightLeft > 6) {
     position -= pageH
     pdf.addPage()
     pdf.addImage(img, "JPEG", 0, position, imgW, imgH)
