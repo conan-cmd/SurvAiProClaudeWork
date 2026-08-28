@@ -197,7 +197,9 @@ ${params.context}
 CURRENT CONTENT:
 ${params.currentContent}
 
-${params.feedback ? `USER FEEDBACK TO APPLY: ${params.feedback}` : "Improve clarity and impact while keeping every fact unchanged."}
+${params.feedback ? `USER FEEDBACK TO APPLY: ${params.feedback}` : "Improve clarity and impact while keeping every fact about this job unchanged."}
+
+IMPORTANT: the section must match the job in CONTEXT. If the current content references a different service or trade than this job (e.g. boilerplate written for another job type), rewrite those references for this job's actual service — do not carry them over.
 
 Respond with the rewritten section content only — plain text, no JSON, no heading.`,
       },
