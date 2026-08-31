@@ -1,10 +1,10 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Eye, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing, KanbanSquare, MapPin } from "lucide-react"
+import { Eye, EyeOff, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing, KanbanSquare, MapPin } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { isApprover } from "@/lib/permissions"
-import { formatDate, calculateProposalTotals, formatNetPlusVat } from "@/lib/utils"
+import { formatDate, formatCurrency, calculateProposalTotals, formatNetPlusVat } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
 import { ListSearch } from "@/components/list-search"
 import { DraggableRow } from "@/components/draggable-row"
@@ -30,10 +30,29 @@ const STATUS_STYLES: Record<string, string> = {
   LOST: "bg-red-100 text-red-600",
 }
 
+const PERIODS: [string, string][] = [
+  ["", "All time"],
+  ["7d", "Last 7 days"],
+  ["30d", "Last 30 days"],
+  ["90d", "Last 90 days"],
+  ["year", "This year"],
+]
+
+function periodStart(period?: string): Date | undefined {
+  if (period === "7d") return new Date(Date.now() - 7 * 864e5)
+  if (period === "30d") return new Date(Date.now() - 30 * 864e5)
+  if (period === "90d") return new Date(Date.now() - 90 * 864e5)
+  if (period === "year") return new Date(new Date().getFullYear(), 0, 1)
+  return undefined
+}
+
 export default async function ProposalsPage({
   searchParams,
 }: {
-  searchParams: { folder?: string; scope?: string; status?: string; q?: string; member?: string }
+  searchParams: {
+    folder?: string; scope?: string; status?: string; q?: string; member?: string
+    period?: string; viewed?: string; visit?: string
+  }
 }) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
@@ -56,17 +75,58 @@ export default async function ProposalsPage({
       : {}
   // Per-member filter — only meaningful when viewing everyone's proposals.
   const memberId = viewingAll ? searchParams.member : undefined
-  const buildLink = (folder?: string, all?: boolean, status?: string, member?: string) => {
+  const period = PERIODS.some(([v]) => v === searchParams.period) ? searchParams.period : undefined
+  const from = periodStart(period)
+  const notViewed = searchParams.viewed === "no"
+  const visit = searchParams.visit === "yes" ? true : searchParams.visit === "no" ? false : undefined
+  const currentStatus = wonFilter ? "won" : statusFilter
+
+  // Every filter chip keeps the rest of the current filters — override only its own key.
+  const link = (overrides: Record<string, string | undefined>) => {
+    const merged: Record<string, string | undefined> = {
+      scope: viewingAll ? "all" : undefined,
+      member: memberId,
+      folder: folderId,
+      status: currentStatus || undefined,
+      period,
+      viewed: notViewed ? "no" : undefined,
+      visit: searchParams.visit,
+      q: searchParams.q,
+      ...overrides,
+    }
     const p = new URLSearchParams()
-    if (all) p.set("scope", "all")
-    if (all && member) p.set("member", member)
-    if (folder) p.set("folder", folder)
-    if (status) p.set("status", status)
-    if (searchParams.q) p.set("q", searchParams.q)
+    for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v)
     const s = p.toString()
     return `/proposals${s ? `?${s}` : ""}`
   }
-  const currentStatus = wonFilter ? "won" : statusFilter
+
+  // The survey relation gets filtered on folder AND site-visit tag — build once.
+  const surveyWhere = {
+    ...(folderId ? { folderId } : {}),
+    ...(visit === undefined ? {} : { surveyedInPerson: visit }),
+  }
+  // On the won view the time filter means "won in this period" (falling back to
+  // the signature date for deals won before wonAt existed); otherwise it's the
+  // proposal's creation date. Kept in AND so it can't clash with the search OR.
+  const andWhere: object[] = []
+  if (from) {
+    andWhere.push(
+      wonFilter
+        ? { OR: [{ wonAt: { gte: from } }, { wonAt: null, signedAt: { gte: from } }] }
+        : { createdAt: { gte: from } }
+    )
+  }
+  if (q) {
+    andWhere.push({
+      OR: [
+        { clientName: { contains: q, mode: "insensitive" as const } },
+        { clientEmail: { contains: q, mode: "insensitive" as const } },
+        { survey: { title: { contains: q, mode: "insensitive" as const } } },
+        { survey: { clientAddress: { contains: q, mode: "insensitive" as const } } },
+        { survey: { clientCompany: { contains: q, mode: "insensitive" as const } } },
+      ],
+    })
+  }
 
   const [folders, teamMembers, proposals] = await Promise.all([
     db.folder.findMany({
@@ -83,31 +143,27 @@ export default async function ProposalsPage({
     db.proposal.findMany({
       where: {
         organizationId: user.organizationId,
-        ...(folderId ? { survey: { folderId } } : {}),
+        ...(Object.keys(surveyWhere).length ? { survey: surveyWhere } : {}),
         ...(viewingAll ? (memberId ? { createdById: memberId } : {}) : { createdById: user.id }),
         ...statusWhere,
-        ...(q
-          ? {
-              OR: [
-                { clientName: { contains: q, mode: "insensitive" as const } },
-                { clientEmail: { contains: q, mode: "insensitive" as const } },
-                { survey: { title: { contains: q, mode: "insensitive" as const } } },
-                { survey: { clientAddress: { contains: q, mode: "insensitive" as const } } },
-                { survey: { clientCompany: { contains: q, mode: "insensitive" as const } } },
-              ],
-            }
-          : {}),
+        ...(notViewed ? { views: { none: {} } } : {}),
+        ...(andWhere.length ? { AND: andWhere } : {}),
       },
       orderBy: [{ sortIndex: { sort: "asc", nulls: "first" } }, { updatedAt: "desc" }],
       include: {
         pricingLineItems: true,
-        survey: { select: { title: true, clientAddress: true } },
+        survey: { select: { title: true, clientAddress: true, surveyedInPerson: true } },
         createdBy: { select: { name: true, email: true } },
         _count: { select: { views: true } },
         views: { select: { updatedAt: true }, orderBy: { updatedAt: "desc" }, take: 1 },
       },
     }),
   ])
+
+  const totalNet = proposals.reduce(
+    (sum, p) => sum + calculateProposalTotals(p.pricingLineItems).subtotal,
+    0
+  )
 
   return (
     <div className="space-y-6 overflow-x-hidden">
@@ -123,17 +179,17 @@ export default async function ProposalsPage({
 
       {canViewAll && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Link href={buildLink(folderId, false)}
+          <Link href={link({ scope: undefined, member: undefined })}
             className={`px-3 py-1.5 rounded-full font-medium border transition ${!viewingAll ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
             Mine
           </Link>
-          <Link href={buildLink(folderId, true)}
+          <Link href={link({ scope: "all", member: undefined })}
             className={`px-3 py-1.5 rounded-full font-medium border transition ${viewingAll && !memberId ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
             Everyone
           </Link>
           {/* One chip per team member — each person's proposals at a glance. */}
           {teamMembers.length > 1 && teamMembers.map((m) => (
-            <Link key={m.id} href={buildLink(folderId, true, currentStatus, m.id)}
+            <Link key={m.id} href={link({ scope: "all", member: m.id })}
               className={`px-3 py-1.5 rounded-full font-medium border transition ${memberId === m.id ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
               {(m.name || m.email).split(" ")[0]}
             </Link>
@@ -143,12 +199,12 @@ export default async function ProposalsPage({
 
       {folders.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Link href={buildLink(undefined, viewingAll, undefined, memberId)}
+          <Link href={link({ folder: undefined })}
             className={`px-3 py-1.5 rounded-full font-medium border transition ${!folderId ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"}`}>
             All
           </Link>
           {folders.map((f) => (
-            <Link key={f.id} href={buildLink(f.id, viewingAll, undefined, memberId)}
+            <Link key={f.id} href={link({ folder: f.id })}
               className={`px-3 py-1.5 rounded-full font-medium border transition ${folderId === f.id ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"}`}>
               {f.name}
             </Link>
@@ -168,7 +224,7 @@ export default async function ProposalsPage({
           ["WON", "Won"],
           ["LOST", "Lost"],
         ] as const).map(([value, label]) => (
-          <Link key={value || "all"} href={buildLink(folderId, viewingAll, value || undefined, memberId)}
+          <Link key={value || "all"} href={link({ status: value || undefined })}
             className={`px-3 py-1.5 rounded-full font-medium border transition ${
               (currentStatus || "") === value
                 ? "bg-brand-blue text-white border-brand-blue"
@@ -178,18 +234,63 @@ export default async function ProposalsPage({
           </Link>
         ))}
       </div>
-      {wonFilter && (
-        <div className="text-sm">
-          <span className="inline-flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-brand-blue font-medium">
-            Showing won deals (signed, deposit paid &amp; won)
-            <Link href={buildLink(folderId, viewingAll, undefined, memberId)} className="text-gray-400 hover:text-gray-600" aria-label="Clear filter">✕</Link>
-          </span>
-        </div>
-      )}
+
+      {/* Time period + engagement + site-visit filters */}
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        {PERIODS.map(([value, label]) => (
+          <Link key={value || "all-time"} href={link({ period: value || undefined })}
+            className={`px-3 py-1.5 rounded-full font-medium border transition ${
+              (period || "") === value
+                ? "bg-brand-navy text-white border-brand-navy"
+                : "bg-white text-gray-600 hover:border-gray-400"
+            }`}
+            title={wonFilter && value ? "Filters won deals by the date they were won" : undefined}>
+            {label}
+          </Link>
+        ))}
+        <span className="w-px h-5 bg-gray-200 mx-1 hidden sm:block" />
+        <Link href={link({ viewed: notViewed ? undefined : "no" })}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium border transition ${
+            notViewed ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"
+          }`}
+          title="Only proposals the client hasn't opened yet">
+          <EyeOff className="w-3.5 h-3.5" /> Not viewed
+        </Link>
+        <Link href={link({ visit: visit === true ? undefined : "yes" })}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium border transition ${
+            visit === true ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"
+          }`}
+          title="Jobs tagged as surveyed in person">
+          <MapPin className="w-3.5 h-3.5" /> Site visited
+        </Link>
+        <Link href={link({ visit: visit === false ? undefined : "no" })}
+          className={`px-3 py-1.5 rounded-full font-medium border transition ${
+            visit === false ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"
+          }`}
+          title="Jobs quoted without an in-person site visit">
+          Quoted remotely
+        </Link>
+      </div>
+
+      {/* Totals for whatever is filtered — the quick answer to "how many?" */}
+      <div className="text-sm text-gray-600">
+        <span className="font-semibold text-brand-navy">{proposals.length}</span>
+        {" "}proposal{proposals.length === 1 ? "" : "s"}
+        {proposals.length > 0 && <> · {formatCurrency(totalNet)} + VAT</>}
+        {wonFilter && <> · won deals{from ? ` (${PERIODS.find(([v]) => v === period)?.[1].toLowerCase()}, by date won)` : ""}</>}
+        {!wonFilter && from && <> · created {PERIODS.find(([v]) => v === period)?.[1].toLowerCase()}</>}
+        {notViewed && <> · not yet opened by the client</>}
+        {visit === true && <> · site visited</>}
+        {visit === false && <> · quoted remotely</>}
+      </div>
 
       {proposals.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-10 text-center text-gray-400">
-          {q ? <>No proposals match &ldquo;{q}&rdquo;.</> : "Generate a proposal from one of your surveys and it will appear here."}
+          {q
+            ? <>No proposals match &ldquo;{q}&rdquo;.</>
+            : currentStatus || from || notViewed || visit !== undefined || folderId
+              ? "No proposals match these filters."
+              : "Generate a proposal from one of your surveys and it will appear here."}
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm divide-y">
@@ -211,6 +312,12 @@ export default async function ProposalsPage({
                 </div>
                 {/* Chips wrap onto their own line on mobile so the title keeps full width */}
                 <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0 sm:justify-end [&>span]:text-[11px] sm:[&>span]:text-xs">
+                  {p.survey.surveyedInPerson && (
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200"
+                      title="Surveyed in person — counts towards site-visit conversion">
+                      <MapPin className="w-3.5 h-3.5" /> Site visit
+                    </span>
+                  )}
                   {/* Sign-off flag — only meaningful before a proposal is sent */}
                   {["DRAFT", "READY"].includes(p.status) && p.approvalStatus === "PENDING" && (
                     <span className={`inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${approver ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-700"}`}
@@ -248,6 +355,15 @@ export default async function ProposalsPage({
                       </span>
                     )
                   })()}
+                  {/* A signed / deposit-paid deal is a won deal — say so alongside the stage */}
+                  {["SIGNED", "DEPOSIT_PAID"].includes(p.status) && (
+                    <span className="whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700"
+                      title={p.wonAt || p.signedAt
+                        ? `Won ${new Date((p.wonAt || p.signedAt)!).toLocaleDateString("en-GB")}`
+                        : "Won"}>
+                      Won
+                    </span>
+                  )}
                   {/* Won-stage deals must show whether the paperwork is actually signed */}
                   {["SIGNED", "DEPOSIT_PAID", "WON"].includes(p.status) && (
                     <span className={`whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full border ${
@@ -259,12 +375,16 @@ export default async function ProposalsPage({
                       {p.signedAt ? "Signed" : "Not signed"}
                     </span>
                   )}
-                  <span className={`whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[p.status]}`}>
+                  <span className={`whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[p.status]}`}
+                    title={p.status === "WON" && (p.wonAt || p.signedAt)
+                      ? `Won ${new Date((p.wonAt || p.signedAt)!).toLocaleDateString("en-GB")}`
+                      : undefined}>
                     {p.status}
                   </span>
                 </div>
               </Link>
-              <ItemActions kind="proposal" id={p.id} surveyId={p.surveyId} title={p.survey.title} proposalStatus={p.status} />
+              <ItemActions kind="proposal" id={p.id} surveyId={p.surveyId} title={p.survey.title}
+                proposalStatus={p.status} siteVisited={p.survey.surveyedInPerson} />
             </DraggableRow>
           ))}
         </div>

@@ -317,6 +317,14 @@ export default function ProposalEditorPage() {
   const [nudgeTemplateName, setNudgeTemplateName] = useState("")
   // Missing client email can be added right here instead of via the survey.
   const [nudgeEmail, setNudgeEmail] = useState("")
+  // Lock the page behind the nudge modal — on mobile, touch-scrolling the
+  // dialog otherwise scrolls the background page instead of the options.
+  useEffect(() => {
+    if (!nudgeOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => { document.body.style.overflow = prev }
+  }, [nudgeOpen])
   const openNudge = async () => {
     setNudgeOpen(true)
     if (nudgeTemplates) return
@@ -927,9 +935,9 @@ export default function ProposalEditorPage() {
             </div>
           )}
           {nudgeOpen && (
-            <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4"
+            <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4 overscroll-contain"
               onClick={() => !nudging && setNudgeOpen(false)}>
-              <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-4 max-h-[85vh] overflow-y-auto"
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-4 max-h-[85dvh] overflow-y-auto overscroll-contain"
                 onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between">
                   <h3 className="font-bold text-brand-navy">Send a reminder</h3>

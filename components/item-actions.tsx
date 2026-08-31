@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
-  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check, ExternalLink,
+  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check, ExternalLink, MapPin,
 } from "lucide-react"
 
 type FolderOption = { id: string; name: string }
@@ -17,6 +17,7 @@ export function ItemActions({
   surveyId,
   title,
   proposalStatus,
+  siteVisited,
 }: {
   kind: "survey" | "proposal"
   id: string
@@ -25,6 +26,8 @@ export function ItemActions({
   title: string
   // Enables quick status actions (Mark as sent / Mark accepted) on proposal rows.
   proposalStatus?: string
+  // Current site-visit tag on the job — enables the toggle in the menu.
+  siteVisited?: boolean
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -97,6 +100,24 @@ export function ItemActions({
       const d = await res.json().catch(() => ({}))
       toast.error(d.error || "Couldn't mark as won")
     }
+  }
+
+  // Tag the job as surveyed in person (or untag) — feeds the site-visit vs
+  // remote-quote conversion split on the dashboard.
+  const toggleSiteVisit = async () => {
+    setOpen(false)
+    if (!targetSurvey) return
+    setBusy(true)
+    const res = await fetch(`/api/surveys/${targetSurvey}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ surveyedInPerson: !siteVisited }),
+    })
+    setBusy(false)
+    if (res.ok) {
+      toast.success(siteVisited ? "Site-visit tag removed" : "Tagged as site visited")
+      router.refresh()
+    } else toast.error("Couldn't update the tag")
   }
 
   // Manual CRM push — the automatic sync only fires on send / status changes.
@@ -224,6 +245,12 @@ export function ItemActions({
                 <button onClick={(e) => { e.preventDefault(); markAccepted() }} className={menuItem}
                   title="Client agreed verbally or on paper — shows as Won, Not signed">
                   <Check className="w-4 h-4" /> Mark as won
+                </button>
+              )}
+              {kind === "proposal" && siteVisited !== undefined && targetSurvey && (
+                <button onClick={(e) => { e.preventDefault(); toggleSiteVisit() }} className={menuItem}
+                  title="Tracks conversion for in-person surveys vs remote quotes on the dashboard">
+                  <MapPin className="w-4 h-4" /> {siteVisited ? "Untag site visit" : "Tag as site visit"}
                 </button>
               )}
               <button onClick={(e) => { e.preventDefault(); rename() }} className={menuItem}>

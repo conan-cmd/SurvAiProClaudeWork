@@ -114,6 +114,23 @@ export default async function DashboardPage({
   const visited = visitSplit(true)
   const remote = visitSplit(false)
 
+  // Won in the last 7 days by the DATE THE DEAL WAS WON (wonAt, falling back to
+  // the signature date) — independent of the page's time filter, which slices
+  // by when proposals were created.
+  const weekAgo = new Date(Date.now() - 7 * 864e5)
+  const wonDate = (p: (typeof proposals)[number]) => p.wonAt ?? p.signedAt
+  const wonThisWeek = proposals.filter((p) => {
+    const d = wonDate(p)
+    return (
+      WONISH.has(p.status) && d && d >= weekAgo &&
+      (!filterUser || p.createdById === filterUser)
+    )
+  })
+  const wonThisWeekNet = wonThisWeek.reduce(
+    (sum, p) => sum + calculateProposalTotals(p.pricingLineItems).subtotal,
+    0
+  )
+
   // Average AI generation time - the number that proves the tagline
   const genTimes = proposals
     .map((p) => p.generationMs)
@@ -233,6 +250,15 @@ export default async function DashboardPage({
             </span>
             {" / "}
             <span className="text-red-500">{byStatus("LOST").length}</span>
+          </div>
+        </Link>
+        <Link href="/proposals?scope=all&status=won&period=7d" className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition block">
+          <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
+            <TrendingUp className="w-4 h-4 text-brand-green" /> Won this week
+          </div>
+          <div className="text-xl font-bold text-emerald-600">{wonThisWeek.length}</div>
+          <div className="text-xs text-gray-400">
+            {wonThisWeek.length > 0 ? `${formatCurrency(wonThisWeekNet)} net · ` : ""}last 7 days
           </div>
         </Link>
       </div>

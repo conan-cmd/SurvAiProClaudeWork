@@ -90,6 +90,14 @@ export async function PATCH(
     // sign the paperwork digitally later (e.g. after a nudge).
     data.status = "WON"
   }
+  // Keep the won date honest: stamp it the first time a deal reaches a won
+  // stage, and clear it if the deal is moved back to an open stage or lost.
+  const WON_STAGES = ["SIGNED", "DEPOSIT_PAID", "WON"]
+  const nextStatus = data.status as string | undefined
+  if (nextStatus) {
+    if (WON_STAGES.includes(nextStatus) && !existing.wonAt) data.wonAt = new Date()
+    if (!WON_STAGES.includes(nextStatus) && existing.wonAt) data.wonAt = null
+  }
 
   const proposal = await db.proposal.update({
     where: { id: params.proposalId },
