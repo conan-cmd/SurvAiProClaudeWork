@@ -7,7 +7,7 @@ import {
 } from "lucide-react"
 import { uploadSurveyPhotos } from "@/lib/photo-upload"
 import { DropZone } from "@/components/drop-zone"
-import { ZoomableImage } from "@/components/zoomable-image"
+import { ZoomableImage, ZoomableGallery } from "@/components/zoomable-image"
 
 export type Photo = {
   id: string
@@ -174,6 +174,7 @@ export function PhotoManager({
         </div>
       )}
 
+      <ZoomableGallery>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {photos.map((photo, index) => (
           <div key={photo.id} className="bg-white border rounded-xl overflow-hidden">
@@ -240,6 +241,7 @@ export function PhotoManager({
           </div>
         ))}
       </div>
+      </ZoomableGallery>
     </div>
   )
 }
