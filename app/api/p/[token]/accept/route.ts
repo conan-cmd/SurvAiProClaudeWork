@@ -25,6 +25,7 @@ export async function POST(
           id: true,
           status: true,
           signedAt: true,
+          wonAt: true,
           clientName: true,
           createdBy: { select: { email: true, name: true } },
           organization: { select: { name: true, email: true } },
@@ -67,6 +68,8 @@ export async function POST(
     data: {
       status: "SIGNED",
       signedAt: new Date(),
+      // Keep the earlier won date if this deal was already marked won verbally.
+      ...(link.proposal.wonAt ? {} : { wonAt: new Date() }),
       signedName: parsed.data.name,
       signedPosition: parsed.data.position || null,
       signedCompany: parsed.data.company || null,
