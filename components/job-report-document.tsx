@@ -4,7 +4,7 @@
 // details grid, callout boxes for observations/recommendations, treatment
 // record, framed sign-off and a company footer band.
 
-import { ZoomableImage, ZoomableGallery } from "@/components/zoomable-image"
+import { ZoomableImage } from "@/components/zoomable-image"
 
 export type ReportDocData = {
   // Report id — used to derive the reference shown on the sheet.
@@ -175,7 +175,6 @@ export function JobReportDocument({ data }: { data: ReportDocData }) {
       {data.photos.length > 0 && (
         <>
           <SectionHead>Site photographs</SectionHead>
-          <ZoomableGallery>
           <div className="grid grid-cols-2 gap-3">
             {data.photos.map((p) => (
               <figure key={p.id} className="break-inside-avoid m-0">
@@ -191,7 +190,6 @@ export function JobReportDocument({ data }: { data: ReportDocData }) {
               </figure>
             ))}
           </div>
-          </ZoomableGallery>
         </>
       )}
 

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useParams } from "next/navigation"
 import { toast } from "sonner"
 import { Loader2, AlertTriangle, Printer, Copy, MessageCircle, Share2, MapPin } from "lucide-react"
-import { ZoomableImage, ZoomableGallery } from "@/components/zoomable-image"
+import { ZoomableImage } from "@/components/zoomable-image"
 
 type WoData = {
   clientName: string
@@ -252,7 +252,6 @@ export default function WorksOrderPage() {
           {s.photos.length > 0 && (
             <>
               <Head>Site photos</Head>
-              <ZoomableGallery>
               <div className="grid grid-cols-2 gap-3">
                 {s.photos.map((p) => (
                   <figure key={p.id} className="m-0">
@@ -264,7 +263,6 @@ export default function WorksOrderPage() {
                   </figure>
                 ))}
               </div>
-              </ZoomableGallery>
             </>
           )}
 

@@ -111,18 +111,16 @@ export default async function SurveysPage({
                 <div className="min-w-0">
                   <div className="font-medium text-gray-900 truncate">{s.title}</div>
                   <div className="text-sm text-gray-500 truncate">
-                    {s.clientName} · {s.serviceType}
+                    {s.clientName} · {s.serviceType} · {formatDate(s.updatedAt)}
+                    {viewingAll && s.createdBy && ` · by ${s.createdBy.name || s.createdBy.email}`}
                   </div>
                   {s.clientAddress && (
                     <div className="text-xs text-gray-400 mt-0.5 truncate flex items-center gap-1">
                       <MapPin className="w-3 h-3 shrink-0" /> {s.clientAddress}
                     </div>
                   )}
-                  {/* Own line (no truncate) so date + creator survive narrow mobile rows */}
                   <div className="text-xs text-gray-400 mt-0.5">
-                    Created {formatDate(s.createdAt)}
-                    {s.createdBy && <> by {(s.createdBy.name || s.createdBy.email).split(" ")[0]}</>}
-                    {" "}· {s._count.photos} photos · {s._count.voiceNotes} voice notes
+                    {s._count.photos} photos · {s._count.voiceNotes} voice notes
                   </div>
                 </div>
                 {s.proposal ? (

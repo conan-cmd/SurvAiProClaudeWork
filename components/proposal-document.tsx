@@ -1,5 +1,5 @@
 import { formatCurrency, calculateProposalTotals, lineNet, PricingItem } from "@/lib/utils"
-import { ZoomableImage, ZoomableGallery } from "@/components/zoomable-image"
+import { ZoomableImage } from "@/components/zoomable-image"
 
 type Photo = {
   id: string
@@ -161,7 +161,6 @@ function PhotosSection({ data, section }: { data: ProposalDocumentData; section:
   if (!photos.length) return null
 
   return (
-    <ZoomableGallery>
     <div className="grid grid-cols-2 gap-4">
       {photos.map((photo) => (
         <figure key={photo.id} className="break-inside-avoid">
@@ -177,7 +176,6 @@ function PhotosSection({ data, section }: { data: ProposalDocumentData; section:
         </figure>
       ))}
     </div>
-    </ZoomableGallery>
   )
 }
 
@@ -368,7 +366,6 @@ function GallerySection({ section }: { section: Section }) {
   }
   if (!photos.length) return <p className="text-gray-400 italic">No gallery photos selected.</p>
   return (
-    <ZoomableGallery>
     <div className="grid grid-cols-2 gap-4">
       {photos.map((p) => (
         <figure key={p.id} className="break-inside-avoid">
@@ -380,7 +377,6 @@ function GallerySection({ section }: { section: Section }) {
         </figure>
       ))}
     </div>
-    </ZoomableGallery>
   )
 }
 
