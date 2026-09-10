@@ -214,14 +214,38 @@ export async function syncProposalToPipedrive(
       orgId = (created as { id?: number } | null)?.id ?? null
     }
 
+    // The proposal's own clientEmail (editable in the app) beats the survey's.
+    const clientEmail = (proposal.clientEmail || proposal.survey.clientEmail || "").trim()
+    const clientPhone = (proposal.survey.clientPhone || "").trim()
+
     let personId = proposal.pipedrivePersonId ? Number(proposal.pipedrivePersonId) : null
     if (!personId) {
       const body: Record<string, unknown> = { name: proposal.clientName }
-      if (proposal.survey.clientEmail) body.email = [proposal.survey.clientEmail]
-      if (proposal.survey.clientPhone) body.phone = [proposal.survey.clientPhone]
+      if (clientEmail) body.email = [clientEmail]
+      if (clientPhone) body.phone = [clientPhone]
       if (orgId) body.org_id = orgId
       const created = await pd(org, "/persons", { method: "POST", body })
       personId = (created as { id?: number } | null)?.id ?? null
+    } else if (clientEmail || clientPhone) {
+      // Publish contact details onto the linked person too — but only fill
+      // gaps: existing Pipedrive data is the CRM's truth, never overwritten.
+      try {
+        const person = await pd(org, `/persons/${personId}`)
+        const p = person as {
+          email?: { value?: string }[]
+          phone?: { value?: string }[]
+        } | null
+        const hasEmail = Boolean(p?.email?.some((e) => e.value?.trim()))
+        const hasPhone = Boolean(p?.phone?.some((e) => e.value?.trim()))
+        const update: Record<string, unknown> = {}
+        if (clientEmail && !hasEmail) update.email = [clientEmail]
+        if (clientPhone && !hasPhone) update.phone = [clientPhone]
+        if (Object.keys(update).length) {
+          await pd(org, `/persons/${personId}`, { method: "PUT", body: update })
+        }
+      } catch {
+        // Contact enrichment is a bonus — never let it break the deal sync.
+      }
     }
 
     // Deal value is quoted NET (ex VAT) — Pipedrive tracks the revenue figure.
