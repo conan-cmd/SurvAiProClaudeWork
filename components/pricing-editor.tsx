@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Plus, Trash2, Copy } from "lucide-react"
+import { Plus, Trash2, Copy, HardHat } from "lucide-react"
 import { formatCurrency, calculateProposalTotals, lineNet } from "@/lib/utils"
 
 export type EditableLineItem = {
@@ -14,6 +14,10 @@ export type EditableLineItem = {
   vat: number
   discount: number
   isOptional: boolean
+  // Internal-only subcontractor record — saved with the line, stripped from
+  // every client-facing page before render.
+  subcontractorName?: string | null
+  subcontractorCost?: number | null
   order: number
 }
 
@@ -35,6 +39,17 @@ export function PricingEditor({
 }) {
   const [items, setItems] = useState<EditableLineItem[]>(initialItems)
   const [showDiscount, setShowDiscount] = useState(initialItems.some((i) => i.discount > 0))
+  // Lines with the internal sub-contract panel open (auto-open where data exists).
+  const [subOpen, setSubOpen] = useState<Set<string>>(
+    () => new Set(initialItems.filter((i) => i.subcontractorName || i.subcontractorCost != null).map((i) => i.id))
+  )
+  const toggleSub = (id: string) =>
+    setSubOpen((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle")
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirst = useRef(true)
@@ -199,12 +214,58 @@ export function PricingEditor({
                 <div className="text-sm font-semibold py-1.5">{formatCurrency(lineNet(item))}</div>
               </div>
             </div>
-            <label className="flex items-center gap-2 text-xs font-medium text-gray-600 cursor-pointer select-none">
-              <input type="checkbox" checked={item.isOptional}
-                onChange={(e) => update(item.id, { isOptional: e.target.checked })}
-                className="rounded accent-blue-600" />
-              Optional extra (shown to client, excluded from total)
-            </label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="flex items-center gap-2 text-xs font-medium text-gray-600 cursor-pointer select-none">
+                <input type="checkbox" checked={item.isOptional}
+                  onChange={(e) => update(item.id, { isOptional: e.target.checked })}
+                  className="rounded accent-blue-600" />
+                Optional extra (shown to client, excluded from total)
+              </label>
+              <button type="button" onClick={() => toggleSub(item.id)}
+                title="Record who this line is subbed out to and their cost — internal only, never shown to the client"
+                className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 border transition ${
+                  subOpen.has(item.id) || item.subcontractorName || item.subcontractorCost != null
+                    ? "bg-amber-50 text-amber-800 border-amber-300"
+                    : "text-gray-400 border-gray-200 hover:text-amber-700 hover:border-amber-300"
+                }`}>
+                <HardHat className="w-3.5 h-3.5" />
+                {item.subcontractorCost != null || item.subcontractorName ? "Subbed out" : "Sub-contract"}
+              </button>
+            </div>
+            {subOpen.has(item.id) && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                  Internal — never shown to the client
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
+                  <div className="sm:col-span-1">
+                    <label className="text-[11px] text-gray-500">Subcontractor</label>
+                    <input className={cell} placeholder="Who's doing this line"
+                      value={item.subcontractorName || ""}
+                      onChange={(e) => update(item.id, { subcontractorName: e.target.value || null })} />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-gray-500">Their price £ (net)</label>
+                    <input type="number" min="0" step="0.01" className={cell}
+                      value={item.subcontractorCost ?? ""} placeholder="0"
+                      onChange={(e) => update(item.id, {
+                        subcontractorCost: e.target.value === "" ? null : num(e.target.value),
+                      })} />
+                  </div>
+                  <div className="text-right sm:text-left">
+                    <label className="text-[11px] text-gray-500 block">Your margin</label>
+                    <div className={`text-sm font-semibold py-1.5 ${
+                      item.subcontractorCost != null && lineNet(item) - item.subcontractorCost < 0
+                        ? "text-red-600" : "text-emerald-700"
+                    }`}>
+                      {item.subcontractorCost != null
+                        ? `${formatCurrency(lineNet(item) - item.subcontractorCost)} net`
+                        : "—"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -239,6 +300,30 @@ export function PricingEditor({
           <span>Total</span><span>{formatCurrency(totals.total)}</span>
         </div>
       </div>
+
+      {/* Internal margin summary across subbed-out lines — editor only. */}
+      {items.some((i) => i.subcontractorCost != null) && (() => {
+        const subbed = items.filter((i) => i.subcontractorCost != null)
+        const cost = subbed.reduce((s, i) => s + (i.subcontractorCost || 0), 0)
+        const revenue = subbed.reduce((s, i) => s + lineNet(i), 0)
+        return (
+          <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm space-y-1">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+              Subcontracted lines — internal record
+            </div>
+            <div className="flex justify-between text-gray-600">
+              <span>Subcontractor cost ({subbed.length} line{subbed.length === 1 ? "" : "s"})</span>
+              <span>{formatCurrency(cost)} net</span>
+            </div>
+            <div className="flex justify-between text-gray-600">
+              <span>Quoted for those lines</span><span>{formatCurrency(revenue)} net</span>
+            </div>
+            <div className={`flex justify-between font-semibold ${revenue - cost < 0 ? "text-red-600" : "text-emerald-700"}`}>
+              <span>Your margin</span><span>{formatCurrency(revenue - cost)} net</span>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

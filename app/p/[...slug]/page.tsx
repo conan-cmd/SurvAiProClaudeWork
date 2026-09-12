@@ -93,6 +93,15 @@ export default async function SharedProposalPage({
     .catch(() => {})
 
   let p = link.proposal
+  // Internal subcontractor cost fields must NEVER reach the client-facing
+  // page (props are serialised into the HTML) — strip them before anything
+  // else touches the line items.
+  p = {
+    ...p,
+    pricingLineItems: p.pricingLineItems.map(
+      ({ subcontractorName: _sn, subcontractorCost: _sc, ...item }) => item
+    ) as typeof p.pricingLineItems,
+  }
 
   // Returning from Stripe Checkout: verify payment server-side and record it
   if (

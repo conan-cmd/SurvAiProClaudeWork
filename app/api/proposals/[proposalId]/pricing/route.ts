@@ -13,6 +13,9 @@ const lineItemSchema = z.object({
   vat: z.number().min(0).max(100).default(20),
   discount: z.number().min(0).max(100).default(0),
   isOptional: z.boolean().default(false),
+  // Internal-only subcontractor record — stored, never rendered client-facing.
+  subcontractorName: z.string().max(200).nullable().optional(),
+  subcontractorCost: z.number().min(0).nullable().optional(),
   order: z.number().int().min(0).default(0),
 })
 
@@ -51,6 +54,8 @@ export async function PUT(
         vat: item.vat,
         discount: item.discount,
         isOptional: item.isOptional,
+        subcontractorName: item.subcontractorName?.trim() || null,
+        subcontractorCost: item.subcontractorCost ?? null,
         order: index,
       })),
     })

@@ -610,6 +610,12 @@ model PricingLineItem {
   discount              Float           @default(0)
   isOptional            Boolean         @default(false)
 
+  // Internal-only subcontractor record: who this line is subbed to and their
+  // cost to us. NEVER client-facing — public routes must strip or explicitly
+  // exclude these fields (see app/p/[...slug] and /api/wo).
+  subcontractorName     String?
+  subcontractorCost     Float?
+
   order                 Int             @default(0)
 
   @@index([proposalId])
