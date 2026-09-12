@@ -123,11 +123,11 @@ export default async function DashboardPage({
   const wonPct = sentish.length ? Math.round((wonCount / sentish.length) * 100) : null
   const lostPct = sentish.length ? Math.round((lostCount / sentish.length) * 100) : null
 
-  // Won in the last 7 days by the DATE THE DEAL WAS WON (wonAt, falling back to
-  // the signature date) — independent of the page's time filter, which slices
-  // by when proposals were created.
+  // Won in the last 7 days by signature date (a dedicated won-date column is
+  // deferred until the prod migration path is settled) — independent of the
+  // page's time filter, which slices by when proposals were created.
   const weekAgo = new Date(Date.now() - 7 * 864e5)
-  const wonDate = (p: (typeof proposals)[number]) => p.wonAt ?? p.signedAt
+  const wonDate = (p: (typeof proposals)[number]) => p.signedAt
   const wonThisWeek = proposals.filter((p) => {
     const d = wonDate(p)
     return (

@@ -61,7 +61,9 @@ export default async function ProposalsPage({
   const q = searchParams.q?.trim()
   const approver = isApprover(user)
   const canViewAll = user.role === "OWNER" || user.organization.membersViewAll
-  const viewingAll = searchParams.scope === "all" && canViewAll
+  // Everyone's proposals is the default view; "Mine" narrows explicitly.
+  // (Old ?scope=all links keep working — anything except "mine" means everyone.)
+  const viewingAll = canViewAll && searchParams.scope !== "mine"
   // "won" is a pseudo-filter meaning any accepted deal (signed → deposit → won).
   const wonFilter = searchParams.status === "won"
   const statusFilter =
@@ -84,7 +86,7 @@ export default async function ProposalsPage({
   // Every filter chip keeps the rest of the current filters — override only its own key.
   const link = (overrides: Record<string, string | undefined>) => {
     const merged: Record<string, string | undefined> = {
-      scope: viewingAll ? "all" : undefined,
+      scope: viewingAll ? undefined : "mine",
       member: memberId,
       folder: folderId,
       status: currentStatus || undefined,
@@ -105,14 +107,15 @@ export default async function ProposalsPage({
     ...(folderId ? { folderId } : {}),
     ...(visit === undefined ? {} : { surveyedInPerson: visit }),
   }
-  // On the won view the time filter means "won in this period" (falling back to
-  // the signature date for deals won before wonAt existed); otherwise it's the
-  // proposal's creation date. Kept in AND so it can't clash with the search OR.
+  // On the won view the time filter means "signed in this period" (a proper
+  // won-date column is deferred until the prod migration path is settled);
+  // otherwise it's the proposal's creation date. Kept in AND so it can't
+  // clash with the search OR.
   const andWhere: object[] = []
   if (from) {
     andWhere.push(
       wonFilter
-        ? { OR: [{ wonAt: { gte: from } }, { wonAt: null, signedAt: { gte: from } }] }
+        ? { signedAt: { gte: from } }
         : { createdAt: { gte: from } }
     )
   }
@@ -180,16 +183,16 @@ export default async function ProposalsPage({
       {canViewAll && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <Link href={link({ scope: undefined, member: undefined })}
-            className={`px-3 py-1.5 rounded-full font-medium border transition ${!viewingAll ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
-            Mine
-          </Link>
-          <Link href={link({ scope: "all", member: undefined })}
             className={`px-3 py-1.5 rounded-full font-medium border transition ${viewingAll && !memberId ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
             Everyone
           </Link>
+          <Link href={link({ scope: "mine", member: undefined })}
+            className={`px-3 py-1.5 rounded-full font-medium border transition ${!viewingAll ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
+            Mine
+          </Link>
           {/* One chip per team member — each person's proposals at a glance. */}
           {teamMembers.length > 1 && teamMembers.map((m) => (
-            <Link key={m.id} href={link({ scope: "all", member: m.id })}
+            <Link key={m.id} href={link({ scope: undefined, member: m.id })}
               className={`px-3 py-1.5 rounded-full font-medium border transition ${memberId === m.id ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
               {(m.name || m.email).split(" ")[0]}
             </Link>
@@ -358,8 +361,8 @@ export default async function ProposalsPage({
                   {/* A signed / deposit-paid deal is a won deal — say so alongside the stage */}
                   {["SIGNED", "DEPOSIT_PAID"].includes(p.status) && (
                     <span className="whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700"
-                      title={p.wonAt || p.signedAt
-                        ? `Won ${new Date((p.wonAt || p.signedAt)!).toLocaleDateString("en-GB")}`
+                      title={p.signedAt
+                        ? `Won ${new Date(p.signedAt).toLocaleDateString("en-GB")}`
                         : "Won"}>
                       Won
                     </span>
@@ -376,8 +379,8 @@ export default async function ProposalsPage({
                     </span>
                   )}
                   <span className={`whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[p.status]}`}
-                    title={p.status === "WON" && (p.wonAt || p.signedAt)
-                      ? `Won ${new Date((p.wonAt || p.signedAt)!).toLocaleDateString("en-GB")}`
+                    title={p.status === "WON" && p.signedAt
+                      ? `Won ${new Date(p.signedAt).toLocaleDateString("en-GB")}`
                       : undefined}>
                     {p.status}
                   </span>
