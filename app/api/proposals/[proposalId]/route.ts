@@ -90,7 +90,6 @@ export async function PATCH(
     // sign the paperwork digitally later (e.g. after a nudge).
     data.status = "WON"
   }
-
   const proposal = await db.proposal.update({
     where: { id: params.proposalId },
     data,

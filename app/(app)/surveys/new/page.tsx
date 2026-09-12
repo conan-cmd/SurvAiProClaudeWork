@@ -126,6 +126,58 @@ export default function NewSurveyPage() {
   const set = (name: string, value: string | boolean) =>
     setForm((prev) => ({ ...prev, [name]: value }))
 
+  // Previous-client suggestions while typing the client name — picking one
+  // fills their details from the most recent survey for that client.
+  type ClientSuggestion = {
+    clientName: string
+    clientCompany: string | null
+    clientEmail: string | null
+    clientPhone: string | null
+    clientAddress: string
+    isResidential: boolean
+  }
+  const [clientSugs, setClientSugs] = useState<ClientSuggestion[]>([])
+  const [showSugs, setShowSugs] = useState(false)
+  const sugSkip = useRef(false) // set when a suggestion is picked — don't re-open
+  useEffect(() => {
+    if (sugSkip.current) {
+      sugSkip.current = false
+      return
+    }
+    const q = form.clientName.trim()
+    if (q.length < 2) {
+      setClientSugs([])
+      setShowSugs(false)
+      return
+    }
+    const t = setTimeout(() => {
+      fetch(`/api/clients/suggest?q=${encodeURIComponent(q)}`)
+        .then((r) => (r.ok ? r.json() : { clients: [] }))
+        .then((d) => {
+          const list = Array.isArray(d.clients) ? d.clients : []
+          setClientSugs(list)
+          setShowSugs(list.length > 0)
+        })
+        .catch(() => {})
+    }, 250)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.clientName])
+  const pickClient = (c: ClientSuggestion) => {
+    sugSkip.current = true
+    setForm((prev) => ({
+      ...prev,
+      clientName: c.clientName,
+      clientCompany: c.clientCompany || prev.clientCompany,
+      clientEmail: c.clientEmail || prev.clientEmail,
+      clientPhone: c.clientPhone || prev.clientPhone,
+      clientAddress: c.clientAddress || prev.clientAddress,
+      isResidential: c.isResidential,
+    }))
+    setShowSugs(false)
+    toast.success("Client details filled from their last survey")
+  }
+
   const pickContact = (p: PdPerson) => {
     setForm((prev) => ({
       ...prev,
@@ -254,10 +306,32 @@ export default function NewSurveyPage() {
             )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
+            <div className="relative">
               <label className={labelCls}>Client name *</label>
               <input className={inputCls} value={form.clientName}
-                onChange={(e) => set("clientName", e.target.value)} placeholder="Jane Smith" />
+                onChange={(e) => set("clientName", e.target.value)} placeholder="Jane Smith"
+                onFocus={() => clientSugs.length > 0 && setShowSugs(true)}
+                onBlur={() => setTimeout(() => setShowSugs(false), 150)}
+                autoComplete="off" />
+              {showSugs && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-20 overflow-hidden">
+                  <div className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 bg-gray-50">
+                    Previous clients
+                  </div>
+                  {clientSugs.map((c, i) => (
+                    <button key={i} type="button"
+                      onMouseDown={(e) => { e.preventDefault(); pickClient(c) }}
+                      className="w-full text-left px-3 py-2 hover:bg-blue-50 border-t first:border-t-0">
+                      <span className="block text-sm font-medium text-gray-800">
+                        {c.clientName}{c.clientCompany ? ` · ${c.clientCompany}` : ""}
+                      </span>
+                      <span className="block text-xs text-gray-400 truncate">
+                        {[c.clientAddress, c.clientEmail, c.clientPhone].filter(Boolean).join(" · ")}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div>
               <label className={labelCls}>Company</label>
