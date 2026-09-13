@@ -351,6 +351,18 @@ export default function ProposalEditorPage() {
       setNudgeTemplateId(t[0]?.id ?? null)
     }
   }
+  // Arriving via a list row's "Nudge client" (?nudge=1): open the reminder
+  // dialog as soon as the proposal has loaded. window.location avoids the
+  // useSearchParams suspense requirement.
+  const nudgeAutoOpened = useRef(false)
+  useEffect(() => {
+    if (!proposal || nudgeAutoOpened.current) return
+    if (new URLSearchParams(window.location.search).get("nudge") === "1") {
+      nudgeAutoOpened.current = true
+      openNudge()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposal])
   const sendNudge = async () => {
     if (!proposal) return
     const usingCustom = nudgeTemplateId === "__custom__"

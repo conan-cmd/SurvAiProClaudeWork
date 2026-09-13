@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
-  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check, ExternalLink, MapPin,
+  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check, ExternalLink, MapPin, BellRing,
 } from "lucide-react"
 
 type FolderOption = { id: string; name: string }
@@ -239,6 +239,13 @@ export function ItemActions({
                 <button onClick={(e) => { e.preventDefault(); markSent() }} className={menuItem}
                   title="For proposals delivered outside the app — printed, WhatsApp'd, handed over">
                   <Send className="w-4 h-4" /> Mark as sent
+                </button>
+              )}
+              {kind === "proposal" && ["SENT", "WON"].includes(proposalStatus || "") && (
+                <button onClick={(e) => { e.preventDefault(); setOpen(false); router.push(`/proposals/${id}?nudge=1`) }}
+                  className={menuItem}
+                  title="Send the client a reminder — with an optional video or voice message">
+                  <BellRing className="w-4 h-4" /> Nudge client
                 </button>
               )}
               {kind === "proposal" && ["DRAFT", "READY", "SENT"].includes(proposalStatus || "") && (
