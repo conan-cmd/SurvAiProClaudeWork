@@ -151,9 +151,43 @@ export default async function SharedProposalPage({
   const { resolveProposalIdentity } = await import("@/lib/proposal-identity")
   const identity = await resolveProposalIdentity(p)
 
+  // Latest recorded video/voice message sent with a nudge — played in a
+  // personal banner above the proposal.
+  const { parseNudgeHistory } = await import("@/lib/nudge")
+  const mediaNote = parseNudgeHistory(p.nudgeHistory)
+    .filter((r) => r.mediaUrl && r.mediaType)
+    .pop()
+
   return (
     <main className="min-h-screen bg-brand-gray py-6 px-3 md:py-10">
-      <div className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-4 md:p-10">
+      <div className="max-w-3xl mx-auto space-y-4">
+        {mediaNote && !p.signedAt && (
+          <div className="bg-white rounded-xl shadow-sm p-4 md:p-5">
+            <div className="flex items-center gap-3 mb-3">
+              {identity.headshotUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={identity.headshotUrl} alt={identity.name || p.organization.name}
+                  className="w-10 h-10 rounded-full object-cover" />
+              ) : null}
+              <div>
+                <div className="font-semibold text-gray-900">
+                  {mediaNote.mediaType === "video" ? "A video message" : "A voice message"} from{" "}
+                  {identity.name || p.organization.name}
+                </div>
+                <div className="text-xs text-gray-400">
+                  Recorded {new Date(mediaNote.at).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}
+                </div>
+              </div>
+            </div>
+            {mediaNote.mediaType === "video" ? (
+              <video src={mediaNote.mediaUrl} controls playsInline preload="metadata"
+                className="w-full max-h-[420px] rounded-lg bg-black" />
+            ) : (
+              <audio src={mediaNote.mediaUrl} controls preload="metadata" className="w-full" />
+            )}
+          </div>
+        )}
+        <div className="bg-white rounded-xl shadow-sm p-4 md:p-10">
         <ProposalDocument
           data={{
             clientName: p.clientName,
@@ -250,6 +284,7 @@ export default async function SharedProposalPage({
             brandColor={p.organization.brandColor}
           />
         )}
+        </div>
       </div>
       <p className="text-center text-xs text-gray-400 mt-6">
         Prepared with SurvAIPro

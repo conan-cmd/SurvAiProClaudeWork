@@ -15,6 +15,9 @@ const nudgeSchema = z.object({
   message: z.string().trim().min(1).max(1000).optional(),
   // How the custom message is labelled in the nudge history.
   messageName: z.string().trim().max(60).optional(),
+  // Personal media message uploaded to Blob storage before sending.
+  mediaUrl: z.string().url().max(1000).optional(),
+  mediaType: z.enum(["video", "audio"]).optional(),
 })
 
 // Sends the client a gentle follow-up on an unsigned proposal — e.g. after a
@@ -80,20 +83,36 @@ export async function POST(
 
   const message = template.body.trim()
   const safeMsg = message.replace(/</g, "&lt;").replace(/\n/g, "<br/>")
+  // A recorded video/voice note plays in a banner on the proposal page, so the
+  // email leads with it and the link does double duty.
+  const media = parsed.data.mediaUrl && parsed.data.mediaType
+    ? { url: parsed.data.mediaUrl, type: parsed.data.mediaType }
+    : null
+  const senderFirst = (identity.name || user.name || org.name).split(/\s+/)[0]
+  const mediaLine = media
+    ? media.type === "video"
+      ? `${senderFirst} has recorded you a short video message — it plays at the top of your proposal.`
+      : `${senderFirst} has recorded you a voice message — it plays at the top of your proposal.`
+    : null
+  const linkLabel = media
+    ? media.type === "video" ? "Watch the message &amp; view your proposal" : "Listen &amp; view your proposal"
+    : "Review &amp; sign your proposal"
   const html = `
     <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;max-width:520px">
       <p>Hi ${proposal.clientName.split(/\s+/)[0]},</p>
+      ${mediaLine ? `<p>${media!.type === "video" ? "🎥" : "🎙"} <strong>${mediaLine}</strong></p>` : ""}
       <p>${safeMsg}</p>
-      <p style="margin:20px 0"><a href="${url}" style="color:#2563EB;font-weight:600">Review &amp; sign your proposal &rarr;</a></p>
+      <p style="margin:20px 0"><a href="${url}" style="color:#2563EB;font-weight:600">${linkLabel} &rarr;</a></p>
       <p>Any questions at all, just reply to this email.</p>
       <p>Kind regards,<br/>${identity.name || user.name || org.name}${org.phone ? `<br/>${org.phone}` : ""}</p>
     </div>`
   const text = [
     `Hi ${proposal.clientName.split(/\s+/)[0]},`,
     "",
+    ...(mediaLine ? [mediaLine, ""] : []),
     message,
     "",
-    `Review & sign your proposal: ${url}`,
+    `${media ? (media.type === "video" ? "Watch the message & view your proposal" : "Listen & view your proposal") : "Review & sign your proposal"}: ${url}`,
     "",
     "Any questions at all, just reply to this email.",
     "",
@@ -105,7 +124,9 @@ export async function POST(
     await sendEmail({
       to: proposal.clientEmail,
       replyTo: identity.email || org.email || user.email,
-      subject: `Your proposal from ${org.name} — ready when you are`,
+      subject: media
+        ? `A ${media.type === "video" ? "video" : "voice"} message about your proposal from ${org.name}`
+        : `Your proposal from ${org.name} — ready when you are`,
       html,
       text,
       fromUserId: identity.userId ?? user.id,
@@ -114,6 +135,7 @@ export async function POST(
       at: new Date().toISOString(),
       templateName: template.name,
       by: user.name || user.email,
+      ...(media ? { mediaUrl: media.url, mediaType: media.type } : {}),
     }
     const history = [...parseNudgeHistory(proposal.nudgeHistory), record]
     const updated = await db.proposal.update({
