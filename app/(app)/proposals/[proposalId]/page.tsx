@@ -19,6 +19,15 @@ import { uploadSurveyPhotos, type UploadedPhoto } from "@/lib/photo-upload"
 import { RamsButton } from "@/components/rams-button"
 import { parseNudgeTemplates, parseNudgeHistory, type NudgeTemplate } from "@/lib/nudge"
 
+function relTime(d: Date | string): string {
+  const mins = Math.round((Date.now() - new Date(d).getTime()) / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.round(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.round(hrs / 24)}d ago`
+}
+
 type Section = {
   id: string
   type: string
@@ -886,16 +895,31 @@ export default function ProposalEditorPage() {
             </span>
           )}
           {["SENT", "WON"].includes(proposal.status) && !proposal.signedAt && (() => {
-            const count = parseNudgeHistory(proposal.nudgeHistory).length
+            const history = parseNudgeHistory(proposal.nudgeHistory)
+            const count = history.length
+            const last = history[count - 1]
             return (
-              <button onClick={openNudge}
-                title={proposal.lastNudgeAt
-                  ? `Last reminder sent ${new Date(proposal.lastNudgeAt).toLocaleDateString("en-GB")}`
-                  : "Email the client a gentle reminder to sign (templates customisable in Settings)"}
-                className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
-                <BellRing className="w-4 h-4" />
-                Nudge{count > 0 ? ` (${count})` : ""}
-              </button>
+              <>
+                <button onClick={openNudge}
+                  title={proposal.lastNudgeAt
+                    ? `Last reminder sent ${new Date(proposal.lastNudgeAt).toLocaleDateString("en-GB")}`
+                    : "Email the client a gentle reminder to sign (templates customisable in Settings)"}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+                  <BellRing className="w-4 h-4" />
+                  Nudge{count > 0 ? ` (${count})` : ""}
+                </button>
+                {last && (
+                  // Last follow-up at a glance — click for the full history.
+                  <button onClick={openNudge}
+                    title={`Last follow-up: ${last.templateName} — ${new Date(last.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}${last.mediaType ? ` · included a ${last.mediaType === "video" ? "video" : "voice"} message` : ""}${last.by ? ` · by ${last.by}` : ""}`}
+                    className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100">
+                    {last.mediaType === "video" ? <Video className="w-3.5 h-3.5" />
+                      : last.mediaType === "audio" ? <Mic className="w-3.5 h-3.5" />
+                      : <BellRing className="w-3.5 h-3.5" />}
+                    Last follow-up {relTime(last.at)}
+                  </button>
+                )}
+              </>
             )
           })()}
           {!proposal.signedAt && !["SIGNED", "DEPOSIT_PAID", "WON"].includes(proposal.status) && (
@@ -997,9 +1021,17 @@ export default function ProposalEditorPage() {
                       </p>
                       <ul className="space-y-1">
                         {history.slice().reverse().map((r, i) => (
-                          <li key={i} className="text-xs text-gray-600">
+                          <li key={i} className="text-xs text-gray-600 flex items-center gap-1.5 flex-wrap">
                             {new Date(r.at).toLocaleDateString("en-GB")} — {r.templateName}
-                            {r.by ? <span className="text-gray-400"> · {r.by}</span> : null}
+                            {r.by ? <span className="text-gray-400">· {r.by}</span> : null}
+                            {r.mediaType && r.mediaUrl && (
+                              <a href={r.mediaUrl} target="_blank" rel="noopener noreferrer"
+                                title={`Play the ${r.mediaType === "video" ? "video" : "voice"} message that went with this nudge`}
+                                className="inline-flex items-center gap-1 text-brand-blue font-medium hover:underline">
+                                {r.mediaType === "video" ? <Video className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                                {r.mediaType === "video" ? "video message" : "voice note"}
+                              </a>
+                            )}
                           </li>
                         ))}
                       </ul>
