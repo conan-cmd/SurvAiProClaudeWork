@@ -15,7 +15,9 @@ export function MediaNoteRecorder({
   onCancel,
 }: {
   mode: "video" | "audio"
-  onUse: (blob: Blob, mimeType: string) => void
+  // poster: a JPEG still from the video (play badge baked in) for the email
+  // thumbnail — null for audio or when frame capture fails.
+  onUse: (blob: Blob, mimeType: string, poster: Blob | null) => void
   onCancel: () => void
 }) {
   const [phase, setPhase] = useState<"starting" | "ready" | "recording" | "review" | "error">("starting")
@@ -142,10 +144,67 @@ export function MediaNoteRecorder({
     setPhase("ready")
   }
 
-  const use = () => {
+  // Loom-style email thumbnail: centre-square frame from the take with a
+  // play badge drawn on. Best-effort — a null poster just means a text link.
+  const makePoster = (url: string): Promise<Blob | null> =>
+    new Promise((resolve) => {
+      let done = false
+      const finish = (b: Blob | null) => {
+        if (!done) {
+          done = true
+          resolve(b)
+        }
+      }
+      const v = document.createElement("video")
+      v.muted = true
+      v.playsInline = true
+      v.preload = "auto"
+      v.src = url
+      v.onerror = () => finish(null)
+      v.onloadeddata = () => {
+        try {
+          // MediaRecorder blobs often report Infinity duration — a fixed early
+          // seek is the reliable way to land on a real frame.
+          v.currentTime = 0.5
+        } catch {
+          finish(null)
+        }
+      }
+      v.onseeked = () => {
+        try {
+          const size = 480
+          const c = document.createElement("canvas")
+          c.width = size
+          c.height = size
+          const ctx = c.getContext("2d")
+          if (!ctx || !v.videoWidth) return finish(null)
+          const s = Math.min(v.videoWidth, v.videoHeight)
+          ctx.drawImage(v, (v.videoWidth - s) / 2, (v.videoHeight - s) / 2, s, s, 0, 0, size, size)
+          ctx.fillStyle = "rgba(15,23,42,0.55)"
+          ctx.beginPath()
+          ctx.arc(size / 2, size / 2, size * 0.17, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.fillStyle = "#FFFFFF"
+          const r = size * 0.075
+          ctx.beginPath()
+          ctx.moveTo(size / 2 - r * 0.55, size / 2 - r)
+          ctx.lineTo(size / 2 - r * 0.55, size / 2 + r)
+          ctx.lineTo(size / 2 + r * 1.15, size / 2)
+          ctx.closePath()
+          ctx.fill()
+          c.toBlob((b) => finish(b), "image/jpeg", 0.85)
+        } catch {
+          finish(null)
+        }
+      }
+      setTimeout(() => finish(null), 4000)
+    })
+
+  const use = async () => {
     if (!take) return
+    const poster = mode === "video" ? await makePoster(take.url) : null
     cleanup()
-    onUse(take.blob, take.mime)
+    onUse(take.blob, take.mime, poster)
   }
 
   const close = () => {

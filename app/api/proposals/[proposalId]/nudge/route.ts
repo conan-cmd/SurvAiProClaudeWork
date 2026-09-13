@@ -18,6 +18,8 @@ const nudgeSchema = z.object({
   // Personal media message uploaded to Blob storage before sending.
   mediaUrl: z.string().url().max(1000).optional(),
   mediaType: z.enum(["video", "audio"]).optional(),
+  // Still-frame thumbnail (play badge baked in) for the email body.
+  mediaPosterUrl: z.string().url().max(1000).optional(),
 })
 
 // Sends the client a gentle follow-up on an unsigned proposal — e.g. after a
@@ -86,7 +88,7 @@ export async function POST(
   // A recorded video/voice note plays in a banner on the proposal page, so the
   // email leads with it and the link does double duty.
   const media = parsed.data.mediaUrl && parsed.data.mediaType
-    ? { url: parsed.data.mediaUrl, type: parsed.data.mediaType }
+    ? { url: parsed.data.mediaUrl, type: parsed.data.mediaType, poster: parsed.data.mediaPosterUrl || null }
     : null
   const senderFirst = (identity.name || user.name || org.name).split(/\s+/)[0]
   const mediaLine = media
@@ -97,10 +99,29 @@ export async function POST(
   const linkLabel = media
     ? media.type === "video" ? "Watch the message &amp; view your proposal" : "Listen &amp; view your proposal"
     : "Review &amp; sign your proposal"
+  // Loom-style circular preview: a real frame from the recording (or the
+  // sender's headshot for voice notes), the whole thing linked — so the email
+  // clearly shows a genuine video, not just a bare link.
+  const posterImg = media
+    ? media.type === "video" && media.poster
+      ? { src: media.poster, alt: "Play the video message", size: 132 }
+      : media.type === "audio" && identity.headshotUrl
+        ? { src: identity.headshotUrl, alt: `${senderFirst}'s voice message`, size: 104 }
+        : null
+    : null
+  const posterHtml = posterImg
+    ? `<p style="margin:18px 0 6px"><a href="${url}" style="text-decoration:none">
+        <img src="${posterImg.src}" width="${posterImg.size}" height="${posterImg.size}" alt="${posterImg.alt}"
+          style="display:block;border-radius:50%;border:3px solid #2563EB;object-fit:cover" />
+      </a></p>
+      <p style="margin:0 0 14px"><a href="${url}" style="color:#2563EB;font-weight:600;font-size:13px">
+        ${media!.type === "video" ? "&#9654; Play video message" : "&#127908; Play voice message"}</a></p>`
+    : ""
   const html = `
     <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;max-width:520px">
       <p>Hi ${proposal.clientName.split(/\s+/)[0]},</p>
       ${mediaLine ? `<p>${media!.type === "video" ? "🎥" : "🎙"} <strong>${mediaLine}</strong></p>` : ""}
+      ${posterHtml}
       <p>${safeMsg}</p>
       <p style="margin:20px 0"><a href="${url}" style="color:#2563EB;font-weight:600">${linkLabel} &rarr;</a></p>
       <p>Any questions at all, just reply to this email.</p>
@@ -135,7 +156,7 @@ export async function POST(
       at: new Date().toISOString(),
       templateName: template.name,
       by: user.name || user.email,
-      ...(media ? { mediaUrl: media.url, mediaType: media.type } : {}),
+      ...(media ? { mediaUrl: media.url, mediaType: media.type, ...(media.poster ? { mediaPosterUrl: media.poster } : {}) } : {}),
     }
     const history = [...parseNudgeHistory(proposal.nudgeHistory), record]
     const updated = await db.proposal.update({
