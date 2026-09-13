@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Eye, EyeOff, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing, KanbanSquare, MapPin } from "lucide-react"
+import { Eye, EyeOff, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing, KanbanSquare, MapPin, Video, Mic } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { isApprover } from "@/lib/permissions"
@@ -348,12 +348,18 @@ export default async function ProposalsPage({
                   )}
                   {(() => {
                     const nudges = parseNudgeHistory(p.nudgeHistory)
-                    if (!nudges.length || ["SIGNED", "DEPOSIT_PAID", "WON"].includes(p.status)) return null
+                    // Chasing is over once there's a signature — hide the chip then.
+                    if (!nudges.length || p.signedAt || ["SIGNED", "DEPOSIT_PAID"].includes(p.status)) return null
                     const last = nudges[nudges.length - 1]
+                    const hasVideo = nudges.some((n) => n.mediaType === "video")
+                    const hasAudio = nudges.some((n) => n.mediaType === "audio")
                     return (
                       <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700"
-                        title={`Last nudge: ${last.templateName} — ${new Date(last.at).toLocaleDateString("en-GB")}`}>
-                        <BellRing className="w-3.5 h-3.5" /> Nudged{nudges.length > 1 ? ` ×${nudges.length}` : ""}
+                        title={`Last follow-up: ${last.templateName} — ${new Date(last.at).toLocaleDateString("en-GB")}${last.mediaType ? ` · included a ${last.mediaType === "video" ? "video" : "voice"} message` : ""} · open the proposal for the full history`}>
+                        <BellRing className="w-3.5 h-3.5" />
+                        Nudged{nudges.length > 1 ? ` ×${nudges.length}` : ""} {relTime(last.at)}
+                        {hasVideo && <Video className="w-3.5 h-3.5" />}
+                        {hasAudio && <Mic className="w-3.5 h-3.5" />}
                       </span>
                     )
                   })()}
