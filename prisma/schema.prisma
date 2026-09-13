@@ -440,6 +440,9 @@ model Proposal {
   // Metadata
   status                ProposalStatus  @default(DRAFT)
   sentAt                DateTime?
+  // When the deal was won — stamped on client signing, "Mark as won", or a
+  // manual move to a won-stage status. Cleared if moved back to an open stage.
+  wonAt                 DateTime?
   lastNudgeAt           DateTime?
   // Manual list position (drag to reorder). Null = untouched → newest-first.
   sortIndex             Int?
