@@ -175,8 +175,9 @@ export default async function SharedProposalPage({
                   {identity.name || p.organization.name}
                 </div>
                 <div className="text-xs text-gray-400">
-                  Recorded {new Date(mediaNote.at).toLocaleDateString("en-GB", { day: "numeric", month: "long" })} at{" "}
-                  {new Date(mediaNote.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                  {/* Server renders in UTC — pin to UK time so BST shows correctly */}
+                  Recorded {new Date(mediaNote.at).toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "Europe/London" })} at{" "}
+                  {new Date(mediaNote.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" })}
                 </div>
               </div>
             </div>
