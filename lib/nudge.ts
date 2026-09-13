@@ -4,7 +4,15 @@
 
 export type NudgeTemplate = { id: string; name: string; body: string }
 
-export type NudgeRecord = { at: string; templateName: string; by?: string }
+export type NudgeRecord = {
+  at: string
+  templateName: string
+  by?: string
+  // Personal media message recorded with this nudge (selfie video / voice
+  // note) — the public proposal page plays the latest one in a banner.
+  mediaUrl?: string
+  mediaType?: "video" | "audio"
+}
 
 export const DEFAULT_NUDGE_MESSAGE =
   "Great to hear you'd like to go ahead — let's make it official! " +

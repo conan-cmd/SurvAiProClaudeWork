@@ -7,11 +7,12 @@ import {
   Loader2, Sparkles, ChevronUp, ChevronDown, Trash2, Plus, Eye,
   Pencil, Link2, Printer, Check, Send, Copy, Share2, X, MessageCircle, MessageSquare,
   ShieldCheck, ClipboardCheck, Clock, AlertTriangle, BellRing, MapPin, Play, PenLine,
-  ExternalLink,
+  ExternalLink, Video, Mic,
 } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
 import { ProposalDocument } from "@/components/proposal-document"
 import { AddressInput } from "@/components/address-input"
+import { MediaNoteRecorder } from "@/components/media-note-recorder"
 import { DropZone } from "@/components/drop-zone"
 import { PricingEditor, EditableLineItem } from "@/components/pricing-editor"
 import { uploadSurveyPhotos, type UploadedPhoto } from "@/lib/photo-upload"
@@ -317,6 +318,17 @@ export default function ProposalEditorPage() {
   const [nudgeTemplateName, setNudgeTemplateName] = useState("")
   // Missing client email can be added right here instead of via the survey.
   const [nudgeEmail, setNudgeEmail] = useState("")
+  // Personal selfie-video / voice-note message recorded for this nudge.
+  const [recorderMode, setRecorderMode] = useState<"video" | "audio" | null>(null)
+  const [nudgeMedia, setNudgeMedia] = useState<{
+    blob: Blob; mime: string; kind: "video" | "audio"; url: string
+  } | null>(null)
+  const clearNudgeMedia = () => {
+    setNudgeMedia((m) => {
+      if (m) URL.revokeObjectURL(m.url)
+      return null
+    })
+  }
   // Lock the page behind the nudge modal — on mobile, touch-scrolling the
   // dialog otherwise scrolls the background page instead of the options.
   useEffect(() => {
@@ -362,13 +374,32 @@ export default function ProposalEditorPage() {
         if (!emailRes.ok) throw new Error((await emailRes.json()).error || "Couldn't save the email")
         setProposal((p) => (p ? { ...p, clientEmail: nudgeEmail.trim() } : p))
       }
+      // Recorded video/voice note: upload to Blob first, then send its URL.
+      let media: { mediaUrl: string; mediaType: "video" | "audio" } | undefined
+      if (nudgeMedia) {
+        try {
+          const { upload } = await import("@vercel/blob/client")
+          const org = await fetch("/api/organization").then((r) => r.json())
+          const ext = nudgeMedia.mime.includes("mp4")
+            ? nudgeMedia.kind === "audio" ? "m4a" : "mp4"
+            : nudgeMedia.mime.includes("ogg") ? "ogg" : "webm"
+          const blob = await upload(
+            `organizations/${org.id}/nudge-media/${proposalId}-${Date.now()}.${ext}`,
+            nudgeMedia.blob,
+            { access: "public", handleUploadUrl: "/api/blob/upload", contentType: nudgeMedia.mime }
+          )
+          media = { mediaUrl: blob.url, mediaType: nudgeMedia.kind }
+        } catch {
+          throw new Error("Couldn't upload your recording — check your connection and try again")
+        }
+      }
       const res = await fetch(`/api/proposals/${proposalId}/nudge`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           usingCustom
-            ? { message: nudgeCustom.trim(), messageName: nudgeSaveTemplate && nudgeTemplateName.trim() ? nudgeTemplateName.trim() : undefined }
-            : { templateId: nudgeTemplateId }
+            ? { message: nudgeCustom.trim(), messageName: nudgeSaveTemplate && nudgeTemplateName.trim() ? nudgeTemplateName.trim() : undefined, ...media }
+            : { templateId: nudgeTemplateId, ...media }
         ),
       })
       const d = await res.json()
@@ -394,6 +425,7 @@ export default function ProposalEditorPage() {
       setNudgeCustom("")
       setNudgeSaveTemplate(false)
       setNudgeTemplateName("")
+      clearNudgeMedia()
       toast.success("Reminder sent")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't send the reminder")
@@ -1030,6 +1062,39 @@ export default function ProposalEditorPage() {
                     </p>
                   </div>
                 )}
+                {/* Personal video / voice message — recorded and reviewed before sending */}
+                <div className="rounded-lg border p-3 space-y-2">
+                  <p className="text-sm font-medium text-gray-700">
+                    Add a personal touch <span className="text-xs text-gray-400 font-normal">(optional)</span>
+                  </p>
+                  {nudgeMedia ? (
+                    <div className="space-y-2">
+                      {nudgeMedia.kind === "video" ? (
+                        <video src={nudgeMedia.url} controls playsInline className="w-full max-h-64 rounded-lg bg-black" />
+                      ) : (
+                        <audio src={nudgeMedia.url} controls className="w-full" />
+                      )}
+                      <div className="flex items-center gap-3 text-xs font-medium">
+                        <button type="button" onClick={() => { clearNudgeMedia(); setRecorderMode(nudgeMedia.kind) }}
+                          className="text-brand-blue hover:underline">Re-record</button>
+                        <button type="button" onClick={clearNudgeMedia}
+                          className="text-gray-400 hover:text-red-600">Remove</button>
+                        <span className="text-gray-400 font-normal">Sends with the reminder — the client watches it on their proposal page.</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => setRecorderMode("video")}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:border-brand-blue hover:text-brand-blue">
+                        <Video className="w-4 h-4" /> Record video
+                      </button>
+                      <button type="button" onClick={() => setRecorderMode("audio")}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:border-brand-blue hover:text-brand-blue">
+                        <Mic className="w-4 h-4" /> Record voice note
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <div className="flex justify-end gap-2 pt-1">
                   <button onClick={() => setNudgeOpen(false)} disabled={nudging}
                     className="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
@@ -1041,6 +1106,16 @@ export default function ProposalEditorPage() {
                 </div>
               </div>
             </div>
+          )}
+          {recorderMode && (
+            <MediaNoteRecorder
+              mode={recorderMode}
+              onCancel={() => setRecorderMode(null)}
+              onUse={(blob, mime) => {
+                setNudgeMedia({ blob, mime, kind: recorderMode, url: URL.createObjectURL(blob) })
+                setRecorderMode(null)
+              }}
+            />
           )}
           <button onClick={() => setMode(mode === "edit" ? "preview" : "edit")}
             className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
