@@ -330,7 +330,7 @@ export default function ProposalEditorPage() {
   // Personal selfie-video / voice-note message recorded for this nudge.
   const [recorderMode, setRecorderMode] = useState<"video" | "audio" | null>(null)
   const [nudgeMedia, setNudgeMedia] = useState<{
-    blob: Blob; mime: string; kind: "video" | "audio"; url: string
+    blob: Blob; mime: string; kind: "video" | "audio"; url: string; poster: Blob | null
   } | null>(null)
   const clearNudgeMedia = () => {
     setNudgeMedia((m) => {
@@ -396,7 +396,7 @@ export default function ProposalEditorPage() {
         setProposal((p) => (p ? { ...p, clientEmail: nudgeEmail.trim() } : p))
       }
       // Recorded video/voice note: upload to Blob first, then send its URL.
-      let media: { mediaUrl: string; mediaType: "video" | "audio" } | undefined
+      let media: { mediaUrl: string; mediaType: "video" | "audio"; mediaPosterUrl?: string } | undefined
       if (nudgeMedia) {
         try {
           const { upload } = await import("@vercel/blob/client")
@@ -404,12 +404,26 @@ export default function ProposalEditorPage() {
           const ext = nudgeMedia.mime.includes("mp4")
             ? nudgeMedia.kind === "audio" ? "m4a" : "mp4"
             : nudgeMedia.mime.includes("ogg") ? "ogg" : "webm"
+          const stamp = Date.now()
           const blob = await upload(
-            `organizations/${org.id}/nudge-media/${proposalId}-${Date.now()}.${ext}`,
+            `organizations/${org.id}/nudge-media/${proposalId}-${stamp}.${ext}`,
             nudgeMedia.blob,
             { access: "public", handleUploadUrl: "/api/blob/upload", contentType: nudgeMedia.mime }
           )
           media = { mediaUrl: blob.url, mediaType: nudgeMedia.kind }
+          if (nudgeMedia.poster) {
+            // Thumbnail for the email — best-effort, the text link still works.
+            try {
+              const poster = await upload(
+                `organizations/${org.id}/nudge-media/${proposalId}-${stamp}-poster.jpg`,
+                nudgeMedia.poster,
+                { access: "public", handleUploadUrl: "/api/blob/upload", contentType: "image/jpeg" }
+              )
+              media.mediaPosterUrl = poster.url
+            } catch {
+              // Email falls back to the text link.
+            }
+          }
         } catch {
           throw new Error("Couldn't upload your recording — check your connection and try again")
         }
@@ -1155,8 +1169,8 @@ export default function ProposalEditorPage() {
             <MediaNoteRecorder
               mode={recorderMode}
               onCancel={() => setRecorderMode(null)}
-              onUse={(blob, mime) => {
-                setNudgeMedia({ blob, mime, kind: recorderMode, url: URL.createObjectURL(blob) })
+              onUse={(blob, mime, poster) => {
+                setNudgeMedia({ blob, mime, kind: recorderMode, url: URL.createObjectURL(blob), poster })
                 setRecorderMode(null)
               }}
             />

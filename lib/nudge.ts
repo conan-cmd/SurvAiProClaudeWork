@@ -12,6 +12,8 @@ export type NudgeRecord = {
   // note) — the public proposal page plays the latest one in a banner.
   mediaUrl?: string
   mediaType?: "video" | "audio"
+  // Circular still-frame thumbnail (play badge baked in) used in the email.
+  mediaPosterUrl?: string
 }
 
 export const DEFAULT_NUDGE_MESSAGE =

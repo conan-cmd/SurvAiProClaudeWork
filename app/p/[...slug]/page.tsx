@@ -181,6 +181,7 @@ export default async function SharedProposalPage({
             </div>
             {mediaNote.mediaType === "video" ? (
               <video src={mediaNote.mediaUrl} controls playsInline preload="metadata"
+                poster={mediaNote.mediaPosterUrl}
                 className="w-full max-h-[420px] rounded-lg bg-black" />
             ) : (
               <audio src={mediaNote.mediaUrl} controls preload="metadata" className="w-full" />
