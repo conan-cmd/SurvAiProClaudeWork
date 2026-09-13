@@ -175,7 +175,8 @@ export default async function SharedProposalPage({
                   {identity.name || p.organization.name}
                 </div>
                 <div className="text-xs text-gray-400">
-                  Recorded {new Date(mediaNote.at).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}
+                  Recorded {new Date(mediaNote.at).toLocaleDateString("en-GB", { day: "numeric", month: "long" })} at{" "}
+                  {new Date(mediaNote.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
                 </div>
               </div>
             </div>
