@@ -71,6 +71,8 @@ export async function POST(
           vat: li.vat,
           discount: li.discount,
           isOptional: li.isOptional,
+          subcontractorName: li.subcontractorName,
+          subcontractorCost: li.subcontractorCost,
           order: li.order,
         })),
       },

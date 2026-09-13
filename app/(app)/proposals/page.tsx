@@ -107,15 +107,14 @@ export default async function ProposalsPage({
     ...(folderId ? { folderId } : {}),
     ...(visit === undefined ? {} : { surveyedInPerson: visit }),
   }
-  // On the won view the time filter means "signed in this period" (a proper
-  // won-date column is deferred until the prod migration path is settled);
-  // otherwise it's the proposal's creation date. Kept in AND so it can't
-  // clash with the search OR.
+  // On the won view the time filter means "won in this period" (falling back to
+  // the signature date for older records); otherwise it's the proposal's
+  // creation date. Kept in AND so it can't clash with the search OR.
   const andWhere: object[] = []
   if (from) {
     andWhere.push(
       wonFilter
-        ? { signedAt: { gte: from } }
+        ? { OR: [{ wonAt: { gte: from } }, { wonAt: null, signedAt: { gte: from } }] }
         : { createdAt: { gte: from } }
     )
   }
@@ -361,8 +360,8 @@ export default async function ProposalsPage({
                   {/* A signed / deposit-paid deal is a won deal — say so alongside the stage */}
                   {["SIGNED", "DEPOSIT_PAID"].includes(p.status) && (
                     <span className="whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700"
-                      title={p.signedAt
-                        ? `Won ${new Date(p.signedAt).toLocaleDateString("en-GB")}`
+                      title={p.wonAt || p.signedAt
+                        ? `Won ${new Date((p.wonAt || p.signedAt)!).toLocaleDateString("en-GB")}`
                         : "Won"}>
                       Won
                     </span>
@@ -379,8 +378,8 @@ export default async function ProposalsPage({
                     </span>
                   )}
                   <span className={`whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_STYLES[p.status]}`}
-                    title={p.status === "WON" && p.signedAt
-                      ? `Won ${new Date(p.signedAt).toLocaleDateString("en-GB")}`
+                    title={p.status === "WON" && (p.wonAt || p.signedAt)
+                      ? `Won ${new Date((p.wonAt || p.signedAt)!).toLocaleDateString("en-GB")}`
                       : undefined}>
                     {p.status}
                   </span>
