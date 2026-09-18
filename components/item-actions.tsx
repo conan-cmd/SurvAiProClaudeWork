@@ -241,10 +241,10 @@ export function ItemActions({
                   <Send className="w-4 h-4" /> Mark as sent
                 </button>
               )}
-              {kind === "proposal" && ["SENT", "WON"].includes(proposalStatus || "") && (
+              {kind === "proposal" && ["SENT", "WON", "SIGNED"].includes(proposalStatus || "") && (
                 <button onClick={(e) => { e.preventDefault(); setOpen(false); router.push(`/proposals/${id}?nudge=1`) }}
                   className={menuItem}
-                  title="Send the client a reminder — with an optional video or voice message">
+                  title="Chase the signature or deposit — with an optional video or voice message">
                   <BellRing className="w-4 h-4" /> Nudge client
                 </button>
               )}

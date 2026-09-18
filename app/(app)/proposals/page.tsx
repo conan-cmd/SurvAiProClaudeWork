@@ -348,8 +348,8 @@ export default async function ProposalsPage({
                   )}
                   {(() => {
                     const nudges = parseNudgeHistory(p.nudgeHistory)
-                    // Chasing is over once there's a signature — hide the chip then.
-                    if (!nudges.length || p.signedAt || ["SIGNED", "DEPOSIT_PAID"].includes(p.status)) return null
+                    // Chasing is over once the deposit is paid — hide the chip then.
+                    if (!nudges.length || p.depositPaidAt || p.status === "DEPOSIT_PAID") return null
                     const last = nudges[nudges.length - 1]
                     const hasVideo = nudges.some((n) => n.mediaType === "video")
                     const hasAudio = nudges.some((n) => n.mediaType === "audio")
