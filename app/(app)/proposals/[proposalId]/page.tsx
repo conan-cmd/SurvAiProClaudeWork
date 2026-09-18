@@ -908,7 +908,9 @@ export default function ProposalEditorPage() {
               {proposal.signedAt ? "Signed" : "Not signed"}
             </span>
           )}
-          {["SENT", "WON"].includes(proposal.status) && !proposal.signedAt && (() => {
+          {/* Nudge-able until the deposit lands: unsigned = chase the signature,
+              signed = chase the deposit. */}
+          {["SENT", "WON", "SIGNED"].includes(proposal.status) && !proposal.depositPaidAt && (() => {
             const history = parseNudgeHistory(proposal.nudgeHistory)
             const count = history.length
             const last = history[count - 1]

@@ -50,10 +50,11 @@ export async function POST(
     },
   })
   if (!proposal) return NextResponse.json({ error: "Not found" }, { status: 404 })
-  // A WON-but-unsigned proposal is the classic nudge case (verbal yes, paperwork
-  // outstanding) — only an actual signature makes a reminder pointless.
-  if (proposal.signedAt || ["SIGNED", "DEPOSIT_PAID"].includes(proposal.status)) {
-    return NextResponse.json({ error: "This proposal is already signed" }, { status: 409 })
+  // Chase-able until the money lands: unsigned proposals need the signature,
+  // signed ones may still owe their deposit (e.g. the "Pay your deposit"
+  // template). Once the deposit is paid there's nothing left to nudge for.
+  if (proposal.depositPaidAt || proposal.status === "DEPOSIT_PAID") {
+    return NextResponse.json({ error: "This proposal's deposit is already paid — nothing to chase" }, { status: 409 })
   }
   if (!proposal.clientEmail) {
     return NextResponse.json(
@@ -96,9 +97,16 @@ export async function POST(
       ? `${senderFirst} has recorded you a short video message — it plays at the top of your proposal.`
       : `${senderFirst} has recorded you a voice message — it plays at the top of your proposal.`
     : null
+  // Already-signed deals are being chased for the deposit, not a signature.
+  const baseLabelHtml = proposal.signedAt
+    ? "Open your proposal &amp; pay your deposit"
+    : "Review &amp; sign your proposal"
+  const baseLabelText = proposal.signedAt
+    ? "Open your proposal & pay your deposit"
+    : "Review & sign your proposal"
   const linkLabel = media
     ? media.type === "video" ? "Watch the message &amp; view your proposal" : "Listen &amp; view your proposal"
-    : "Review &amp; sign your proposal"
+    : baseLabelHtml
   // Loom-style circular preview: a real frame from the recording (or the
   // sender's headshot for voice notes), the whole thing linked — so the email
   // clearly shows a genuine video, not just a bare link.
@@ -133,7 +141,7 @@ export async function POST(
     ...(mediaLine ? [mediaLine, ""] : []),
     message,
     "",
-    `${media ? (media.type === "video" ? "Watch the message & view your proposal" : "Listen & view your proposal") : "Review & sign your proposal"}: ${url}`,
+    `${media ? (media.type === "video" ? "Watch the message & view your proposal" : "Listen & view your proposal") : baseLabelText}: ${url}`,
     "",
     "Any questions at all, just reply to this email.",
     "",

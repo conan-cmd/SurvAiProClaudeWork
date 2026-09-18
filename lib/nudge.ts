@@ -27,6 +27,13 @@ export const DEFAULT_NUDGE_TEMPLATES: NudgeTemplate[] = [
     body: DEFAULT_NUDGE_MESSAGE,
   },
   {
+    id: "deposit",
+    name: "Pay your deposit",
+    body:
+      "Great to hear you'd like to go ahead — please follow the steps at the bottom of your proposal " +
+      "to pay your deposit and secure your booking.",
+  },
+  {
     id: "checking-in",
     name: "Checking in",
     body:
@@ -56,7 +63,15 @@ export function parseNudgeTemplates(org: {
           (t): t is NudgeTemplate =>
             t && typeof t.id === "string" && typeof t.name === "string" && typeof t.body === "string" && t.body.trim() !== ""
         )
-        if (valid.length) return valid
+        if (valid.length) {
+          // Orgs that saved templates before the deposit chaser existed still
+          // get it — unless they already have their own deposit template.
+          const deposit = DEFAULT_NUDGE_TEMPLATES.find((t) => t.id === "deposit")
+          if (deposit && !valid.some((t) => /deposit/i.test(t.name) || /deposit/i.test(t.body))) {
+            return [...valid, deposit]
+          }
+          return valid
+        }
       }
     } catch {
       // fall through
