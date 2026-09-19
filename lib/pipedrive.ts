@@ -1,4 +1,5 @@
 import "server-only"
+import crypto from "crypto"
 import { db } from "@/lib/db"
 import { encryptSecret, decryptSecret } from "@/lib/crypto"
 import { calculateProposalTotals } from "@/lib/utils"
@@ -364,6 +365,8 @@ export async function linkProposalToDeal(proposalId: string, dealId: number): Pr
   }).catch(() => {})
 
   await syncProposalToPipedrive(proposalId)
+  // From now on, winning/losing this deal in Pipedrive updates the proposal too.
+  ensureDealStatusWebhook(proposal.organization.id).catch(() => {})
 }
 
 export async function unlinkProposalDeal(proposalId: string): Promise<void> {
@@ -371,6 +374,41 @@ export async function unlinkProposalDeal(proposalId: string): Promise<void> {
     where: { id: proposalId },
     data: { pipedriveDealId: null, pipedrivePersonId: null, pipedriveOrgId: null },
   })
+}
+
+// --- Deal-status webhook (Pipedrive → SurvAIPro) --------------------------------
+
+// The sig baked into the webhook URL ties it to one org — Pipedrive has no
+// other shared secret on webhook deliveries.
+export function webhookSig(orgId: string): string {
+  return crypto
+    .createHmac("sha256", process.env.PIPEDRIVE_CLIENT_SECRET || "no-secret")
+    .update(`pd-webhook:${orgId}`)
+    .digest("hex")
+    .slice(0, 32)
+}
+
+// Idempotently register a webhook so deals marked won/lost IN Pipedrive flow
+// back and update the linked proposal here. Best-effort; called after OAuth
+// connect, link-to-deal and manual pushes, so existing connections pick it up
+// the next time they touch Pipedrive.
+export async function ensureDealStatusWebhook(orgId: string): Promise<void> {
+  try {
+    const org = await db.organization.findUnique({ where: { id: orgId }, select: PIPEDRIVE_SELECT })
+    if (!org || !pipedriveConfigured(org)) return
+    const base = publicBaseUrl("")
+    if (!base.startsWith("https://")) return // Pipedrive can't call localhost
+    const target = `${base}/api/pipedrive/webhook?org=${orgId}&sig=${webhookSig(orgId)}`
+    const existing = await pd(org, "/webhooks")
+    const hooks = ((existing as unknown as { subscription_url?: string }[] | null) || [])
+    if (hooks.some((h) => h.subscription_url === target)) return
+    await pd(org, "/webhooks", {
+      method: "POST",
+      body: { subscription_url: target, event_action: "updated", event_object: "deal" },
+    })
+  } catch (err) {
+    console.error("Pipedrive webhook registration failed:", err)
+  }
 }
 
 type RawDeal = {

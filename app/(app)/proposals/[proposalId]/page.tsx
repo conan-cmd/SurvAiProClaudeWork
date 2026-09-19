@@ -365,6 +365,7 @@ export default function ProposalEditorPage() {
   // dialog as soon as the proposal has loaded. window.location avoids the
   // useSearchParams suspense requirement.
   const nudgeAutoOpened = useRef(false)
+  const pdAutoOpened = useRef(false)
   useEffect(() => {
     if (!proposal || nudgeAutoOpened.current) return
     if (new URLSearchParams(window.location.search).get("nudge") === "1") {
@@ -775,6 +776,35 @@ export default function ProposalEditorPage() {
     }
   }
 
+  // The other half of "link a deal": push a brand-new deal (person + org +
+  // deal + pinned note) into Pipedrive from this proposal.
+  const createPdDeal = async () => {
+    setPdBusy(true)
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/pipedrive-sync`, { method: "POST" })
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(d.error || "Couldn't create the deal")
+      setProposal((p) => (p ? { ...p, pipedriveDealId: d.dealId ? String(d.dealId) : p.pipedriveDealId } : p))
+      toast.success("Deal created in Pipedrive — linked to this proposal")
+      setPdOpen(false)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't create the deal")
+    } finally {
+      setPdBusy(false)
+    }
+  }
+
+  // Arriving via a list row's "Link Pipedrive deal" (?pd=1): open the modal
+  // once the proposal has loaded.
+  useEffect(() => {
+    if (!proposal || pdAutoOpened.current) return
+    if (new URLSearchParams(window.location.search).get("pd") === "1") {
+      pdAutoOpened.current = true
+      openPipedrive()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proposal])
+
   if (!proposal) {
     return (
       <div className="flex justify-center py-20">
@@ -1012,6 +1042,16 @@ export default function ProposalEditorPage() {
                     </button>
                   ))}
                 </div>
+                {!proposal.pipedriveDealId && (
+                  <div className="border-t pt-3 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm text-gray-600">Deal not in Pipedrive yet?</span>
+                    <button onClick={createPdDeal} disabled={pdBusy}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+                      {pdBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                      Create new deal
+                    </button>
+                  </div>
+                )}
                 <p className="text-xs text-gray-400">
                   Linking pins a note with this proposal&apos;s link on the deal, and keeps the deal&apos;s
                   value and status in sync from now on — no duplicate deal is created.

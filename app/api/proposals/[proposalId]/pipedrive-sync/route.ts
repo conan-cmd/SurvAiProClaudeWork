@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
-import { syncProposalToPipedrive } from "@/lib/pipedrive"
+import { syncProposalToPipedrive, ensureDealStatusWebhook } from "@/lib/pipedrive"
 
 // Manual push: create/update this proposal's Pipedrive person + org + deal
 // (the automatic sync only fires on send and status changes).
@@ -19,6 +19,9 @@ export async function POST(
   if (!proposal) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
   await syncProposalToPipedrive(proposal.id, { createIfMissing: true })
+  // Opportunistic registration so existing connections gain the two-way
+  // won/lost sync without reconnecting.
+  ensureDealStatusWebhook(user.organizationId).catch(() => {})
 
   // The sync is best-effort and swallows errors — verify the outcome so the
   // user gets an honest answer instead of a fake success.

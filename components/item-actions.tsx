@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
-  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check, ExternalLink, MapPin, BellRing,
+  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check, ExternalLink, MapPin, BellRing, Link2,
 } from "lucide-react"
 
 type FolderOption = { id: string; name: string }
@@ -268,10 +268,17 @@ export function ItemActions({
                 <Copy className="w-4 h-4" /> Duplicate
               </button>
               {kind === "proposal" && (
-                <button onClick={(e) => { e.preventDefault(); pushToPipedrive() }} className={menuItem}
-                  title="Create/update the Pipedrive deal for this proposal (needs Pipedrive connected in Settings)">
-                  <ExternalLink className="w-4 h-4" /> Push to Pipedrive
-                </button>
+                <>
+                  <button onClick={(e) => { e.preventDefault(); setOpen(false); router.push(`/proposals/${id}?pd=1`) }}
+                    className={menuItem}
+                    title="Attach this proposal to an existing Pipedrive deal (search / suggestions)">
+                    <Link2 className="w-4 h-4" /> Link Pipedrive deal
+                  </button>
+                  <button onClick={(e) => { e.preventDefault(); pushToPipedrive() }} className={menuItem}
+                    title="Create/update the Pipedrive deal for this proposal (needs Pipedrive connected in Settings)">
+                    <ExternalLink className="w-4 h-4" /> Push to Pipedrive
+                  </button>
+                </>
               )}
               {targetSurvey && (
                 <button onClick={(e) => { e.preventDefault(); openFolders() }} className={menuItem}>
