@@ -54,6 +54,9 @@ export async function GET(request: NextRequest) {
       },
     })
     settings.searchParams.set("pipedrive", "connected")
+    // Deals won/lost in Pipedrive should flow back — register the webhook now.
+    const { ensureDealStatusWebhook } = await import("@/lib/pipedrive")
+    ensureDealStatusWebhook(user.organizationId).catch(() => {})
   } catch {
     settings.searchParams.set("pipedrive", "error")
   }
