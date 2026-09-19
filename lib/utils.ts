@@ -104,3 +104,9 @@ export function applyMarkup<T extends PricingItem>(
   if (f === 1) return items
   return items.map((i) => ({ ...i, unitPrice: i.unitPrice * f }))
 }
+
+// Survey media can be photos or videos (same SurveyPhoto records — videos are
+// told apart by file extension). Used to pick <video> vs <img> renders.
+export function isVideoFile(nameOrUrl: string): boolean {
+  return /\.(mp4|webm|mov|m4v|3gpp?|avi|mkv)([?#]|$)/i.test(nameOrUrl)
+}

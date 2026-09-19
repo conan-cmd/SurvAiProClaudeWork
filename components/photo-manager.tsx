@@ -6,6 +6,7 @@ import {
   Camera, Trash2, Star, ChevronUp, ChevronDown, EyeOff, Loader2, Check, Download,
 } from "lucide-react"
 import { uploadSurveyPhotos } from "@/lib/photo-upload"
+import { isVideoFile } from "@/lib/utils"
 import { DropZone } from "@/components/drop-zone"
 import { ZoomableImage, ZoomableGallery } from "@/components/zoomable-image"
 
@@ -141,12 +142,12 @@ export function PhotoManager({
       <input
         ref={fileInput}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*,.heic,.heif"
         multiple
         className="hidden"
         onChange={(e) => upload(e.target.files)}
       />
-      <DropZone onFiles={upload} accept="image/*,.heic,.heif" disabled={uploading}>
+      <DropZone onFiles={upload} accept="image/*,video/*,.heic,.heif" disabled={uploading}>
         <button
           type="button"
           onClick={() => fileInput.current?.click()}
@@ -158,8 +159,8 @@ export function PhotoManager({
           ) : (
             <Camera className="w-8 h-8" />
           )}
-          <span className="font-medium">{uploading ? "Uploading…" : "Take or upload photos"}</span>
-          <span className="text-xs">JPG, PNG, WebP or HEIC — up to 15MB each. Drag &amp; drop works too.</span>
+          <span className="font-medium">{uploading ? "Uploading…" : "Take or upload photos & videos"}</span>
+          <span className="text-xs">Photos (JPG, PNG, WebP, HEIC — up to 15MB) or videos (MP4/MOV — up to 200MB). Drag &amp; drop works too.</span>
         </button>
       </DropZone>
 
@@ -179,12 +180,17 @@ export function PhotoManager({
         {photos.map((photo, index) => (
           <div key={photo.id} className="bg-white border rounded-xl overflow-hidden">
             <div className="relative">
-              <ZoomableImage
-                src={photo.fileUrl}
-                alt={photo.caption || photo.fileName}
-                caption={photo.caption}
-                className="w-full aspect-[4/3] object-cover"
-              />
+              {isVideoFile(photo.fileName || photo.fileUrl) ? (
+                <video src={photo.fileUrl} controls playsInline preload="metadata"
+                  className="w-full aspect-[4/3] object-cover bg-black" />
+              ) : (
+                <ZoomableImage
+                  src={photo.fileUrl}
+                  alt={photo.caption || photo.fileName}
+                  caption={photo.caption}
+                  className="w-full aspect-[4/3] object-cover"
+                />
+              )}
               {photo.isCoverImage && (
                 <span className="absolute top-2 left-2 bg-brand-green text-white text-xs font-semibold px-2 py-0.5 rounded-full">
                   Cover
@@ -211,11 +217,14 @@ export function PhotoManager({
                     className="p-1.5 hover:bg-gray-100 rounded disabled:opacity-30" disabled={index === photos.length - 1}>
                     <ChevronDown className="w-4 h-4" />
                   </button>
-                  <button type="button" title="Mark as cover image"
-                    onClick={() => patch(photo.id, { isCoverImage: !photo.isCoverImage })}
-                    className={`p-1.5 hover:bg-gray-100 rounded ${photo.isCoverImage ? "text-brand-green" : ""}`}>
-                    <Star className="w-4 h-4" fill={photo.isCoverImage ? "currentColor" : "none"} />
-                  </button>
+                  {/* Videos can't be the cover image (the cover renders as a still) */}
+                  {!isVideoFile(photo.fileName || photo.fileUrl) && (
+                    <button type="button" title="Mark as cover image"
+                      onClick={() => patch(photo.id, { isCoverImage: !photo.isCoverImage })}
+                      className={`p-1.5 hover:bg-gray-100 rounded ${photo.isCoverImage ? "text-brand-green" : ""}`}>
+                      <Star className="w-4 h-4" fill={photo.isCoverImage ? "currentColor" : "none"} />
+                    </button>
+                  )}
                   <button type="button" title="Internal only (never shown to client)"
                     onClick={() => patch(photo.id, { internalOnly: !photo.internalOnly })}
                     className={`p-1.5 hover:bg-gray-100 rounded ${photo.internalOnly ? "text-gray-900" : ""}`}>
