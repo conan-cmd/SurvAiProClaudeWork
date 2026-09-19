@@ -11,7 +11,7 @@ import { DraggableRow } from "@/components/draggable-row"
 export default async function SurveysPage({
   searchParams,
 }: {
-  searchParams: { folder?: string; scope?: string; q?: string }
+  searchParams: { folder?: string; scope?: string; q?: string; member?: string }
 }) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
@@ -20,24 +20,34 @@ export default async function SurveysPage({
   const q = searchParams.q?.trim()
   const canViewAll = user.role === "OWNER" || user.organization.membersViewAll
   const viewingAll = searchParams.scope === "all" && canViewAll
-  const buildLink = (folder?: string, all?: boolean) => {
+  // Per-member filter — only meaningful when viewing everyone's surveys.
+  const memberId = viewingAll ? searchParams.member : undefined
+  const buildLink = (folder?: string, all?: boolean, member?: string) => {
     const p = new URLSearchParams()
     if (all) p.set("scope", "all")
+    if (all && member) p.set("member", member)
     if (folder) p.set("folder", folder)
     const s = p.toString()
     return `/surveys${s ? `?${s}` : ""}`
   }
 
-  const [folders, surveys] = await Promise.all([
+  const [folders, teamMembers, surveys] = await Promise.all([
     db.folder.findMany({
       where: { organizationId: user.organizationId },
       orderBy: { name: "asc" },
     }),
+    canViewAll
+      ? db.user.findMany({
+          where: { organizationId: user.organizationId },
+          select: { id: true, name: true, email: true },
+          orderBy: { createdAt: "asc" },
+        })
+      : Promise.resolve([]),
     db.siteSurvey.findMany({
       where: {
         organizationId: user.organizationId,
         ...(folderId ? { folderId } : {}),
-        ...(viewingAll ? {} : { createdById: user.id }),
+        ...(viewingAll ? (memberId ? { createdById: memberId } : {}) : { createdById: user.id }),
         ...(q
           ? {
               OR: [
@@ -77,20 +87,27 @@ export default async function SurveysPage({
             Mine
           </Link>
           <Link href={buildLink(folderId, true)}
-            className={`px-3 py-1.5 rounded-full font-medium border transition ${viewingAll ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
+            className={`px-3 py-1.5 rounded-full font-medium border transition ${viewingAll && !memberId ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
             Everyone
           </Link>
+          {/* One chip per team member — each person's surveys at a glance. */}
+          {teamMembers.length > 1 && teamMembers.map((m) => (
+            <Link key={m.id} href={buildLink(folderId, true, m.id)}
+              className={`px-3 py-1.5 rounded-full font-medium border transition ${memberId === m.id ? "bg-brand-blue text-white border-brand-blue" : "bg-white text-gray-600 hover:border-gray-400"}`}>
+              {(m.name || m.email).split(" ")[0]}
+            </Link>
+          ))}
         </div>
       )}
 
       {folders.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <Link href={buildLink(undefined, viewingAll)}
+          <Link href={buildLink(undefined, viewingAll, memberId)}
             className={`px-3 py-1.5 rounded-full font-medium border transition ${!folderId ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"}`}>
             All
           </Link>
           {folders.map((f) => (
-            <Link key={f.id} href={buildLink(f.id, viewingAll)}
+            <Link key={f.id} href={buildLink(f.id, viewingAll, memberId)}
               className={`px-3 py-1.5 rounded-full font-medium border transition ${folderId === f.id ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"}`}>
               {f.name}
             </Link>
