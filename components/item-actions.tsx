@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import {
   MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check, ExternalLink, MapPin, BellRing, Link2,
 } from "lucide-react"
+import { NudgeDialog } from "@/components/nudge-dialog"
 
 type FolderOption = { id: string; name: string }
 
@@ -18,6 +19,8 @@ export function ItemActions({
   title,
   proposalStatus,
   siteVisited,
+  clientEmail,
+  nudgeHistory,
 }: {
   kind: "survey" | "proposal"
   id: string
@@ -28,11 +31,15 @@ export function ItemActions({
   proposalStatus?: string
   // Current site-visit tag on the job — enables the toggle in the menu.
   siteVisited?: boolean
+  // For the in-place nudge dialog on proposal rows.
+  clientEmail?: string | null
+  nudgeHistory?: string | null
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [showFolders, setShowFolders] = useState(false)
+  const [nudgeOpen, setNudgeOpen] = useState(false)
   const [folders, setFolders] = useState<FolderOption[] | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -242,7 +249,7 @@ export function ItemActions({
                 </button>
               )}
               {kind === "proposal" && ["SENT", "WON", "SIGNED"].includes(proposalStatus || "") && (
-                <button onClick={(e) => { e.preventDefault(); setOpen(false); router.push(`/proposals/${id}?nudge=1`) }}
+                <button onClick={(e) => { e.preventDefault(); setOpen(false); setNudgeOpen(true) }}
                   className={menuItem}
                   title="Chase the signature or deposit — with an optional video or voice message">
                   <BellRing className="w-4 h-4" /> Nudge client
@@ -317,6 +324,15 @@ export function ItemActions({
             </>
           )}
         </div>
+      )}
+      {nudgeOpen && (
+        <NudgeDialog
+          proposalId={id}
+          clientEmail={clientEmail ?? null}
+          nudgeHistory={nudgeHistory ?? null}
+          onClose={() => setNudgeOpen(false)}
+          onSent={() => router.refresh()}
+        />
       )}
     </div>
   )
