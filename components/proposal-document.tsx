@@ -191,7 +191,40 @@ function PricingSection({ data }: { data: ProposalDocumentData }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      {/* Phones get stacked rows — the 4-column table squeezes descriptions
+          into a sliver on narrow screens. PDFs render at desktop width, so
+          they keep the table. */}
+      <div className="sm:hidden">
+        <div className="border-b-2" style={{ borderColor: data.organization.brandColor }} />
+        <div className="divide-y divide-gray-100">
+          {items.filter((i) => !i.isOptional).map((item) => (
+            <div key={item.id} className="py-3">
+              <div className="text-sm text-gray-900 leading-snug">
+                {item.description}
+                {item.discount > 0 && (
+                  <span className="text-xs text-emerald-600 ml-2">({item.discount}% discount)</span>
+                )}
+              </div>
+              <div className="flex items-baseline justify-between gap-3 mt-1.5">
+                <span className="text-xs text-gray-500 whitespace-nowrap">
+                  {item.quantity} {item.unit} × {formatCurrency(item.unitPrice)}
+                </span>
+                <span className="text-sm font-semibold whitespace-nowrap">{formatCurrency(lineNet(item))}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="border-t pt-2 mt-1 space-y-1 text-sm">
+          <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>{formatCurrency(totals.subtotal)}</span></div>
+          <div className="flex justify-between text-gray-500"><span>VAT</span><span>{formatCurrency(totals.vat)}</span></div>
+          <div className="flex justify-between text-base font-bold">
+            <span>Total</span>
+            <span style={{ color: data.organization.brandColor }}>{formatCurrency(totals.total)}</span>
+          </div>
+        </div>
+      </div>
+
+      <table className="hidden sm:table w-full text-sm">
         <thead>
           <tr className="text-left border-b-2" style={{ borderColor: data.organization.brandColor }}>
             <th className="py-2 pr-2 font-semibold">Description</th>
@@ -238,7 +271,18 @@ function PricingSection({ data }: { data: ProposalDocumentData }) {
       {optional.length > 0 && !data.hideOptionalExtras && (
         <div className="mt-6">
           <h4 className="font-semibold text-sm mb-2">Optional extras (not included in total)</h4>
-          <table className="w-full text-sm">
+          <div className="sm:hidden divide-y divide-gray-100">
+            {optional.map((item) => (
+              <div key={item.id} className="py-3">
+                <div className="text-sm text-gray-900 leading-snug">{item.description}</div>
+                <div className="flex items-baseline justify-between gap-3 mt-1.5">
+                  <span className="text-xs text-gray-500 whitespace-nowrap">{item.quantity} {item.unit}</span>
+                  <span className="text-sm font-semibold whitespace-nowrap">{formatCurrency(lineNet(item))} + VAT</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <table className="hidden sm:table w-full text-sm">
             <tbody>
               {optional.map((item) => (
                 <tr key={item.id} className="border-b border-gray-100">
