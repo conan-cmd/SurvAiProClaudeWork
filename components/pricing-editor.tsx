@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Plus, Trash2, Copy, HardHat } from "lucide-react"
+import { Plus, Trash2, Copy, HardHat, GripVertical } from "lucide-react"
 import { formatCurrency, calculateProposalTotals, lineNet } from "@/lib/utils"
 
 export type EditableLineItem = {
@@ -81,6 +81,30 @@ export function PricingEditor({
 
   const update = (id: string, patch: Partial<EditableLineItem>) =>
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
+
+  // Drag-to-reorder: the grip arms the drag (so text selection in the inputs
+  // keeps working) and lines swap live under the cursor/finger. The debounced
+  // autosave persists the new order (PUT re-indexes by position).
+  const [dragArmed, setDragArmed] = useState<string | null>(null)
+  const dragLine = useRef<string | null>(null)
+  const [dragging, setDragging] = useState<string | null>(null)
+  const reorder = (fromId: string, toId: string) => {
+    if (fromId === toId) return
+    setItems((prev) => {
+      const from = prev.findIndex((i) => i.id === fromId)
+      const to = prev.findIndex((i) => i.id === toId)
+      if (from === -1 || to === -1 || from === to) return prev
+      const next = [...prev]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next.map((i, n) => ({ ...i, order: n }))
+    })
+  }
+  const endDrag = () => {
+    dragLine.current = null
+    setDragging(null)
+    setDragArmed(null)
+  }
 
   // Keep the parent (and therefore the live preview) in sync
   useEffect(() => {
@@ -161,8 +185,44 @@ export function PricingEditor({
 
       <div className="space-y-3">
         {items.map((item) => (
-          <div key={item.id} className="border rounded-xl p-3 space-y-2 bg-gray-50/50">
+          <div key={item.id} data-line-id={item.id}
+            draggable={dragArmed === item.id}
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = "move"
+              dragLine.current = item.id
+              setDragging(item.id)
+            }}
+            onDragEnd={endDrag}
+            onDragOver={(e) => {
+              if (dragLine.current) {
+                e.preventDefault()
+                reorder(dragLine.current, item.id)
+              }
+            }}
+            className={`border rounded-xl p-3 space-y-2 bg-gray-50/50 ${dragging === item.id ? "opacity-50 ring-2 ring-brand-blue" : ""}`}>
             <div className="flex gap-2">
+              <span
+                role="button"
+                aria-label="Drag to reorder"
+                title="Drag to reorder this line"
+                className="shrink-0 self-center p-1 -ml-1 text-gray-300 hover:text-gray-500 cursor-grab active:cursor-grabbing touch-none"
+                onMouseDown={() => setDragArmed(item.id)}
+                onMouseUp={() => setDragArmed(null)}
+                onTouchStart={() => {
+                  dragLine.current = item.id
+                  setDragging(item.id)
+                }}
+                onTouchMove={(e) => {
+                  const t = e.touches[0]
+                  const row = document.elementFromPoint(t.clientX, t.clientY)?.closest("[data-line-id]")
+                  const overId = row?.getAttribute("data-line-id")
+                  if (overId && dragLine.current) reorder(dragLine.current, overId)
+                }}
+                onTouchEnd={endDrag}
+                onTouchCancel={endDrag}
+              >
+                <GripVertical className="w-4 h-4" />
+              </span>
               <input
                 className={cell}
                 placeholder="Description (e.g. Full roof clean and moss treatment)"
