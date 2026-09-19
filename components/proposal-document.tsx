@@ -1,4 +1,4 @@
-import { formatCurrency, calculateProposalTotals, lineNet, PricingItem } from "@/lib/utils"
+import { formatCurrency, calculateProposalTotals, lineNet, isVideoFile, PricingItem } from "@/lib/utils"
 import { ZoomableImage, ZoomableGallery } from "@/components/zoomable-image"
 
 type Photo = {
@@ -164,6 +164,17 @@ function PhotosSection({ data, section }: { data: ProposalDocumentData; section:
     <ZoomableGallery>
     <div className="grid grid-cols-2 gap-4">
       {photos.map((photo) => (
+        isVideoFile(photo.fileUrl) ? (
+          // Videos play on the web view but can't rasterise onto paper —
+          // no-print keeps them out of the PDF export.
+          <figure key={photo.id} className="break-inside-avoid no-print">
+            <video src={photo.fileUrl} controls playsInline preload="metadata"
+              className="w-full rounded-lg aspect-[4/3] object-cover bg-black" />
+            {photo.caption && (
+              <figcaption className="text-sm text-gray-500 mt-1.5">{photo.caption}</figcaption>
+            )}
+          </figure>
+        ) : (
         <figure key={photo.id} className="break-inside-avoid">
           <ZoomableImage
             src={photo.fileUrl}
@@ -175,6 +186,7 @@ function PhotosSection({ data, section }: { data: ProposalDocumentData; section:
             <figcaption className="text-sm text-gray-500 mt-1.5">{photo.caption}</figcaption>
           )}
         </figure>
+        )
       ))}
     </div>
     </ZoomableGallery>

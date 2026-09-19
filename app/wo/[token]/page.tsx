@@ -6,6 +6,7 @@ import { toast } from "sonner"
 import { Loader2, AlertTriangle, Printer, Copy, MessageCircle, Share2, MapPin } from "lucide-react"
 import { ZoomableImage, ZoomableGallery } from "@/components/zoomable-image"
 import { WhatsAppLink } from "@/components/whatsapp-link"
+import { isVideoFile } from "@/lib/utils"
 
 type WoData = {
   clientName: string
@@ -257,8 +258,13 @@ export default function WorksOrderPage() {
               <div className="grid grid-cols-2 gap-3">
                 {s.photos.map((p) => (
                   <figure key={p.id} className="m-0">
-                    <ZoomableImage src={p.fileUrl} alt={p.caption || "Site photo"} caption={p.caption}
-                      className="w-full aspect-[4/3] rounded-md border object-cover" />
+                    {isVideoFile(p.fileUrl) ? (
+                      <video src={p.fileUrl} controls playsInline preload="metadata"
+                        className="w-full aspect-[4/3] rounded-md border object-cover bg-black no-print" />
+                    ) : (
+                      <ZoomableImage src={p.fileUrl} alt={p.caption || "Site photo"} caption={p.caption}
+                        className="w-full aspect-[4/3] rounded-md border object-cover" />
+                    )}
                     <figcaption className="text-[11px] text-gray-500 mt-1 text-center">
                       {p.caption}{p.internalOnly ? (p.caption ? " · " : "") + "internal only" : ""}
                     </figcaption>
