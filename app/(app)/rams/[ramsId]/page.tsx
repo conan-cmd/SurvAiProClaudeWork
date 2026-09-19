@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { DropZone } from "@/components/drop-zone"
+import { openWhatsApp } from "@/components/whatsapp-link"
 
 // Common PPE for exterior-cleaning / trade work, shown as a selectable icon grid.
 // Uses inline SVG (lucide) icons — unlike emoji, these rasterise reliably in the
@@ -319,8 +320,9 @@ export default function RamsPage() {
     const url = await getShareLink()
     if (!url) return
     const msg = `Please review & sign the RAMS for ${rams.survey.title}: ${url}`
-    const base = phone ? `https://wa.me/${waNumber(phone)}` : `https://wa.me/`
-    window.open(`${base}?text=${encodeURIComponent(msg)}`, "_blank")
+    // openWhatsApp survives the async link creation above — window.open here
+    // was popup-blocked on iOS (gesture lost), so the button did nothing.
+    openWhatsApp(msg, phone ? waNumber(phone) : undefined)
   }
   const copyShareLink = async () => {
     const url = await getShareLink()

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import { toast } from "sonner"
 import { Loader2, AlertTriangle, Printer, Copy, MessageCircle, Share2, MapPin } from "lucide-react"
 import { ZoomableImage, ZoomableGallery } from "@/components/zoomable-image"
+import { WhatsAppLink } from "@/components/whatsapp-link"
 
 type WoData = {
   clientName: string
@@ -129,10 +130,10 @@ export default function WorksOrderPage() {
             className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
             <Copy className="w-4 h-4" /> Copy link
           </button>
-          <a href={`https://wa.me/?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer"
+          <WhatsAppLink text={waMsg}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold bg-[#25D366] text-white hover:brightness-95">
             <MessageCircle className="w-4 h-4" /> WhatsApp
-          </a>
+          </WhatsAppLink>
           {typeof navigator !== "undefined" && !!navigator.share && (
             <button onClick={() => navigator.share({ title: "Scope of works", url: window.location.href }).catch(() => {})}
               className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">

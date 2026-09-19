@@ -9,6 +9,7 @@ import { DictateButton } from "@/components/dictate-button"
 import { JobReportDocument, ReportDocData, REPORT_FIELDS } from "@/components/job-report-document"
 import { uploadJobReportPhotos } from "@/lib/report-photo-upload"
 import { DropZone } from "@/components/drop-zone"
+import { WhatsAppLink } from "@/components/whatsapp-link"
 
 type Photo = { id: string; fileUrl: string; caption: string | null }
 type Report = {
@@ -264,11 +265,10 @@ export default function JobReportEditor() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
               <Copy className="w-4 h-4" /> Copy
             </button>
-            <a href={`https://wa.me/?text=${encodeURIComponent(`Hi ${report.site.clientName}, here's the report from our visit to ${report.site.address}: ${shareUrl}`)}`}
-              target="_blank" rel="noopener noreferrer"
+            <WhatsAppLink text={`Hi ${report.site.clientName}, here's the report from our visit to ${report.site.address}: ${shareUrl}`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-[#25D366] text-white hover:brightness-95">
               <MessageCircle className="w-4 h-4" /> WhatsApp
-            </a>
+            </WhatsAppLink>
             {canShare && (
               <button onClick={nativeShareUrl}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
