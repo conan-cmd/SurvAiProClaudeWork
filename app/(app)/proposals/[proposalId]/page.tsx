@@ -13,6 +13,7 @@ import { formatCurrency } from "@/lib/utils"
 import { ProposalDocument } from "@/components/proposal-document"
 import { AddressInput } from "@/components/address-input"
 import { MediaNoteRecorder } from "@/components/media-note-recorder"
+import { WhatsAppLink } from "@/components/whatsapp-link"
 import { DropZone } from "@/components/drop-zone"
 import { PricingEditor, EditableLineItem } from "@/components/pricing-editor"
 import { uploadSurveyPhotos, type UploadedPhoto } from "@/lib/photo-upload"
@@ -1269,10 +1270,10 @@ export default function ProposalEditorPage() {
             const msg = `Hi ${proposal.clientName}, here's your proposal for ${proposal.survey.title}: ${shareUrl}`
             return (
               <>
-                <a href={`https://wa.me/?text=${encodeURIComponent(msg)}`} target="_blank" rel="noopener noreferrer"
+                <WhatsAppLink text={msg}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold bg-[#25D366] text-white hover:brightness-95">
                   <MessageCircle className="w-4 h-4" /> WhatsApp
-                </a>
+                </WhatsAppLink>
                 <a href={`sms:?&body=${encodeURIComponent(msg)}`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
                   <MessageSquare className="w-4 h-4" /> Text
