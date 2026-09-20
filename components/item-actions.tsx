@@ -40,6 +40,7 @@ export function ItemActions({
   const [busy, setBusy] = useState(false)
   const [showFolders, setShowFolders] = useState(false)
   const [nudgeOpen, setNudgeOpen] = useState(false)
+  const [dropUp, setDropUp] = useState(false)
   const [folders, setFolders] = useState<FolderOption[] | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -230,6 +231,10 @@ export function ItemActions({
           e.preventDefault()
           e.stopPropagation()
           setShowFolders(false)
+          // Open upwards when the row sits near the bottom of the viewport —
+          // otherwise the menu gets clipped and the options "don't show".
+          const r = ref.current?.getBoundingClientRect()
+          setDropUp(!!r && window.innerHeight - r.bottom < 360)
           setOpen((o) => !o)
         }}
         disabled={busy}
@@ -239,7 +244,7 @@ export function ItemActions({
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoreVertical className="w-4 h-4" />}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-48 bg-white border rounded-lg shadow-lg py-1 z-30 text-sm">
+        <div className={`absolute right-0 ${dropUp ? "bottom-full mb-1" : "top-full mt-1"} w-48 bg-white border rounded-lg shadow-lg py-1 z-30 text-sm`}>
           {!showFolders ? (
             <>
               {kind === "proposal" && ["DRAFT", "READY"].includes(proposalStatus || "") && (
