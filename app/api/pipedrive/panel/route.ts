@@ -49,14 +49,14 @@ export async function GET(request: NextRequest) {
 
   const org = await db.organization.findFirst({
     where: { pipedriveCompanyId: companyId },
-    select: { id: true },
+    select: { id: true, depositRules: true },
   })
   const proposal = org
     ? await db.proposal.findFirst({
         where: { organizationId: org.id, pipedriveDealId: dealId },
         include: {
           pricingLineItems: true,
-          survey: { select: { title: true } },
+          survey: { select: { title: true, isResidential: true } },
           _count: { select: { views: true } },
           views: { select: { updatedAt: true }, orderBy: { updatedAt: "desc" }, take: 1 },
         },
@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
         status: "Not linked",
         quoted_net: "—",
         signed: "—",
+        deposit: "—",
         client_views: "—",
       },
     })
@@ -83,6 +84,17 @@ export async function GET(request: NextRequest) {
     DEPOSIT_PAID: "Deposit paid", WON: "Won", LOST: "Lost",
   }
 
+  // Deposit line: paid beats due; nothing shows before the client signs.
+  let deposit = "—"
+  if (proposal.depositPaidAt) {
+    deposit = `Paid${proposal.depositAmount ? ` ${formatCurrency(proposal.depositAmount)}` : ""} on ${proposal.depositPaidAt.toLocaleDateString("en-GB")}`
+  } else if (proposal.signedAt) {
+    const { computeDeposit } = await import("@/lib/stripe")
+    const agreed = proposal.agreedTotal ?? totals.total
+    const due = computeDeposit(org!.depositRules, proposal.survey.isResidential, agreed)
+    deposit = due > 0 ? `Due ${formatCurrency(due)}` : "None due"
+  }
+
   return NextResponse.json({
     data: {
       // Pipedrive's panel schema requires id + header on every response.
@@ -93,6 +105,7 @@ export async function GET(request: NextRequest) {
       signed: proposal.signedAt
         ? `Signed by ${proposal.signedName || proposal.clientName} on ${proposal.signedAt.toLocaleDateString("en-GB")}`
         : "Not signed",
+      deposit,
       client_views: proposal._count.views > 0
         ? `${proposal._count.views}× — last ${lastView ? lastView.toLocaleDateString("en-GB") : ""}`
         : "Not opened yet",
