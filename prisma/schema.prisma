@@ -160,6 +160,14 @@ model Organization {
   pipedriveApiDomain      String?
   pipedriveCompanyId      String?
 
+  // Xero accounting connection (per-firm OAuth). Tokens encrypted at rest
+  // (lib/crypto); the tenant is the Xero organisation invoices are raised in.
+  xeroAccessToken         String?
+  xeroRefreshToken        String?
+  xeroTokenExpiresAt      DateTime?
+  xeroTenantId            String?
+  xeroTenantName          String?
+
   // True once the first-run setup wizard is finished (or dismissed for good).
   onboardingComplete    Boolean         @default(false)
 
@@ -479,6 +487,10 @@ model Proposal {
   pipedriveDealId       String?
   pipedrivePersonId     String?
   pipedriveOrgId        String?
+
+  // Xero deposit invoice raised when the deposit was paid (dedupe + reference).
+  xeroDepositInvoiceId     String?
+  xeroDepositInvoiceNumber String?
 
   // Deposit
   depositAmount         Float?

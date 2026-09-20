@@ -123,6 +123,8 @@ export default async function SharedProposalPage({
             data: { depositPaidAt: new Date(), status: "DEPOSIT_PAID" },
           })),
         }
+        // Raise the Xero draft deposit invoice (best-effort, fire-and-forget).
+        import("@/lib/xero").then((m) => m.createDepositInvoice(p.id)).catch(() => {})
         // Notify the business their deposit landed (best-effort, first time only).
         notifyDepositPaid({
           id: p.id,
