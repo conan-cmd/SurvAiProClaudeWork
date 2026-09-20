@@ -279,6 +279,7 @@ export default async function ProposalsPage({
         <span className="font-semibold text-brand-navy">{proposals.length}</span>
         {" "}proposal{proposals.length === 1 ? "" : "s"}
         {proposals.length > 0 && <> · {formatCurrency(totalNet)} + VAT</>}
+        {proposals.length > 1 && <> · avg {formatCurrency(totalNet / proposals.length)} + VAT</>}
         {wonFilter && <> · won deals{from ? ` (${PERIODS.find(([v]) => v === period)?.[1].toLowerCase()}, by date won)` : ""}</>}
         {!wonFilter && from && <> · created {PERIODS.find(([v]) => v === period)?.[1].toLowerCase()}</>}
         {notViewed && <> · not yet opened by the client</>}
