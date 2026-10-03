@@ -130,6 +130,10 @@ model Organization {
   // Pipeline board stages (JSON PipelineStage[], lib/pipeline.ts; null = defaults).
   pipelineStages        String?
 
+  // Comma-separated emails alerted when a job report is completed (e.g. the
+  // office + ops). Empty/null = fall back to the org Contact email.
+  reportAlertEmails     String?
+
   // Google Business Profile place (for importing Google reviews via Places API).
   googlePlaceId         String?
   testimonials          Testimonial[]

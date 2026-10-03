@@ -38,6 +38,7 @@ type Org = {
   termsCommercial: string | null
   nudgeMessage: string | null
   nudgeTemplates: string | null
+  reportAlertEmails: string | null
   youtubeChannelUrl: string | null
   depositRules: string | null
   signOffName: string | null
@@ -321,6 +322,7 @@ export default function SettingsPage() {
           termsCommercial: org.termsCommercial || "",
           nudgeMessage: org.nudgeMessage || "",
           nudgeTemplates: org.nudgeTemplates || "",
+          reportAlertEmails: org.reportAlertEmails || "",
           youtubeChannelUrl: org.youtubeChannelUrl || "",
           depositRules: org.depositRules || "",
           signOffName: org.signOffName || "",
@@ -480,6 +482,15 @@ export default function SettingsPage() {
           <div>
             <label className={labelCls}>Contact phone</label>
             <input className={inputCls} value={org.phone || ""} onChange={(e) => set("phone", e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Job report alerts</label>
+            <input className={inputCls} placeholder="office@company.co.uk, ops@company.co.uk"
+              value={org.reportAlertEmails || ""} onChange={(e) => set("reportAlertEmails", e.target.value)} />
+            <p className="text-xs text-gray-400 mt-1">
+              These addresses get an email the moment a job report is completed (e.g. by a contractor).
+              Comma-separated; leave empty to use the Contact email.
+            </p>
           </div>
           <div className="sm:col-span-2">
             <label className={labelCls}>YouTube channel URL</label>
