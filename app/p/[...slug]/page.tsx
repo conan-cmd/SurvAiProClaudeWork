@@ -6,45 +6,9 @@ import { DepositCard } from "@/components/deposit-card"
 import { computeDeposit, retrieveCheckoutSession } from "@/lib/stripe"
 import { calculateProposalTotals, formatCurrency, lineGross } from "@/lib/utils"
 import { ReadTracker } from "@/components/read-tracker"
+import { markDepositPaid } from "@/lib/deposit"
 
 export const dynamic = "force-dynamic"
-
-// Best-effort "deposit received" email to the business when a client pays.
-// Recipients come from Settings → deposit paid alerts, falling back to the
-// proposal creator, then the org Contact email.
-async function notifyDepositPaid(p: {
-  id: string; clientName: string; depositAmount: number | null
-  orgId: string; creatorEmail: string | null; orgEmail: string | null; title: string
-}) {
-  const { emailEnabled, sendEmail } = await import("@/lib/email")
-  if (!emailEnabled()) return
-  // Alert addresses are looked up here rather than in the page's org select,
-  // which is serialised into the client-facing HTML.
-  const org = await db.organization.findUnique({
-    where: { id: p.orgId },
-    select: { depositAlertEmails: true },
-  })
-  const to = (org?.depositAlertEmails || p.creatorEmail || p.orgEmail || "")
-    .split(/[,;\s]+/)
-    .map((e) => e.trim())
-    .filter((e) => /.+@.+\..+/.test(e))
-  if (!to.length) return
-  const { publicBaseUrl } = await import("@/lib/public-url")
-  const amount = p.depositAmount ? formatCurrency(p.depositAmount) : "The deposit"
-  const url = `${publicBaseUrl("")}/proposals/${p.id}`
-  const html = `
-    <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;max-width:520px">
-      <p>💰 <strong>${p.clientName}</strong> has just paid their deposit of <strong>${amount}</strong> for <strong>${p.title}</strong>.</p>
-      <p style="margin:18px 0"><a href="${url}" style="color:#2563EB;font-weight:600">Open the proposal &rarr;</a></p>
-      <p style="color:#6b7280;font-size:13px">Time to get them booked in.</p>
-    </div>`
-  await sendEmail({
-    to,
-    subject: `💰 ${p.clientName} paid their deposit`,
-    html,
-    text: `${p.clientName} paid their deposit (${amount}) for ${p.title}.\n\nOpen it: ${url}`,
-  })
-}
 
 export default async function SharedProposalPage({
   params,
@@ -127,25 +91,11 @@ export default async function SharedProposalPage({
           : null
       const session = await retrieveCheckoutSession(searchParams.session_id, connectedAccountId)
       if (session.payment_status === "paid") {
-        p = {
-          ...p,
-          ...(await db.proposal.update({
-            where: { id: p.id },
-            data: { depositPaidAt: new Date(), status: "DEPOSIT_PAID" },
-          })),
+        // Shared with the Stripe webhook — records once, fires Xero + alerts.
+        const paid = await markDepositPaid(p.id)
+        if (paid) {
+          p = { ...p, depositPaidAt: paid.depositPaidAt, status: "DEPOSIT_PAID" as typeof p.status }
         }
-        // Raise the Xero draft deposit invoice (best-effort, fire-and-forget).
-        import("@/lib/xero").then((m) => m.createDepositInvoice(p.id)).catch(() => {})
-        // Notify the business their deposit landed (best-effort, first time only).
-        notifyDepositPaid({
-          id: p.id,
-          clientName: p.clientName,
-          depositAmount: p.depositAmount,
-          orgId: p.organization.id,
-          creatorEmail: p.createdBy?.email ?? null,
-          orgEmail: p.organization.email,
-          title: p.survey.title,
-        }).catch(() => {})
       }
     } catch (err) {
       console.error("Deposit verification failed:", err)
