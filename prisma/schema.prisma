@@ -134,6 +134,10 @@ model Organization {
   // office + ops). Empty/null = fall back to the org Contact email.
   reportAlertEmails     String?
 
+  // Comma-separated emails alerted when a client pays a deposit. Empty/null =
+  // fall back to the proposal creator, then the org Contact email.
+  depositAlertEmails    String?
+
   // Google Business Profile place (for importing Google reviews via Places API).
   googlePlaceId         String?
   testimonials          Testimonial[]

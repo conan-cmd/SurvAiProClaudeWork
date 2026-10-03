@@ -41,6 +41,8 @@ const updateOrgSchema = z.object({
   nudgeTemplates: z.string().max(8000).optional(),
   // Comma-separated emails alerted when a job report is completed.
   reportAlertEmails: z.string().max(500).optional(),
+  // Comma-separated emails alerted when a client pays a deposit.
+  depositAlertEmails: z.string().max(500).optional(),
   // JSON PipelineStage[] (lib/pipeline.ts). "" clears back to the app defaults.
   pipelineStages: z.string().max(4000).optional(),
   youtubeChannelUrl: z.string().optional(),

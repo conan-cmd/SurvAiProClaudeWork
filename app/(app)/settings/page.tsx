@@ -39,6 +39,7 @@ type Org = {
   nudgeMessage: string | null
   nudgeTemplates: string | null
   reportAlertEmails: string | null
+  depositAlertEmails: string | null
   youtubeChannelUrl: string | null
   depositRules: string | null
   signOffName: string | null
@@ -323,6 +324,7 @@ export default function SettingsPage() {
           nudgeMessage: org.nudgeMessage || "",
           nudgeTemplates: org.nudgeTemplates || "",
           reportAlertEmails: org.reportAlertEmails || "",
+          depositAlertEmails: org.depositAlertEmails || "",
           youtubeChannelUrl: org.youtubeChannelUrl || "",
           depositRules: org.depositRules || "",
           signOffName: org.signOffName || "",
@@ -490,6 +492,15 @@ export default function SettingsPage() {
             <p className="text-xs text-gray-400 mt-1">
               These addresses get an email the moment a job report is completed (e.g. by a contractor).
               Comma-separated; leave empty to use the Contact email.
+            </p>
+          </div>
+          <div className="sm:col-span-2">
+            <label className={labelCls}>Deposit paid alerts</label>
+            <input className={inputCls} placeholder="office@company.co.uk, accounts@company.co.uk"
+              value={org.depositAlertEmails || ""} onChange={(e) => set("depositAlertEmails", e.target.value)} />
+            <p className="text-xs text-gray-400 mt-1">
+              These addresses get an email the moment a client pays their deposit.
+              Comma-separated; leave empty to notify the proposal&apos;s creator (or the Contact email).
             </p>
           </div>
           <div className="sm:col-span-2">

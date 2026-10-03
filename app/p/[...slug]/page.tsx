@@ -10,14 +10,25 @@ import { ReadTracker } from "@/components/read-tracker"
 export const dynamic = "force-dynamic"
 
 // Best-effort "deposit received" email to the business when a client pays.
+// Recipients come from Settings → deposit paid alerts, falling back to the
+// proposal creator, then the org Contact email.
 async function notifyDepositPaid(p: {
   id: string; clientName: string; depositAmount: number | null
-  creatorEmail: string | null; orgEmail: string | null; title: string
+  orgId: string; creatorEmail: string | null; orgEmail: string | null; title: string
 }) {
   const { emailEnabled, sendEmail } = await import("@/lib/email")
   if (!emailEnabled()) return
-  const to = p.creatorEmail || p.orgEmail
-  if (!to) return
+  // Alert addresses are looked up here rather than in the page's org select,
+  // which is serialised into the client-facing HTML.
+  const org = await db.organization.findUnique({
+    where: { id: p.orgId },
+    select: { depositAlertEmails: true },
+  })
+  const to = (org?.depositAlertEmails || p.creatorEmail || p.orgEmail || "")
+    .split(/[,;\s]+/)
+    .map((e) => e.trim())
+    .filter((e) => /.+@.+\..+/.test(e))
+  if (!to.length) return
   const { publicBaseUrl } = await import("@/lib/public-url")
   const amount = p.depositAmount ? formatCurrency(p.depositAmount) : "The deposit"
   const url = `${publicBaseUrl("")}/proposals/${p.id}`
@@ -130,6 +141,7 @@ export default async function SharedProposalPage({
           id: p.id,
           clientName: p.clientName,
           depositAmount: p.depositAmount,
+          orgId: p.organization.id,
           creatorEmail: p.createdBy?.email ?? null,
           orgEmail: p.organization.email,
           title: p.survey.title,
