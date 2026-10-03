@@ -32,6 +32,7 @@ export async function POST(
       return NextResponse.json({
         created: result.status === "created",
         invoiceNumber: result.invoiceNumber,
+        balanceInvoiceNumber: result.balanceInvoiceNumber ?? null,
       })
     case "skipped":
       return NextResponse.json(

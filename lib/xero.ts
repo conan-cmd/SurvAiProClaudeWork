@@ -142,15 +142,19 @@ async function xeroFetch(
 }
 
 export type DepositInvoiceResult =
-  | { status: "created" | "exists"; invoiceNumber: string | null }
+  | { status: "created" | "exists"; invoiceNumber: string | null; balanceInvoiceNumber?: string | null }
   | { status: "skipped"; reason: "not_connected" | "no_deposit" }
   | { status: "error"; message: string }
 
-// Raise the DRAFT deposit invoice for a just-paid proposal. Idempotent — a
-// stored invoice id means it already exists. Amounts are VAT-inclusive (the
-// deposit is charged on the gross agreed total), so lines use Inclusive with
-// UK 20% output VAT for Xero to back the VAT out correctly. Never throws —
-// the result says what happened so callers can surface or ignore it.
+// Raise the DRAFT deposit invoice for a just-paid proposal, plus a DRAFT
+// remaining-balance invoice for the rest of the job (approved by the office
+// on completion — drafts carry no tax point, so the VAT timing stays right).
+// Idempotent — stored invoice ids mean they already exist; a proposal with a
+// deposit invoice but no balance invoice gets the balance backfilled.
+// Amounts are VAT-inclusive (the deposit is charged on the gross agreed
+// total), so lines use Inclusive with UK 20% output VAT for Xero to back the
+// VAT out correctly. Never throws — the result says what happened so callers
+// can surface or ignore it.
 export async function createDepositInvoice(proposalId: string): Promise<DepositInvoiceResult> {
   try {
     const proposal = await db.proposal.findUnique({
@@ -162,13 +166,10 @@ export async function createDepositInvoice(proposalId: string): Promise<DepositI
       },
     })
     if (!proposal) return { status: "error", message: "Proposal not found" }
-    if (proposal.xeroDepositInvoiceId) {
-      return { status: "exists", invoiceNumber: proposal.xeroDepositInvoiceNumber }
-    }
     const org = proposal.organization
     if (!xeroAvailable() || !xeroConnected(org)) return { status: "skipped", reason: "not_connected" }
 
-    const { calculateProposalTotals } = await import("@/lib/utils")
+    const { calculateProposalTotals, formatCurrency } = await import("@/lib/utils")
     const agreed = proposal.agreedTotal ?? calculateProposalTotals(proposal.pricingLineItems).total
     const gross =
       proposal.depositAmount ??
@@ -176,48 +177,119 @@ export async function createDepositInvoice(proposalId: string): Promise<DepositI
     if (!gross || gross <= 0) return { status: "skipped", reason: "no_deposit" }
 
     const today = new Date().toISOString().slice(0, 10)
-    const contactName = proposal.survey.clientCompany?.trim() || proposal.clientName
-    const created = await xeroFetch(org, "/Invoices", {
-      method: "POST",
-      body: {
-        Invoices: [
-          {
-            Type: "ACCREC",
-            Contact: {
-              Name: contactName,
-              ...(proposal.clientEmail ? { EmailAddress: proposal.clientEmail } : {}),
+    const jobLabel =
+      proposal.survey.title +
+      (proposal.survey.clientAddress ? ` — ${proposal.survey.clientAddress}` : "")
+    const totalStr = `${formatCurrency(agreed)} inc VAT`
+    const contact = {
+      Name: proposal.survey.clientCompany?.trim() || proposal.clientName,
+      ...(proposal.clientEmail ? { EmailAddress: proposal.clientEmail } : {}),
+    }
+
+    let depositId = proposal.xeroDepositInvoiceId
+    let invoiceNumber = proposal.xeroDepositInvoiceNumber
+
+    if (!depositId) {
+      // "Deposit (50% of total job value £3,600.00 inc VAT)" when the split is
+      // a clean percentage; a fixed-amount deposit just shows both figures.
+      const pctRaw = (gross / agreed) * 100
+      const pct = Math.abs(pctRaw - Math.round(pctRaw)) < 0.05 ? `${Math.round(pctRaw)}% of ` : ""
+      const created = await xeroFetch(org, "/Invoices", {
+        method: "POST",
+        body: {
+          Invoices: [
+            {
+              Type: "ACCREC",
+              Contact: contact,
+              Date: today,
+              DueDate: today,
+              Reference: `Deposit — ${proposal.survey.title}`.slice(0, 255),
+              LineAmountTypes: "Inclusive",
+              Status: "DRAFT",
+              LineItems: [
+                {
+                  Description: `Deposit (${pct}total job value ${totalStr}) — ${jobLabel} (paid via SurvAIPro)`,
+                  Quantity: 1,
+                  UnitAmount: gross,
+                  TaxType: "OUTPUT2",
+                },
+              ],
             },
-            Date: today,
-            DueDate: today,
-            Reference: `Deposit — ${proposal.survey.title}`.slice(0, 255),
-            LineAmountTypes: "Inclusive",
-            Status: "DRAFT",
-            LineItems: [
+          ],
+        },
+      })
+      const inv = ((created.Invoices as Record<string, unknown>[] | undefined) || [])[0]
+      if (!inv?.InvoiceID) return { status: "error", message: "Xero returned no invoice" }
+      depositId = String(inv.InvoiceID)
+      invoiceNumber = inv.InvoiceNumber ? String(inv.InvoiceNumber) : null
+      await db.proposal.update({
+        where: { id: proposalId },
+        data: { xeroDepositInvoiceId: depositId, xeroDepositInvoiceNumber: invoiceNumber },
+      })
+    }
+
+    // Companion DRAFT invoice for the remaining balance, tied back to the
+    // deposit. Xero only assigns draft numbers on approval, so the deposit
+    // invoice number is quoted when known and the amounts + paid date are
+    // always baked in. Best-effort: a balance failure never undoes the
+    // deposit invoice.
+    let balanceInvoiceNumber = proposal.xeroBalanceInvoiceNumber
+    const balance = Math.round((agreed - gross) * 100) / 100
+    if (!proposal.xeroBalanceInvoiceId && balance > 0) {
+      try {
+        const paidOn = (proposal.depositPaidAt ?? new Date()).toLocaleDateString("en-GB", {
+          day: "numeric", month: "short", year: "numeric",
+        })
+        const re = invoiceNumber ? ` (deposit invoice ${invoiceNumber})` : ""
+        const dueDate = new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10)
+        const created = await xeroFetch(org, "/Invoices", {
+          method: "POST",
+          body: {
+            Invoices: [
               {
-                Description:
-                  `Deposit for ${proposal.survey.title}` +
-                  (proposal.survey.clientAddress ? ` — ${proposal.survey.clientAddress}` : "") +
-                  " (paid via SurvAIPro)",
-                Quantity: 1,
-                UnitAmount: gross,
-                TaxType: "OUTPUT2",
+                Type: "ACCREC",
+                Contact: contact,
+                Date: today,
+                DueDate: dueDate,
+                Reference: `Balance — ${proposal.survey.title}${re}`.slice(0, 255),
+                LineAmountTypes: "Inclusive",
+                Status: "DRAFT",
+                LineItems: [
+                  {
+                    Description:
+                      `Remaining balance — ${jobLabel}. ` +
+                      `Total job value ${totalStr}, less deposit ${formatCurrency(gross)} ` +
+                      `paid ${paidOn} via SurvAIPro${re}.`,
+                    Quantity: 1,
+                    UnitAmount: balance,
+                    TaxType: "OUTPUT2",
+                  },
+                ],
               },
             ],
           },
-        ],
-      },
-    })
-    const inv = ((created.Invoices as Record<string, unknown>[] | undefined) || [])[0]
-    if (!inv?.InvoiceID) return { status: "error", message: "Xero returned no invoice" }
-    const invoiceNumber = inv.InvoiceNumber ? String(inv.InvoiceNumber) : null
-    await db.proposal.update({
-      where: { id: proposalId },
-      data: {
-        xeroDepositInvoiceId: String(inv.InvoiceID),
-        xeroDepositInvoiceNumber: invoiceNumber,
-      },
-    })
-    return { status: "created", invoiceNumber }
+        })
+        const inv = ((created.Invoices as Record<string, unknown>[] | undefined) || [])[0]
+        if (inv?.InvoiceID) {
+          balanceInvoiceNumber = inv.InvoiceNumber ? String(inv.InvoiceNumber) : null
+          await db.proposal.update({
+            where: { id: proposalId },
+            data: {
+              xeroBalanceInvoiceId: String(inv.InvoiceID),
+              xeroBalanceInvoiceNumber: balanceInvoiceNumber,
+            },
+          })
+        }
+      } catch (err) {
+        console.error("Xero balance invoice failed:", err)
+      }
+    }
+
+    return {
+      status: proposal.xeroDepositInvoiceId ? "exists" : "created",
+      invoiceNumber,
+      balanceInvoiceNumber,
+    }
   } catch (err) {
     console.error("Xero deposit invoice failed:", err)
     return { status: "error", message: err instanceof Error ? err.message : "Unexpected error" }
