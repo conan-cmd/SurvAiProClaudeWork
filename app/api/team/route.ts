@@ -18,13 +18,19 @@ export async function GET() {
     }),
     db.invite.findMany({
       where: { organizationId: user.organizationId, acceptedAt: null, expiresAt: { gt: new Date() } },
-      select: { id: true, email: true, token: true, expiresAt: true },
+      select: { id: true, email: true, token: true, expiresAt: true, role: true },
     }),
   ])
   return NextResponse.json({ users, invites })
 }
 
-const inviteSchema = z.object({ email: z.string().trim().email("Enter a valid email") })
+const inviteSchema = z.object({
+  email: z.string().trim().email("Enter a valid email"),
+  // Access level applied when the invite is accepted. OWNER is never
+  // grantable by invite.
+  role: z.enum(["ADMIN", "MEMBER", "CONTRACTOR"]).default("MEMBER"),
+  canSendProposals: z.boolean().default(true),
+})
 
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser()
@@ -35,6 +41,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.errors[0].message }, { status: 400 })
   }
   const email = parsed.data.email.toLowerCase()
+  const { role, canSendProposals } = parsed.data
+  // Granting elevated or restricted access is an owner/admin call.
+  if (role !== "MEMBER" && user.role !== "OWNER" && user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Only an owner or admin can set access levels" }, { status: 403 })
+  }
 
   const existing = await db.user.findUnique({ where: { email } })
   if (existing?.organizationId === user.organizationId) {
@@ -47,6 +58,8 @@ export async function POST(request: NextRequest) {
     data: {
       organizationId: user.organizationId,
       email,
+      role,
+      canSendProposals,
       token,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     },

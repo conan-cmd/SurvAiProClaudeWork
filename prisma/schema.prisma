@@ -60,6 +60,9 @@ model Invite {
   organizationId        String
   organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   email                 String
+  // Access granted the moment the invite is accepted — chosen by the inviter.
+  role                  UserRole        @default(MEMBER)
+  canSendProposals      Boolean         @default(true)
   token                 String          @unique
   expiresAt             DateTime
   acceptedAt            DateTime?
@@ -127,6 +130,10 @@ model Organization {
   // Pipeline board stages (JSON PipelineStage[], lib/pipeline.ts; null = defaults).
   pipelineStages        String?
 
+  // Comma-separated emails alerted when a job report is completed (e.g. the
+  // office + ops). Empty/null = fall back to the org Contact email.
+  reportAlertEmails     String?
+
   // Google Business Profile place (for importing Google reviews via Places API).
   googlePlaceId         String?
   testimonials          Testimonial[]
@@ -159,6 +166,14 @@ model Organization {
   pipedriveTokenExpiresAt DateTime?
   pipedriveApiDomain      String?
   pipedriveCompanyId      String?
+
+  // Xero accounting connection (per-firm OAuth). Tokens encrypted at rest
+  // (lib/crypto); the tenant is the Xero organisation invoices are raised in.
+  xeroAccessToken         String?
+  xeroRefreshToken        String?
+  xeroTokenExpiresAt      DateTime?
+  xeroTenantId            String?
+  xeroTenantName          String?
 
   // True once the first-run setup wizard is finished (or dismissed for good).
   onboardingComplete    Boolean         @default(false)
@@ -479,6 +494,10 @@ model Proposal {
   pipedriveDealId       String?
   pipedrivePersonId     String?
   pipedriveOrgId        String?
+
+  // Xero deposit invoice raised when the deposit was paid (dedupe + reference).
+  xeroDepositInvoiceId     String?
+  xeroDepositInvoiceNumber String?
 
   // Deposit
   depositAmount         Float?

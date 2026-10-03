@@ -35,7 +35,11 @@ export async function POST(request: NextRequest) {
     await db.$transaction([
       db.user.update({
         where: { id: existing.id },
-        data: { organizationId: invite.organizationId, role: "MEMBER" },
+        data: {
+          organizationId: invite.organizationId,
+          role: invite.role,
+          canSendProposals: invite.canSendProposals,
+        },
       }),
       db.invite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }),
     ])
@@ -50,7 +54,8 @@ export async function POST(request: NextRequest) {
           name,
           password: await hash(password, 12),
           organizationId: invite.organizationId,
-          role: "MEMBER",
+          role: invite.role,
+          canSendProposals: invite.canSendProposals,
         },
       }),
       db.invite.update({ where: { id: invite.id }, data: { acceptedAt: new Date() } }),
