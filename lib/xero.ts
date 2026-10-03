@@ -38,9 +38,10 @@ export function xeroConnected(org: { xeroRefreshToken?: string | null; xeroTenan
 }
 
 export function authorizeUrl(state: string, redirectUri: string): string {
-  // Scopes are joined with %20 explicitly — Xero's identity server has been
-  // seen rejecting the + encoding URLSearchParams produces for spaces.
-  const scope = ["offline_access", "accounting.transactions", "accounting.contacts"]
+  // Granular scopes (apps created after 2 Mar 2026 can't use the old broad
+  // accounting.transactions): invoices to raise drafts, contacts to
+  // match/create the customer, app.connections to resolve the tenant.
+  const scope = ["offline_access", "app.connections", "accounting.invoices", "accounting.contacts"]
     .map(encodeURIComponent)
     .join("%20")
   return (
