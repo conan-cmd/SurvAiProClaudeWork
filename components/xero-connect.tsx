@@ -22,10 +22,15 @@ export function XeroConnect() {
 
   // Toast on return from the OAuth redirect (?xero=connected|error|…).
   useEffect(() => {
-    const p = new URLSearchParams(window.location.search).get("xero")
+    const params = new URLSearchParams(window.location.search)
+    const p = params.get("xero")
     if (!p) return
+    const why = params.get("why")
     if (p === "connected") toast.success("Xero connected")
-    else if (p === "error") toast.error("Couldn't connect Xero — please try again")
+    else if (p === "error")
+      toast.error(why ? `Couldn't connect Xero: ${why}` : "Couldn't connect Xero — please try again", {
+        duration: 12000,
+      })
     else if (p === "forbidden") toast.error("Only an owner or admin can connect Xero")
     else if (p === "unavailable") toast.error("Xero connect isn't configured on the server yet")
     window.history.replaceState({}, "", window.location.pathname)

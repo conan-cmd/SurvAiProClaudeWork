@@ -18,6 +18,10 @@ export async function GET(request: NextRequest) {
 
   if (request.nextUrl.searchParams.get("error") || !code || !state || state !== cookieState) {
     settings.searchParams.set("xero", "error")
+    settings.searchParams.set(
+      "why",
+      request.nextUrl.searchParams.get("error") || (!code ? "no code returned" : "state mismatch")
+    )
     const r = NextResponse.redirect(settings)
     r.cookies.delete("xero_oauth_state")
     return r
@@ -40,8 +44,10 @@ export async function GET(request: NextRequest) {
       },
     })
     settings.searchParams.set("xero", "connected")
-  } catch {
+  } catch (err) {
+    console.error("Xero connect failed:", err)
     settings.searchParams.set("xero", "error")
+    settings.searchParams.set("why", err instanceof Error ? err.message.slice(0, 120) : "unexpected error")
   }
 
   const res = NextResponse.redirect(settings)
