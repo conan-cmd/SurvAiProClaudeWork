@@ -60,6 +60,9 @@ model Invite {
   organizationId        String
   organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   email                 String
+  // Access granted the moment the invite is accepted — chosen by the inviter.
+  role                  UserRole        @default(MEMBER)
+  canSendProposals      Boolean         @default(true)
   token                 String          @unique
   expiresAt             DateTime
   acceptedAt            DateTime?

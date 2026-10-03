@@ -75,7 +75,7 @@ type Me = {
 
 type TeamData = {
   users: { id: string; name: string | null; email: string; role: string; headshotUrl: string | null; canSendProposals?: boolean; navSections?: string | null; lastActiveAt?: string | null }[]
-  invites: { id: string; email: string; token: string }[]
+  invites: { id: string; email: string; token: string; role?: string }[]
 }
 
 export default function SettingsPage() {
@@ -83,6 +83,8 @@ export default function SettingsPage() {
   const [me, setMe] = useState<Me | null>(null)
   const [team, setTeam] = useState<TeamData | null>(null)
   const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteRole, setInviteRole] = useState<"MEMBER" | "ADMIN" | "CONTRACTOR">("MEMBER")
+  const [inviteCanSend, setInviteCanSend] = useState(true)
   const [inviting, setInviting] = useState(false)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [referral, setReferral] = useState<{ code: string | null; count: number } | null>(null)
@@ -136,7 +138,11 @@ export default function SettingsPage() {
       const res = await fetch("/api/team", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: inviteEmail }),
+        body: JSON.stringify({
+          email: inviteEmail,
+          role: inviteRole,
+          canSendProposals: inviteRole === "MEMBER" ? inviteCanSend : true,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -827,17 +833,44 @@ export default function SettingsPage() {
           {team?.invites.map((i) => (
             <div key={i.id} className="flex items-center gap-3 opacity-60">
               <div className="w-8 h-8 rounded-full border-2 border-dashed" />
-              <div className="text-sm">{i.email} <span className="text-xs text-amber-600">invited</span></div>
+              <div className="text-sm">
+                {i.email}{" "}
+                <span className="text-xs text-amber-600">
+                  invited{i.role && i.role !== "MEMBER" ? ` · ${i.role.toLowerCase()}` : ""}
+                </span>
+              </div>
             </div>
           ))}
         </div>
-        <div className="flex gap-2">
-          <input className={inputCls} type="email" placeholder="colleague@company.co.uk"
-            value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
-          <button onClick={invite} disabled={inviting}
-            className="shrink-0 px-4 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
-            {inviting ? "Inviting…" : "Invite"}
-          </button>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <input className={inputCls} type="email" placeholder="colleague@company.co.uk"
+              value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
+            <button onClick={invite} disabled={inviting}
+              className="shrink-0 px-4 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
+              {inviting ? "Inviting…" : "Invite"}
+            </button>
+          </div>
+          {/* Access is set BEFORE they accept — they land with the right role. */}
+          {(me?.role === "OWNER" || me?.role === "ADMIN") && (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+              <select value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as "MEMBER" | "ADMIN" | "CONTRACTOR")}
+                className="px-2.5 py-1.5 border rounded-lg bg-white text-sm">
+                <option value="MEMBER">Member — surveys, proposals & RAMS</option>
+                <option value="ADMIN">Admin — everything, incl. settings & team</option>
+                <option value="CONTRACTOR">Contractor — job reports only</option>
+              </select>
+              {inviteRole === "MEMBER" && (
+                <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                  <input type="checkbox" checked={inviteCanSend}
+                    onChange={(e) => setInviteCanSend(e.target.checked)}
+                    className="rounded accent-blue-600" />
+                  Can send proposals (untick = drafts need your sign-off)
+                </label>
+              )}
+            </div>
+          )}
         </div>
         {inviteLink && (
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-brand-blue/30 bg-blue-50 px-3 py-2">
