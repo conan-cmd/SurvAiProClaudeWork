@@ -53,6 +53,8 @@ type ProposalData = {
   depositPaidAt: string | null
   xeroDepositInvoiceId: string | null
   xeroDepositInvoiceNumber: string | null
+  xeroBalanceInvoiceId: string | null
+  xeroBalanceInvoiceNumber: string | null
   pipedriveDealId: string | null
   lastNudgeAt: string | null
   nudgeHistory: string | null
@@ -1375,38 +1377,49 @@ export default function ProposalEditorPage() {
                   })}
                 </div>
               )}
-              {proposal.depositPaidAt && (
-                proposal.xeroDepositInvoiceId ? (
+              {proposal.depositPaidAt && (() => {
+                const num = (n: string | null) => (n ? ` ${n}` : "")
+                const raiseInvoices = async () => {
+                  try {
+                    const res = await fetch(`/api/proposals/${proposalId}/xero-invoice`, { method: "POST" })
+                    const json = await res.json()
+                    if (!res.ok) throw new Error(json.error)
+                    toast.success(
+                      json.balanceInvoiceNumber || json.created
+                        ? "Xero draft invoices raised"
+                        : "Invoices already exist in Xero"
+                    )
+                    setProposal((prev) => prev && {
+                      ...prev,
+                      xeroDepositInvoiceId: "created",
+                      xeroDepositInvoiceNumber: json.invoiceNumber ?? null,
+                      xeroBalanceInvoiceId: "created",
+                      xeroBalanceInvoiceNumber: json.balanceInvoiceNumber ?? null,
+                    })
+                  } catch (e) {
+                    toast.error(e instanceof Error ? e.message : "Couldn't raise the Xero invoices")
+                  }
+                }
+                return proposal.xeroDepositInvoiceId ? (
                   <div className="text-gray-500">
-                    Xero draft invoice{proposal.xeroDepositInvoiceNumber ? ` ${proposal.xeroDepositInvoiceNumber}` : ""} raised
+                    Xero draft raised: deposit{num(proposal.xeroDepositInvoiceNumber)}
+                    {proposal.xeroBalanceInvoiceId ? (
+                      <> + balance{num(proposal.xeroBalanceInvoiceNumber)}</>
+                    ) : (
+                      <>
+                        {" · "}
+                        <button onClick={raiseInvoices} className="font-medium text-[#13B5EA] hover:underline">
+                          Raise balance invoice
+                        </button>
+                      </>
+                    )}
                   </div>
                 ) : (
-                  <button
-                    onClick={async () => {
-                      try {
-                        const res = await fetch(`/api/proposals/${proposalId}/xero-invoice`, { method: "POST" })
-                        const json = await res.json()
-                        if (!res.ok) throw new Error(json.error)
-                        toast.success(
-                          json.created
-                            ? `Draft invoice${json.invoiceNumber ? ` ${json.invoiceNumber}` : ""} raised in Xero`
-                            : "Invoice already exists in Xero"
-                        )
-                        setProposal((prev) => prev && {
-                          ...prev,
-                          xeroDepositInvoiceId: "created",
-                          xeroDepositInvoiceNumber: json.invoiceNumber ?? null,
-                        })
-                      } catch (e) {
-                        toast.error(e instanceof Error ? e.message : "Couldn't raise the Xero invoice")
-                      }
-                    }}
-                    className="text-xs font-medium text-[#13B5EA] hover:underline"
-                  >
-                    Raise deposit invoice in Xero
+                  <button onClick={raiseInvoices} className="text-xs font-medium text-[#13B5EA] hover:underline">
+                    Raise deposit + balance invoices in Xero
                   </button>
                 )
-              )}
+              })()}
             </div>
           </div>
         </div>

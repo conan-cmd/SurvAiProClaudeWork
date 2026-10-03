@@ -502,6 +502,8 @@ model Proposal {
   // Xero deposit invoice raised when the deposit was paid (dedupe + reference).
   xeroDepositInvoiceId     String?
   xeroDepositInvoiceNumber String?
+  xeroBalanceInvoiceId     String?
+  xeroBalanceInvoiceNumber String?
 
   // Deposit
   depositAmount         Float?
