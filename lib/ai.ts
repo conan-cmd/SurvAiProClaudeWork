@@ -183,6 +183,47 @@ export async function regenerateSection(params: {
   tone: string
   feedback?: string
 }): Promise<string> {
+  // Terms & conditions get their own treatment: the generic "rewrite this
+  // content, keep the facts" framing makes the model preserve clauses from
+  // whatever service the saved template was written for (the bin-cleaning
+  // carry-over bug). Terms are REBUILT for this job's service instead, with
+  // only the business policies retained from the current text.
+  if (params.sectionType === "terms") {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You write clear, fair terms & conditions for UK trade businesses (exterior cleaning and similar). " +
+            "British English. Plain numbered clauses, no markdown headings. Never invent prices, percentages or timescales — " +
+            "reuse the ones present in the provided terms, and write \"[to confirm]\" where a needed figure is missing.",
+        },
+        {
+          role: "user",
+          content: `Produce the terms & conditions for THIS job:
+
+${params.context}
+
+CURRENT SAVED TERMS (treat as the source of BUSINESS POLICIES ONLY — payment/deposit terms, cancellation notice, liability caps, guarantees, complaints, insurance):
+${params.currentContent}
+
+Rules:
+- Keep the business policies (deposit %, payment terms, cancellation, liability, guarantee periods, insurance) exactly as stated in the current terms.
+- REMOVE every clause that is specific to a different service than this job's (e.g. bin-cleaning collection schedules, bin placement, missed-collection clauses on a non-bin job). Do not soften them — delete them.
+- Replace them with clauses appropriate to this job's actual service and site: access and parking requirements, water/power supply, weather delays, pre-existing defects (e.g. fragile pointing, blown render, loose tiles), variability of staining/organic regrowth, and the client's site responsibilities — drawing on the job details above.
+- Keep the length and formality similar to the current terms.
+${params.feedback ? `- USER FEEDBACK TO APPLY: ${params.feedback}` : ""}
+
+Respond with the rewritten terms only — plain text, no JSON, no heading.`,
+        },
+      ],
+      temperature: 0.3,
+      max_tokens: 4000,
+    })
+    return response.choices[0].message.content || params.currentContent
+  }
+
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
