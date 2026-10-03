@@ -81,8 +81,8 @@ export function BigChangeConnect() {
       if (!res.ok) throw new Error(json.error)
       toast.success(
         json.imported
-          ? `Imported ${json.imported} booking${json.imported === 1 ? "" : "s"} (${json.skipped} already in)`
-          : `No new bookings — ${json.fetched} checked, ${json.skipped} already in`,
+          ? `Imported ${json.imported} booking${json.imported === 1 ? "" : "s"} (${json.skipped} already in, ${json.ignoredPast} past/undated)`
+          : `No new future bookings — ${json.fetched} checked, ${json.skipped} already in, ${json.ignoredPast} past/undated`,
         { duration: 8000 }
       )
       if (json.debugKeys) console.info("BigChange job fields:", json.debugKeys)

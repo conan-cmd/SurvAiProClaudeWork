@@ -139,6 +139,7 @@ export type SyncResult = {
   fetched: number
   imported: number
   skipped: number
+  ignoredPast: number
   // When jobs came back but none could be mapped, the first job's keys help
   // diagnose which field names this account actually uses.
   debugKeys?: string[]
@@ -166,16 +167,51 @@ export async function syncSurveyBookings(orgId: string, userId: string): Promise
     }
   }
 
+  // The jobs endpoint requires a date-range filter, and the feed only wants
+  // future bookings anyway. The exact param names aren't documented publicly,
+  // so likely spellings are tried until one isn't rejected with a 422 —
+  // created-at last, over a wide window, with the future-only rule enforced
+  // in code below either way.
+  const from = new Date()
+  from.setHours(0, 0, 0, 0)
+  const to = new Date(Date.now() + 365 * 86400_000)
+  const createdFrom = new Date(Date.now() - 120 * 86400_000)
+  const rangeCandidates = [
+    `plannedAtFrom=${from.toISOString()}&plannedAtTo=${to.toISOString()}`,
+    `plannedStartFrom=${from.toISOString()}&plannedStartTo=${to.toISOString()}`,
+    `scheduledAtFrom=${from.toISOString()}&scheduledAtTo=${to.toISOString()}`,
+    `createdAtFrom=${createdFrom.toISOString()}&createdAtTo=${to.toISOString()}`,
+  ]
+
+  let range: string | null = null
+  let firstPage: Record<string, unknown>[] = []
+  const rangeErrors: string[] = []
+  for (const candidate of rangeCandidates) {
+    try {
+      firstPage = asArray(
+        await bcFetch(cfg, `/v1/jobs?pageNumber=1&pageSize=100${typeId ? `&typeId=${typeId}` : ""}&${candidate}`)
+      )
+      range = candidate
+      break
+    } catch (err) {
+      rangeErrors.push(err instanceof Error ? err.message : String(err))
+    }
+  }
+  if (range === null) {
+    throw new Error(`BigChange rejected every date-filter spelling — ${rangeErrors[rangeErrors.length - 1]}`)
+  }
+
   const query = (page: number) =>
-    `/v1/jobs?pageNumber=${page}&pageSize=100${typeId ? `&typeId=${typeId}` : ""}`
+    `/v1/jobs?pageNumber=${page}&pageSize=100${typeId ? `&typeId=${typeId}` : ""}&${range}`
 
   let fetched = 0
   let imported = 0
   let skipped = 0
+  let ignoredPast = 0
   let debugKeys: string[] | undefined
 
   for (let page = 1; page <= 5; page++) {
-    const jobs = asArray(await bcFetch(cfg, query(page)))
+    const jobs = page === 1 ? firstPage : asArray(await bcFetch(cfg, query(page)))
     if (!jobs.length) break
     fetched += jobs.length
 
@@ -197,7 +233,12 @@ export async function syncSurveyBookings(orgId: string, userId: string): Promise
         pickString(job, ["postcode", "postCode", "contactPostcode", "zip"]),
       ].filter(Boolean)
       const scheduledAt =
-        pickDate(job, ["plannedStart", "plannedStartDate", "plannedDate", "scheduledStart", "startDate", "start", "date", "creationDate"])
+        pickDate(job, ["plannedStart", "plannedStartDate", "plannedDate", "plannedAt", "scheduledStart", "startDate", "start", "date"])
+      // Future bookings only — undated or past jobs aren't upcoming surveys.
+      if (!scheduledAt || scheduledAt < from) {
+        ignoredPast++
+        continue
+      }
       const reference = pickString(job, ["reference", "description", "title", "name"])
 
       await db.siteSurvey.create({
@@ -225,5 +266,5 @@ export async function syncSurveyBookings(orgId: string, userId: string): Promise
     if (jobs.length < 100) break
   }
 
-  return { fetched, imported, skipped, debugKeys }
+  return { fetched, imported, skipped, ignoredPast, debugKeys }
 }
