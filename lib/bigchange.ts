@@ -10,9 +10,10 @@ import { encryptSecret, decryptSecret } from "@/lib/crypto"
 // via SiteSurvey.externalBookingRef ("bigchange:<jobId>").
 
 const API_BASE = "https://api.bigchange.com"
-// BigChange's docs call it an "authentication proxy"; the exact path isn't in
-// the published swagger, so the standard candidates are tried in order.
-const TOKEN_URLS = [`${API_BASE}/connect/token`, `${API_BASE}/oauth/token`]
+// Documented: POST /auth/tokens, form-urlencoded client_credentials grant
+// (developers.bigchange.com/docs/rest/auth-proxy/get-an-access-token). The
+// standard OAuth paths stay as fallbacks in case it ever moves.
+const TOKEN_URLS = [`${API_BASE}/auth/tokens`, `${API_BASE}/connect/token`, `${API_BASE}/oauth/token`]
 
 export type BigChangeConfig = {
   clientId: string
