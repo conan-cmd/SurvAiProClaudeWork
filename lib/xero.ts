@@ -38,14 +38,18 @@ export function xeroConnected(org: { xeroRefreshToken?: string | null; xeroTenan
 }
 
 export function authorizeUrl(state: string, redirectUri: string): string {
-  const params = new URLSearchParams({
-    response_type: "code",
-    client_id: process.env.XERO_CLIENT_ID || "",
-    redirect_uri: redirectUri,
-    scope: "offline_access accounting.transactions accounting.contacts",
-    state,
-  })
-  return `${AUTH_BASE}?${params.toString()}`
+  // Scopes are joined with %20 explicitly — Xero's identity server has been
+  // seen rejecting the + encoding URLSearchParams produces for spaces.
+  const scope = ["offline_access", "accounting.transactions", "accounting.contacts"]
+    .map(encodeURIComponent)
+    .join("%20")
+  return (
+    `${AUTH_BASE}?response_type=code` +
+    `&client_id=${encodeURIComponent(process.env.XERO_CLIENT_ID || "")}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&scope=${scope}` +
+    `&state=${encodeURIComponent(state)}`
+  )
 }
 
 function basicAuth(): string {
