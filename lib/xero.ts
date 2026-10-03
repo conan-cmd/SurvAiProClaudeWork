@@ -141,11 +141,17 @@ async function xeroFetch(
   return json
 }
 
+export type DepositInvoiceResult =
+  | { status: "created" | "exists"; invoiceNumber: string | null }
+  | { status: "skipped"; reason: "not_connected" | "no_deposit" }
+  | { status: "error"; message: string }
+
 // Raise the DRAFT deposit invoice for a just-paid proposal. Idempotent — a
 // stored invoice id means it already exists. Amounts are VAT-inclusive (the
 // deposit is charged on the gross agreed total), so lines use Inclusive with
-// UK 20% output VAT for Xero to back the VAT out correctly.
-export async function createDepositInvoice(proposalId: string): Promise<void> {
+// UK 20% output VAT for Xero to back the VAT out correctly. Never throws —
+// the result says what happened so callers can surface or ignore it.
+export async function createDepositInvoice(proposalId: string): Promise<DepositInvoiceResult> {
   try {
     const proposal = await db.proposal.findUnique({
       where: { id: proposalId },
@@ -155,16 +161,19 @@ export async function createDepositInvoice(proposalId: string): Promise<void> {
         pricingLineItems: true,
       },
     })
-    if (!proposal || proposal.xeroDepositInvoiceId) return
+    if (!proposal) return { status: "error", message: "Proposal not found" }
+    if (proposal.xeroDepositInvoiceId) {
+      return { status: "exists", invoiceNumber: proposal.xeroDepositInvoiceNumber }
+    }
     const org = proposal.organization
-    if (!xeroAvailable() || !xeroConnected(org)) return
+    if (!xeroAvailable() || !xeroConnected(org)) return { status: "skipped", reason: "not_connected" }
 
     const { calculateProposalTotals } = await import("@/lib/utils")
     const agreed = proposal.agreedTotal ?? calculateProposalTotals(proposal.pricingLineItems).total
     const gross =
       proposal.depositAmount ??
       computeDeposit(org.depositRules, proposal.survey.isResidential, agreed)
-    if (!gross || gross <= 0) return
+    if (!gross || gross <= 0) return { status: "skipped", reason: "no_deposit" }
 
     const today = new Date().toISOString().slice(0, 10)
     const contactName = proposal.survey.clientCompany?.trim() || proposal.clientName
@@ -199,16 +208,18 @@ export async function createDepositInvoice(proposalId: string): Promise<void> {
       },
     })
     const inv = ((created.Invoices as Record<string, unknown>[] | undefined) || [])[0]
-    if (inv?.InvoiceID) {
-      await db.proposal.update({
-        where: { id: proposalId },
-        data: {
-          xeroDepositInvoiceId: String(inv.InvoiceID),
-          xeroDepositInvoiceNumber: inv.InvoiceNumber ? String(inv.InvoiceNumber) : null,
-        },
-      })
-    }
+    if (!inv?.InvoiceID) return { status: "error", message: "Xero returned no invoice" }
+    const invoiceNumber = inv.InvoiceNumber ? String(inv.InvoiceNumber) : null
+    await db.proposal.update({
+      where: { id: proposalId },
+      data: {
+        xeroDepositInvoiceId: String(inv.InvoiceID),
+        xeroDepositInvoiceNumber: invoiceNumber,
+      },
+    })
+    return { status: "created", invoiceNumber }
   } catch (err) {
     console.error("Xero deposit invoice failed:", err)
+    return { status: "error", message: err instanceof Error ? err.message : "Unexpected error" }
   }
 }
