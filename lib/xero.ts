@@ -40,8 +40,10 @@ export function xeroConnected(org: { xeroRefreshToken?: string | null; xeroTenan
 export function authorizeUrl(state: string, redirectUri: string): string {
   // Granular scopes (apps created after 2 Mar 2026 can't use the old broad
   // accounting.transactions): invoices to raise drafts, contacts to
-  // match/create the customer, app.connections to resolve the tenant.
-  const scope = ["offline_access", "app.connections", "accounting.invoices", "accounting.contacts"]
+  // match/create the customer. Do NOT request app.connections — it's a
+  // client-credentials-only scope and Xero instantly access_denies it for
+  // uncertified apps; GET /connections works with an ordinary token.
+  const scope = ["offline_access", "accounting.invoices", "accounting.contacts"]
     .map(encodeURIComponent)
     .join("%20")
   return (
