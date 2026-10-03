@@ -37,26 +37,46 @@ export function serializeBigChangeConfig(cfg: BigChangeConfig): string {
 }
 
 async function getToken(cfg: BigChangeConfig): Promise<string> {
-  let lastError = ""
+  // The auth proxy's exact expectations aren't publicly documented, so both
+  // standard client-credentials styles are tried on both endpoint candidates:
+  // creds in the form body, then creds as a Basic header.
+  const errors: string[] = []
   for (const url of TOKEN_URLS) {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "client_credentials",
-        client_id: cfg.clientId,
-        client_secret: cfg.clientSecret,
-      }),
-      signal: AbortSignal.timeout(12000),
-    })
-    const json = (await res.json().catch(() => ({}))) as { access_token?: string; error?: string }
-    if (res.ok && json.access_token) return json.access_token
-    lastError = json.error || `${res.status} from ${new URL(url).pathname}`
-    // 404 means wrong endpoint — try the next candidate. Auth errors are
-    // terminal: the endpoint exists and rejected the credentials.
-    if (res.status !== 404 && res.status !== 405) break
+    for (const basic of [false, true]) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          ...(basic
+            ? {
+                Authorization:
+                  "Basic " +
+                  Buffer.from(
+                    `${encodeURIComponent(cfg.clientId)}:${encodeURIComponent(cfg.clientSecret)}`
+                  ).toString("base64"),
+              }
+            : {}),
+        },
+        body: new URLSearchParams({
+          grant_type: "client_credentials",
+          ...(basic ? {} : { client_id: cfg.clientId, client_secret: cfg.clientSecret }),
+        }),
+        signal: AbortSignal.timeout(12000),
+      })
+      const json = (await res.json().catch(() => ({}))) as {
+        access_token?: string
+        error?: string
+        error_description?: string
+      }
+      if (res.ok && json.access_token) return json.access_token
+      errors.push(
+        `${res.status}${json.error ? ` ${json.error}` : ""}${json.error_description ? `: ${json.error_description}` : ""} (${new URL(url).pathname}, ${basic ? "basic" : "body"})`
+      )
+      // Wrong endpoint entirely — no point trying the Basic variant on it.
+      if (res.status === 404 || res.status === 405) break
+    }
   }
-  throw new Error(`BigChange token request failed (${lastError})`)
+  throw new Error(`BigChange token request failed — ${errors.join("; ")}`)
 }
 
 async function bcFetch(cfg: BigChangeConfig, path: string): Promise<unknown> {
