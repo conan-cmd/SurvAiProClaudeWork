@@ -135,6 +135,16 @@ export default async function SurveysPage({
                       <MapPin className="w-3 h-3 shrink-0" /> {s.clientAddress}
                     </div>
                   )}
+                  {s.scheduledAt && (
+                    <div className="text-xs font-medium text-amber-700 mt-0.5">
+                      Booked for {new Date(s.scheduledAt).toLocaleString("en-GB", {
+                        weekday: "short", day: "numeric", month: "short",
+                        ...(new Date(s.scheduledAt).getHours() || new Date(s.scheduledAt).getMinutes()
+                          ? { hour: "2-digit", minute: "2-digit" } : {}),
+                      })}
+                      {s.externalBookingRef?.startsWith("bigchange:") && " · from BigChange"}
+                    </div>
+                  )}
                   {/* Own line (no truncate) so date + creator survive narrow mobile rows */}
                   <div className="text-xs text-gray-400 mt-0.5">
                     Created {formatDate(s.createdAt)}
