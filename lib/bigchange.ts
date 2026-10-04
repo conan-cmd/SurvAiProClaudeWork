@@ -21,6 +21,8 @@ export type BigChangeConfig = {
   customerId: string
   jobTypeId?: number
   jobTypeName?: string
+  // Last auto-sync stamp (ISO) — throttles the on-page-load background sync.
+  lastSyncAt?: string
 }
 
 export function parseBigChangeConfig(encrypted: string | null): BigChangeConfig | null {
@@ -143,6 +145,25 @@ export type SyncResult = {
   // When jobs came back but none could be mapped, the first job's keys help
   // diagnose which field names this account actually uses.
   debugKeys?: string[]
+}
+
+// Background sync, throttled to one run per 10 minutes per org — fired when
+// someone opens the Surveys page so bookings appear without a manual sync.
+// The stamp is written before the run so concurrent page loads don't double-run.
+export async function syncIfDue(orgId: string, userId: string): Promise<SyncResult | { throttled: true }> {
+  const org = await db.organization.findUnique({
+    where: { id: orgId },
+    select: { bigchangeApiKey: true },
+  })
+  const cfg = parseBigChangeConfig(org?.bigchangeApiKey ?? null)
+  if (!cfg || (!cfg.jobTypeId && !cfg.jobTypeName)) return { throttled: true }
+  const last = cfg.lastSyncAt ? Date.parse(cfg.lastSyncAt) : 0
+  if (Date.now() - last < 10 * 60_000) return { throttled: true }
+  await db.organization.update({
+    where: { id: orgId },
+    data: { bigchangeApiKey: serializeBigChangeConfig({ ...cfg, lastSyncAt: new Date().toISOString() }) },
+  })
+  return syncSurveyBookings(orgId, userId)
 }
 
 export async function syncSurveyBookings(orgId: string, userId: string): Promise<SyncResult> {

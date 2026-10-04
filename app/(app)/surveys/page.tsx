@@ -7,6 +7,7 @@ import { formatDate } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
 import { ListSearch } from "@/components/list-search"
 import { DraggableRow } from "@/components/draggable-row"
+import { BigChangeAutoSync } from "@/components/bigchange-autosync"
 
 export default async function SurveysPage({
   searchParams,
@@ -70,6 +71,7 @@ export default async function SurveysPage({
 
   return (
     <div className="space-y-6 overflow-x-hidden">
+      <BigChangeAutoSync />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-brand-navy">Site surveys</h1>
         <Link href="/surveys/new"
