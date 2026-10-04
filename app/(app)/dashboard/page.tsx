@@ -5,6 +5,7 @@ import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { formatCurrency, formatDate, calculateProposalTotals, formatNetPlusVat } from "@/lib/utils"
 import { OnboardingNudge } from "@/components/onboarding-nudge"
+import { BigChangeAutoSync } from "@/components/bigchange-autosync"
 
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-600",
@@ -151,6 +152,7 @@ export default async function DashboardPage({
   return (
     <div className="space-y-6 overflow-x-hidden">
       {showNudge && <OnboardingNudge />}
+      <BigChangeAutoSync />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
