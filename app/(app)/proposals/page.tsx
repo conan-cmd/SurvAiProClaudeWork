@@ -7,6 +7,7 @@ import { isApprover } from "@/lib/permissions"
 import { formatDate, formatCurrency, calculateProposalTotals, formatNetPlusVat } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
 import { ListSearch } from "@/components/list-search"
+import { DateRangeFilter } from "@/components/date-range-filter"
 import { DraggableRow } from "@/components/draggable-row"
 import { parseNudgeHistory } from "@/lib/nudge"
 import { ProposalStatus } from "@prisma/client"
@@ -51,7 +52,7 @@ export default async function ProposalsPage({
 }: {
   searchParams: {
     folder?: string; scope?: string; status?: string; q?: string; member?: string
-    period?: string; viewed?: string; visit?: string
+    period?: string; viewed?: string; visit?: string; from?: string; to?: string
   }
 }) {
   const user = await getCurrentUser()
@@ -77,8 +78,19 @@ export default async function ProposalsPage({
       : {}
   // Per-member filter — only meaningful when viewing everyone's proposals.
   const memberId = viewingAll ? searchParams.member : undefined
-  const period = PERIODS.some(([v]) => v === searchParams.period) ? searchParams.period : undefined
-  const from = periodStart(period)
+  // Custom from–to range (?from/?to, YYYY-MM-DD) wins over the preset chips.
+  const parseDay = (s: string | undefined, endOfDay = false): Date | undefined => {
+    if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return undefined
+    const d = new Date(`${s}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`)
+    return isNaN(d.getTime()) ? undefined : d
+  }
+  const customFrom = parseDay(searchParams.from)
+  const customTo = parseDay(searchParams.to, true)
+  const customRange = Boolean(customFrom || customTo)
+  const period =
+    !customRange && PERIODS.some(([v]) => v === searchParams.period) ? searchParams.period : undefined
+  const from = customFrom ?? periodStart(period)
+  const to = customTo
   const notViewed = searchParams.viewed === "no"
   const visit = searchParams.visit === "yes" ? true : searchParams.visit === "no" ? false : undefined
   const currentStatus = wonFilter ? "won" : statusFilter
@@ -91,6 +103,8 @@ export default async function ProposalsPage({
       folder: folderId,
       status: currentStatus || undefined,
       period,
+      from: searchParams.from,
+      to: searchParams.to,
       viewed: notViewed ? "no" : undefined,
       visit: searchParams.visit,
       q: searchParams.q,
@@ -111,11 +125,12 @@ export default async function ProposalsPage({
   // the signature date for older records); otherwise it's the proposal's
   // creation date. Kept in AND so it can't clash with the search OR.
   const andWhere: object[] = []
-  if (from) {
+  if (from || to) {
+    const bounds = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) }
     andWhere.push(
       wonFilter
-        ? { OR: [{ wonAt: { gte: from } }, { wonAt: null, signedAt: { gte: from } }] }
-        : { createdAt: { gte: from } }
+        ? { OR: [{ wonAt: bounds }, { wonAt: null, signedAt: bounds }] }
+        : { createdAt: bounds }
     )
   }
   if (q) {
@@ -240,9 +255,9 @@ export default async function ProposalsPage({
       {/* Time period + engagement + site-visit filters */}
       <div className="flex flex-wrap items-center gap-2 text-sm">
         {PERIODS.map(([value, label]) => (
-          <Link key={value || "all-time"} href={link({ period: value || undefined })}
+          <Link key={value || "all-time"} href={link({ period: value || undefined, from: undefined, to: undefined })}
             className={`px-3 py-1.5 rounded-full font-medium border transition ${
-              (period || "") === value
+              !customRange && (period || "") === value
                 ? "bg-brand-navy text-white border-brand-navy"
                 : "bg-white text-gray-600 hover:border-gray-400"
             }`}
@@ -250,6 +265,7 @@ export default async function ProposalsPage({
             {label}
           </Link>
         ))}
+        <DateRangeFilter />
         <span className="w-px h-5 bg-gray-200 mx-1 hidden sm:block" />
         <Link href={link({ viewed: notViewed ? undefined : "no" })}
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-medium border transition ${
@@ -280,8 +296,16 @@ export default async function ProposalsPage({
         {" "}proposal{proposals.length === 1 ? "" : "s"}
         {proposals.length > 0 && <> · {formatCurrency(totalNet)} + VAT</>}
         {proposals.length > 1 && <> · avg {formatCurrency(totalNet / proposals.length)} + VAT</>}
-        {wonFilter && <> · won deals{from ? ` (${PERIODS.find(([v]) => v === period)?.[1].toLowerCase()}, by date won)` : ""}</>}
-        {!wonFilter && from && <> · created {PERIODS.find(([v]) => v === period)?.[1].toLowerCase()}</>}
+        {customRange && (
+          <>
+            {" "}· {wonFilter ? "won" : "created"}{" "}
+            {customFrom ? customFrom.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "any time"}
+            {" – "}
+            {customTo ? customTo.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "now"}
+          </>
+        )}
+        {!customRange && wonFilter && <> · won deals{from ? ` (${PERIODS.find(([v]) => v === period)?.[1].toLowerCase()}, by date won)` : ""}</>}
+        {!customRange && !wonFilter && from && <> · created {PERIODS.find(([v]) => v === period)?.[1].toLowerCase()}</>}
         {notViewed && <> · not yet opened by the client</>}
         {visit === true && <> · site visited</>}
         {visit === false && <> · quoted remotely</>}
