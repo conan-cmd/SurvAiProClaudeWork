@@ -312,6 +312,21 @@ export default async function ProposalsPage({
                       <MapPin className="w-3 h-3 shrink-0" /> {p.survey.clientAddress}
                     </div>
                   )}
+                  {(() => {
+                    // Lifecycle line: when it went out and when it was won.
+                    const wonDate =
+                      p.wonAt || (["SIGNED", "DEPOSIT_PAID", "WON"].includes(p.status) ? p.signedAt : null)
+                    if (!p.sentAt && !wonDate) return null
+                    return (
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {p.sentAt && <>Sent {formatDate(p.sentAt)}</>}
+                        {p.sentAt && wonDate && " · "}
+                        {wonDate && (
+                          <span className="font-medium text-emerald-600">Won {formatDate(wonDate)}</span>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
                 {/* Chips wrap onto their own line on mobile so the title keeps full width */}
                 <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0 sm:justify-end [&>span]:text-[11px] sm:[&>span]:text-xs">
