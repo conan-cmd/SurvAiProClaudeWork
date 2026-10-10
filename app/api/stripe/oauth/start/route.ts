@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { randomBytes } from "crypto"
 import { getCurrentUser } from "@/lib/session"
 import { stripeOAuthAvailable, stripeOAuthUrl } from "@/lib/stripe"
-import { publicBaseUrl } from "@/lib/public-url"
 
 // Kicks off linking a firm's EXISTING Stripe account (Connect OAuth, Standard):
 // CSRF state cookie + redirect to Stripe's sign-in/consent page.
@@ -17,7 +16,9 @@ export async function GET(request: NextRequest) {
   }
 
   const state = randomBytes(16).toString("base64url")
-  const redirectUri = `${publicBaseUrl(request.nextUrl.origin)}/api/stripe/oauth/callback`
+  // Come back to the host they started on — the state cookie and their login
+  // session live there (PUBLIC_BASE_URL may be a different domain).
+  const redirectUri = `${request.nextUrl.origin}/api/stripe/oauth/callback`
   const res = NextResponse.redirect(stripeOAuthUrl(state, redirectUri, user.organization.email || user.email))
   res.cookies.set("stripe_oauth_state", state, {
     httpOnly: true,
