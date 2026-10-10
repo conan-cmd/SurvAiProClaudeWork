@@ -207,6 +207,21 @@ export async function retrieveSubscription(subscriptionId: string) {
   return stripeFetch(`/subscriptions/${encodeURIComponent(subscriptionId)}`)
 }
 
+// Platform fees (pence, net of refunds) collected on client deposits, grouped by
+// the connected account they came from. Admin usage view only; capped at 1,000.
+export async function depositFeesByAccount(): Promise<Map<string, number>> {
+  const byAccount = new Map<string, number>()
+  let startingAfter: string | undefined
+  for (let page = 0; page < 10; page++) {
+    const res = await stripeFetch(`/application_fees?limit=100${startingAfter ? `&starting_after=${startingAfter}` : ""}`)
+    const fees = res.data as { id: string; account: string; amount: number; amount_refunded: number }[]
+    for (const f of fees) byAccount.set(f.account, (byAccount.get(f.account) || 0) + f.amount - (f.amount_refunded || 0))
+    if (!res.has_more || !fees.length) break
+    startingAfter = fees[fees.length - 1].id
+  }
+  return byAccount
+}
+
 // Total (pence) a customer has actually paid the platform — after discounts and
 // promo codes. Admin usage view only; the last 100 paid invoices is plenty.
 export async function totalPaidPence(customerId: string): Promise<number> {

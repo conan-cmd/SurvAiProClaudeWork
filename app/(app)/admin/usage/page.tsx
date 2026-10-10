@@ -3,7 +3,7 @@ import Link from "next/link"
 import { getCurrentUser } from "@/lib/session"
 import { isPlatformAdmin } from "@/lib/admin"
 import { db } from "@/lib/db"
-import { stripeEnabled, retrieveSubscription, totalPaidPence } from "@/lib/stripe"
+import { stripeEnabled, retrieveSubscription, totalPaidPence, depositFeesByAccount } from "@/lib/stripe"
 
 export const dynamic = "force-dynamic"
 
@@ -72,7 +72,7 @@ export default async function AdminUsagePage() {
       subscriptionStatus: true, billingExempt: true, freeAccess: true,
       cryptoAccessUntil: true, isFoundingMember: true,
       referralCode: true, referredByCode: true,
-      stripeCustomerId: true, subscriptionId: true,
+      stripeCustomerId: true, subscriptionId: true, stripeAccountId: true,
       users: {
         select: { email: true, name: true, role: true, lastLoginAt: true, lastActiveAt: true },
         orderBy: { createdAt: "asc" },
@@ -81,7 +81,17 @@ export default async function AdminUsagePage() {
     },
   })
 
-  const billing = await Promise.all(orgs.map((o) => stripeBilling(o)))
+  const [billing, feesByAccount] = await Promise.all([
+    Promise.all(orgs.map((o) => stripeBilling(o))),
+    stripeEnabled() ? depositFeesByAccount().catch(() => null) : Promise.resolve(new Map<string, number>()),
+  ])
+  // 1% platform fee on client deposits. Fees from an account a firm has since
+  // replaced (e.g. Express -> their own linked account) can't be tied back to
+  // the firm, so they only count in the header total.
+  const depositFeesTotalPence = feesByAccount ? Array.from(feesByAccount.values()).reduce((s, v) => s + v, 0) : null
+  const unmatchedFeesPence = feesByAccount && depositFeesTotalPence != null
+    ? depositFeesTotalPence - orgs.reduce((s, o) => s + (o.stripeAccountId ? feesByAccount.get(o.stripeAccountId) || 0 : 0), 0)
+    : 0
   const mrrPence = billing.reduce((s, b) => s + (b?.paying && b.monthlyPence ? b.monthlyPence : 0), 0)
   const payingCount = billing.filter((b) => b?.paying).length
   const paidTotalPence = billing.reduce((s, b) => s + (b?.paidPence || 0), 0)
@@ -103,7 +113,9 @@ export default async function AdminUsagePage() {
           <h1 className="text-xl font-bold text-brand-navy">Admin · Usage</h1>
           <p className="text-sm text-gray-500">
             {orgs.length} account{orgs.length !== 1 ? "s" : ""} · {totalProposals} proposal{totalProposals !== 1 ? "s" : ""} generated in total.
-            {" "}{payingCount} paying · {gbp(mrrPence)}/month recurring · {gbp(paidTotalPence)} paid to date.
+            {" "}{payingCount} paying · {gbp(mrrPence)}/month recurring · {gbp(paidTotalPence)} paid to date ·
+            {" "}{depositFeesTotalPence == null ? "deposit fees unavailable" : `${gbp(depositFeesTotalPence)} deposit fees collected`}
+            {unmatchedFeesPence > 0 ? ` (incl. ${gbp(unmatchedFeesPence)} from previously connected accounts)` : ""}.
           </p>
         </div>
         <Link href="/admin" className="text-sm text-brand-blue hover:underline whitespace-nowrap">← Access codes</Link>
@@ -118,6 +130,7 @@ export default async function AdminUsagePage() {
               <th className="p-3 font-medium">Plan</th>
               <th className="p-3 font-medium text-right">Per month</th>
               <th className="p-3 font-medium text-right">Paid to date</th>
+              <th className="p-3 font-medium text-right">Deposit fees</th>
               <th className="p-3 font-medium">Joined</th>
               <th className="p-3 font-medium">Referred by</th>
               <th className="p-3 font-medium">Last login</th>
@@ -153,6 +166,10 @@ export default async function AdminUsagePage() {
                   <td className="p-3 text-right text-gray-700">
                     {b == null ? <span className="text-gray-400">—</span> : b.paidPence == null ? "?" : gbp(b.paidPence)}
                   </td>
+                  <td className="p-3 text-right text-gray-700">
+                    {!o.stripeAccountId ? <span className="text-gray-400">—</span>
+                      : feesByAccount == null ? "?" : gbp(feesByAccount.get(o.stripeAccountId) || 0)}
+                  </td>
                   <td className="p-3 text-gray-500">{fmtDate(o.createdAt)}</td>
                   <td className="p-3 text-gray-600">
                     {o.referredByCode ? byReferralCode.get(o.referredByCode) || `code ${o.referredByCode}` : "—"}
@@ -170,7 +187,7 @@ export default async function AdminUsagePage() {
       </div>
 
       <p className="text-xs text-gray-400">
-        &quot;Last active&quot; updates as a user moves around the app (to the nearest few minutes). "Per month" is the plan's list price (annual ÷ 12) — green when it's actually billing, grey during a trial or after cancelling; promo-code discounts show in "Paid to date", which is what Stripe has collected. Bitcoin payments aren't included. New columns start filling in from now — accounts that haven&apos;t signed in since this was added show &quot;never&quot; until their next visit.
+        &quot;Last active&quot; updates as a user moves around the app (to the nearest few minutes). "Per month" is the plan's list price (annual ÷ 12) — green when it's actually billing, grey during a trial or after cancelling; promo-code discounts show in "Paid to date", which is what Stripe has collected. Bitcoin payments aren't included. "Deposit fees" is SurvAIPro's 1% on client deposits taken through the firm's connected Stripe account, net of refunds. New columns start filling in from now — accounts that haven&apos;t signed in since this was added show &quot;never&quot; until their next visit.
       </p>
     </div>
   )
