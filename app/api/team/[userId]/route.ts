@@ -51,3 +51,32 @@ export async function PATCH(
   })
   return NextResponse.json(updated)
 }
+
+// Owners/admins remove someone from the team. Their surveys, proposals, RAMS and
+// job reports stay with the organisation (the creator link is cleared by the
+// schema's onDelete: SetNull) — only the login goes. Only the owner can remove
+// an admin; nobody can remove the owner or themselves.
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: { userId: string } }
+) {
+  const user = await getCurrentUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!isApprover(user)) return NextResponse.json({ error: "Only owners and admins can remove team members." }, { status: 403 })
+  if (params.userId === user.id) return NextResponse.json({ error: "You can't remove yourself." }, { status: 400 })
+
+  const target = await db.user.findFirst({
+    where: { id: params.userId, organizationId: user.organizationId },
+    select: { id: true, role: true },
+  })
+  if (!target) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  if (target.role === "OWNER") return NextResponse.json({ error: "The owner can't be removed." }, { status: 400 })
+  if (target.role === "ADMIN" && user.role !== "OWNER") {
+    return NextResponse.json({ error: "Only the owner can remove an admin." }, { status: 403 })
+  }
+
+  // Proposals signed off in their name fall back to the org identity
+  // (resolveProposalIdentity handles a missing user).
+  await db.user.delete({ where: { id: target.id } })
+  return NextResponse.json({ removed: true })
+}

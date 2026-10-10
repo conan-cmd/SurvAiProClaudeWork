@@ -816,6 +816,21 @@ export default function SettingsPage() {
                       Can send
                     </label>
                   )}
+                  {(u.role !== "ADMIN" || me?.role === "OWNER") && (
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Remove ${u.name || u.email} from the team? They'll lose access straight away. Their surveys, proposals and RAMS stay with the company.`)) return
+                        const res = await fetch(`/api/team/${u.id}`, { method: "DELETE" })
+                        const d = await res.json().catch(() => ({}))
+                        if (!res.ok) { toast.error(d.error || "Couldn't remove team member"); return }
+                        setTeam((t) => t ? { ...t, users: t.users.filter((x) => x.id !== u.id) } : t)
+                        toast.success(`${u.name || u.email} removed`)
+                      }}
+                      className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                      title="Remove from team" aria-label={`Remove ${u.name || u.email}`}>
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               )}
             </div>

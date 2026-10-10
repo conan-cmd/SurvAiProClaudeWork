@@ -41,6 +41,7 @@ export default async function AdminUsagePage() {
       id: true, name: true, createdAt: true,
       subscriptionStatus: true, billingExempt: true, freeAccess: true,
       cryptoAccessUntil: true, isFoundingMember: true,
+      referralCode: true, referredByCode: true,
       users: {
         select: { email: true, name: true, role: true, lastLoginAt: true, lastActiveAt: true },
         orderBy: { createdAt: "asc" },
@@ -53,6 +54,9 @@ export default async function AdminUsagePage() {
     const t = ds.filter((d): d is Date => !!d).map((d) => d.getTime())
     return t.length ? new Date(Math.max(...t)) : null
   }
+
+  // Referral code -> the firm whose link it is, to name who referred each account.
+  const byReferralCode = new Map(orgs.filter((o) => o.referralCode).map((o) => [o.referralCode as string, o.name]))
 
   const totalProposals = orgs.reduce((s, o) => s + o._count.proposals, 0)
 
@@ -75,6 +79,7 @@ export default async function AdminUsagePage() {
               <th className="p-3 font-medium">Account</th>
               <th className="p-3 font-medium">Status</th>
               <th className="p-3 font-medium">Joined</th>
+              <th className="p-3 font-medium">Referred by</th>
               <th className="p-3 font-medium">Last login</th>
               <th className="p-3 font-medium">Last active</th>
               <th className="p-3 font-medium text-right">Surveys</th>
@@ -97,6 +102,9 @@ export default async function AdminUsagePage() {
                   </td>
                   <td className="p-3 text-gray-600">{statusLabel(o)}</td>
                   <td className="p-3 text-gray-500">{fmtDate(o.createdAt)}</td>
+                  <td className="p-3 text-gray-600">
+                    {o.referredByCode ? byReferralCode.get(o.referredByCode) || `code ${o.referredByCode}` : "—"}
+                  </td>
                   <td className="p-3 text-gray-500">{rel(lastLogin)}</td>
                   <td className="p-3 text-gray-500">{rel(lastActive)}</td>
                   <td className="p-3 text-right text-gray-700">{o._count.surveys}</td>
