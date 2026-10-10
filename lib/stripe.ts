@@ -207,6 +207,13 @@ export async function retrieveSubscription(subscriptionId: string) {
   return stripeFetch(`/subscriptions/${encodeURIComponent(subscriptionId)}`)
 }
 
+// Total (pence) a customer has actually paid the platform — after discounts and
+// promo codes. Admin usage view only; the last 100 paid invoices is plenty.
+export async function totalPaidPence(customerId: string): Promise<number> {
+  const res = await stripeFetch(`/invoices?customer=${encodeURIComponent(customerId)}&status=paid&limit=100`)
+  return (res.data as { amount_paid: number }[]).reduce((s, inv) => s + (inv.amount_paid || 0), 0)
+}
+
 // Cancels at the end of the paid period (they keep access until it runs out).
 export async function cancelSubscriptionAtPeriodEnd(subscriptionId: string) {
   return stripeFetch(`/subscriptions/${encodeURIComponent(subscriptionId)}`, { cancel_at_period_end: "true" })

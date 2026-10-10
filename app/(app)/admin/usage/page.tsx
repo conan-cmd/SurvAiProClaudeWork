@@ -3,6 +3,7 @@ import Link from "next/link"
 import { getCurrentUser } from "@/lib/session"
 import { isPlatformAdmin } from "@/lib/admin"
 import { db } from "@/lib/db"
+import { stripeEnabled, retrieveSubscription, totalPaidPence } from "@/lib/stripe"
 
 export const dynamic = "force-dynamic"
 
@@ -24,6 +25,35 @@ type OrgRow = {
   cryptoAccessUntil: Date | null
   subscriptionStatus: string | null
 }
+const gbp = (pence: number) =>
+  "£" + (pence / 100).toLocaleString("en-GB", { minimumFractionDigits: pence % 100 ? 2 : 0, maximumFractionDigits: 2 })
+
+type Billing = {
+  plan: string | null      // e.g. "Monthly", "Annual"
+  monthlyPence: number | null
+  paying: boolean          // subscription currently billing (not trial/cancelled)
+  paidPence: number | null // total actually paid to date (after discounts)
+}
+
+// Live figures from Stripe: the subscription's price (annual shown per month)
+// and everything the customer has paid. Best-effort — a Stripe hiccup shows "?".
+async function stripeBilling(o: { subscriptionId: string | null; stripeCustomerId: string | null }): Promise<Billing | null> {
+  if (!stripeEnabled() || (!o.subscriptionId && !o.stripeCustomerId)) return null
+  const [sub, paid] = await Promise.all([
+    o.subscriptionId ? retrieveSubscription(o.subscriptionId).catch(() => null) : null,
+    o.stripeCustomerId ? totalPaidPence(o.stripeCustomerId).catch(() => null) : 0,
+  ])
+  const item = sub?.items?.data?.[0]
+  const amount = item?.price?.unit_amount != null ? item.price.unit_amount * (item.quantity || 1) : null
+  const interval = item?.price?.recurring?.interval as string | undefined
+  return {
+    plan: interval === "year" ? "Annual" : interval === "month" ? "Monthly" : null,
+    monthlyPence: amount == null ? null : interval === "year" ? Math.round(amount / 12) : amount,
+    paying: sub?.status === "active" || sub?.status === "past_due",
+    paidPence: paid,
+  }
+}
+
 function statusLabel(o: OrgRow): string {
   if (o.billingExempt) return "Comped"
   if (o.freeAccess) return "Free (code)"
@@ -42,6 +72,7 @@ export default async function AdminUsagePage() {
       subscriptionStatus: true, billingExempt: true, freeAccess: true,
       cryptoAccessUntil: true, isFoundingMember: true,
       referralCode: true, referredByCode: true,
+      stripeCustomerId: true, subscriptionId: true,
       users: {
         select: { email: true, name: true, role: true, lastLoginAt: true, lastActiveAt: true },
         orderBy: { createdAt: "asc" },
@@ -49,6 +80,11 @@ export default async function AdminUsagePage() {
       _count: { select: { surveys: true, proposals: true, rams: true } },
     },
   })
+
+  const billing = await Promise.all(orgs.map((o) => stripeBilling(o)))
+  const mrrPence = billing.reduce((s, b) => s + (b?.paying && b.monthlyPence ? b.monthlyPence : 0), 0)
+  const payingCount = billing.filter((b) => b?.paying).length
+  const paidTotalPence = billing.reduce((s, b) => s + (b?.paidPence || 0), 0)
 
   const maxDate = (ds: (Date | null)[]): Date | null => {
     const t = ds.filter((d): d is Date => !!d).map((d) => d.getTime())
@@ -67,6 +103,7 @@ export default async function AdminUsagePage() {
           <h1 className="text-xl font-bold text-brand-navy">Admin · Usage</h1>
           <p className="text-sm text-gray-500">
             {orgs.length} account{orgs.length !== 1 ? "s" : ""} · {totalProposals} proposal{totalProposals !== 1 ? "s" : ""} generated in total.
+            {" "}{payingCount} paying · {gbp(mrrPence)}/month recurring · {gbp(paidTotalPence)} paid to date.
           </p>
         </div>
         <Link href="/admin" className="text-sm text-brand-blue hover:underline whitespace-nowrap">← Access codes</Link>
@@ -78,6 +115,9 @@ export default async function AdminUsagePage() {
             <tr className="text-left text-gray-400 border-b">
               <th className="p-3 font-medium">Account</th>
               <th className="p-3 font-medium">Status</th>
+              <th className="p-3 font-medium">Plan</th>
+              <th className="p-3 font-medium text-right">Per month</th>
+              <th className="p-3 font-medium text-right">Paid to date</th>
               <th className="p-3 font-medium">Joined</th>
               <th className="p-3 font-medium">Referred by</th>
               <th className="p-3 font-medium">Last login</th>
@@ -88,7 +128,8 @@ export default async function AdminUsagePage() {
             </tr>
           </thead>
           <tbody>
-            {orgs.map((o) => {
+            {orgs.map((o, i) => {
+              const b = billing[i]
               const owner = o.users.find((u) => u.role === "OWNER") || o.users[0]
               const lastLogin = maxDate(o.users.map((u) => u.lastLoginAt))
               const lastActive = maxDate(o.users.map((u) => u.lastActiveAt))
@@ -101,6 +142,17 @@ export default async function AdminUsagePage() {
                     </div>
                   </td>
                   <td className="p-3 text-gray-600">{statusLabel(o)}</td>
+                  <td className="p-3 text-gray-600">
+                    {b?.plan ? `${b.plan}${o.isFoundingMember ? " · founding" : ""}` : "—"}
+                  </td>
+                  <td className="p-3 text-right">
+                    {b?.monthlyPence == null ? <span className="text-gray-400">—</span>
+                      : b.paying ? <span className="font-semibold text-emerald-700">{gbp(b.monthlyPence)}</span>
+                      : <span className="text-gray-400" title="Not currently billing (trial, paused or cancelled)">{gbp(b.monthlyPence)}</span>}
+                  </td>
+                  <td className="p-3 text-right text-gray-700">
+                    {b == null ? <span className="text-gray-400">—</span> : b.paidPence == null ? "?" : gbp(b.paidPence)}
+                  </td>
                   <td className="p-3 text-gray-500">{fmtDate(o.createdAt)}</td>
                   <td className="p-3 text-gray-600">
                     {o.referredByCode ? byReferralCode.get(o.referredByCode) || `code ${o.referredByCode}` : "—"}
@@ -118,7 +170,7 @@ export default async function AdminUsagePage() {
       </div>
 
       <p className="text-xs text-gray-400">
-        &quot;Last active&quot; updates as a user moves around the app (to the nearest few minutes). New columns start filling in from now — accounts that haven&apos;t signed in since this was added show &quot;never&quot; until their next visit.
+        &quot;Last active&quot; updates as a user moves around the app (to the nearest few minutes). "Per month" is the plan's list price (annual ÷ 12) — green when it's actually billing, grey during a trial or after cancelling; promo-code discounts show in "Paid to date", which is what Stripe has collected. Bitcoin payments aren't included. New columns start filling in from now — accounts that haven&apos;t signed in since this was added show &quot;never&quot; until their next visit.
       </p>
     </div>
   )
