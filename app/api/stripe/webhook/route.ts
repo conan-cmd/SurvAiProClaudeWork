@@ -29,11 +29,28 @@ export async function POST(request: NextRequest) {
 
   const type = event.type as string
   const obj = ((event.data as { object?: Record<string, unknown> } | undefined)?.object || {}) as Record<string, unknown>
+  // Set on events from a firm's connected account. A linked EXISTING account also
+  // sends us its own unrelated business (its subscriptions, other checkouts), so
+  // platform-billing handling must only ever run on the platform's own events.
+  const connectedAccount = event.account as string | undefined
 
   try {
-    if (type === "checkout.session.completed" || type === "checkout.session.async_payment_succeeded") {
+    if (type === "account.application.deauthorized" && connectedAccount) {
+      // The firm disconnected SurvAIPro from their Stripe dashboard — stop routing
+      // deposits to an account we can no longer charge on.
+      await db.organization.updateMany({
+        where: { stripeAccountId: connectedAccount },
+        data: { stripeAccountId: null, stripeChargesEnabled: false },
+      })
+    } else if (type === "account.updated" && typeof obj.id === "string") {
+      await db.organization.updateMany({
+        where: { stripeAccountId: obj.id },
+        data: { stripeChargesEnabled: Boolean(obj.charges_enabled) },
+      })
+    } else if (type === "checkout.session.completed" || type === "checkout.session.async_payment_succeeded") {
       const subId = obj.subscription as string | undefined
       if (subId) {
+        if (connectedAccount) return NextResponse.json({ received: true })
         const sub = await retrieveSubscription(subId)
         await applySubscription(sub)
         await forwardToGhl(obj.customer as string | undefined, "trial_started", null, request.nextUrl.origin)
@@ -50,6 +67,8 @@ export async function POST(request: NextRequest) {
         }
         if (proposalId) await markDepositPaid(proposalId)
       }
+    } else if (connectedAccount) {
+      // Nothing else from connected accounts concerns us.
     } else if (type.startsWith("customer.subscription.")) {
       await applySubscription(obj as Parameters<typeof applySubscription>[0])
       const status = obj.status as string | undefined

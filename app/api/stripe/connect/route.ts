@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
-import { stripeEnabled, createConnectedAccount, createAccountLink, retrieveAccount } from "@/lib/stripe"
+import { stripeEnabled, stripeOAuthAvailable, createConnectedAccount, createAccountLink, retrieveAccount } from "@/lib/stripe"
 import { publicBaseUrl } from "@/lib/public-url"
 
 // POST: start (or resume) Stripe Connect onboarding for the firm. Returns a URL
@@ -25,6 +25,10 @@ export async function POST(request: NextRequest) {
       const account = await createConnectedAccount(org.email || user.email)
       accountId = account.id
       await db.organization.update({ where: { id: org.id }, data: { stripeAccountId: accountId } })
+    } else if ((await retrieveAccount(accountId)).type === "standard") {
+      // A linked existing account is managed in the firm's own Stripe dashboard —
+      // onboarding links only work for Express accounts.
+      return NextResponse.json({ url: "https://dashboard.stripe.com/" })
     }
 
     const origin = publicBaseUrl(request.nextUrl.origin)
@@ -50,8 +54,9 @@ export async function GET() {
     select: { id: true, stripeAccountId: true, stripeChargesEnabled: true },
   })
   if (!org) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  const canLinkExisting = stripeOAuthAvailable()
   if (!stripeEnabled() || !org.stripeAccountId) {
-    return NextResponse.json({ connected: false, chargesEnabled: false })
+    return NextResponse.json({ connected: false, chargesEnabled: false, canLinkExisting })
   }
 
   try {
@@ -67,9 +72,11 @@ export async function GET() {
       chargesEnabled: acct.charges_enabled,
       detailsSubmitted: acct.details_submitted,
       payoutsEnabled: acct.payouts_enabled,
+      linkedExisting: acct.type === "standard",
+      canLinkExisting,
     })
   } catch (error) {
     console.error("Stripe status error:", error)
-    return NextResponse.json({ connected: true, chargesEnabled: org.stripeChargesEnabled })
+    return NextResponse.json({ connected: true, chargesEnabled: org.stripeChargesEnabled, canLinkExisting })
   }
 }
