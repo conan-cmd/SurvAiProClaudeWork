@@ -119,6 +119,54 @@ function htmlToText(html: string): string {
     .trim()
 }
 
+// Fetch the page looking like a real browser — many small-business sites sit
+// behind bot protection (Cloudflare, Wix, Squarespace) that 403s obvious
+// non-browser requests. Falls back to the www. variant of the host, and
+// returns the actual failure reason so the user isn't left guessing.
+async function fetchHtml(url: URL): Promise<{ html: string } | { error: string }> {
+  const attempt = async (u: URL): Promise<string> => {
+    const res = await fetch(u.toString(), {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      redirect: "follow",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-GB,en;q=0.9",
+      },
+    })
+    if (!res.ok) {
+      throw new Error(
+        res.status === 403 || res.status === 429
+          ? `the site's bot protection blocked the request (${res.status})`
+          : `the site returned ${res.status}`
+      )
+    }
+    const contentType = res.headers.get("content-type") || ""
+    if (!contentType.includes("text/html")) throw new Error("that address isn't a web page")
+    return (await res.text()).slice(0, MAX_HTML_BYTES)
+  }
+
+  try {
+    return { html: await attempt(url) }
+  } catch (firstErr) {
+    // Some sites only answer on www. (no redirect from the bare domain).
+    if (!url.hostname.startsWith("www.")) {
+      try {
+        const alt = new URL(url.toString())
+        alt.hostname = `www.${url.hostname}`
+        return { html: await attempt(alt) }
+      } catch {
+        /* report the original error */
+      }
+    }
+    const msg = firstErr instanceof Error ? firstErr.message : ""
+    const isTimeout =
+      firstErr instanceof Error && (firstErr.name === "TimeoutError" || firstErr.name === "AbortError")
+    return { error: isTimeout ? "it took too long to respond" : msg || "it couldn't be reached" }
+  }
+}
+
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -134,30 +182,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "That doesn't look like a valid public website" }, { status: 400 })
   }
 
-  let html: string
-  try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
-    const res = await fetch(url.toString(), {
-      signal: controller.signal,
-      redirect: "follow",
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; SurvAIPro-Importer/1.0)",
-        Accept: "text/html",
-      },
-    })
-    clearTimeout(timer)
-    if (!res.ok) throw new Error(`Site returned ${res.status}`)
-    const contentType = res.headers.get("content-type") || ""
-    if (!contentType.includes("text/html")) throw new Error("Not an HTML page")
-    html = (await res.text()).slice(0, MAX_HTML_BYTES)
-  } catch (err) {
-    console.error("Website fetch failed:", err)
+  const fetched = await fetchHtml(url)
+  if ("error" in fetched) {
+    console.error("Website fetch failed:", url.hostname, fetched.error)
     return NextResponse.json(
-      { error: "Couldn't reach that website. Check the address and try again." },
+      { error: `Couldn't read ${url.hostname} — ${fetched.error}. You can fill the details in manually below.` },
       { status: 422 }
     )
   }
+  const html = fetched.html
 
   // Deterministic extraction
   const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || null
