@@ -275,6 +275,7 @@ export default function SettingsPage() {
               website: data.website || prev.website,
               logoUrl: data.logoUrl || prev.logoUrl,
               brandColor: data.brandColor || prev.brandColor,
+              secondaryColor: data.secondaryColor || prev.secondaryColor,
               email: data.contactEmail || prev.email,
               phone: data.contactPhone || prev.phone,
               youtubeChannelUrl: data.youtubeChannelUrl || prev.youtubeChannelUrl,
