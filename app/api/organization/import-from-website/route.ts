@@ -222,6 +222,46 @@ async function extractViaWebSearch(url: URL): Promise<Record<string, unknown> | 
   return null
 }
 
+// Suggest brand colours by looking at the logo image — the most reliable
+// signal we have, and the only one when the site itself can't be fetched.
+async function suggestColorsFromLogo(
+  imageUrl: string
+): Promise<{ primary: string | null; secondary: string | null }> {
+  const none = { primary: null, secondary: null }
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text:
+                'This is a company logo. Identify its brand colours. Respond ONLY with JSON {"primary": "#RRGGBB"|null, "secondary": "#RRGGBB"|null}. ' +
+                "primary = the dominant non-neutral colour; secondary = a clearly-present contrasting accent colour. " +
+                "Ignore white/black/grey and background. Use null when there is no confident answer.",
+            },
+            { type: "image_url", image_url: { url: imageUrl } },
+          ],
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0,
+      max_tokens: 60,
+    })
+    const j = JSON.parse(response.choices[0].message.content || "{}") as {
+      primary?: string
+      secondary?: string
+    }
+    const hex = (v: unknown) => (typeof v === "string" && /^#[0-9A-Fa-f]{6}$/.test(v) ? v : null)
+    return { primary: hex(j.primary), secondary: hex(j.secondary) }
+  } catch (err) {
+    console.error("Logo colour suggestion failed:", err)
+    return none
+  }
+}
+
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -252,11 +292,13 @@ export async function POST(request: NextRequest) {
     const logoUrl = await storeLogo(
       `https://www.google.com/s2/favicons?domain=${encodeURIComponent(url.hostname)}&sz=256`
     )
+    const colors = logoUrl ? await suggestColorsFromLogo(logoUrl) : { primary: null, secondary: null }
     return NextResponse.json({
       companyName: aiData.companyName || null,
       website: url.toString(),
       logoUrl,
-      brandColor: null,
+      brandColor: colors.primary,
+      secondaryColor: colors.secondary,
       description: null,
       services: Array.isArray(aiData.services) ? aiData.services : [],
       areasCovered: Array.isArray(aiData.areasCovered) ? aiData.areasCovered : [],
@@ -284,6 +326,9 @@ export async function POST(request: NextRequest) {
   const rawLogoUrl = extractLogo(html, url)
   // Store on our domain so it renders reliably; fall back to the source URL.
   const logoUrl = rawLogoUrl ? (await storeLogo(rawLogoUrl)) || rawLogoUrl : null
+  // Brand colours from the logo image; an explicitly declared theme-color
+  // still wins for the primary.
+  const logoColors = logoUrl ? await suggestColorsFromLogo(logoUrl) : { primary: null, secondary: null }
   const emailMatch = html.match(/mailto:([^"'?\s>]+)/i)
   const phoneMatch = html.match(/tel:([+\d()\s-]{7,20})["'\s>]/i)
   const youtubeMatch = html.match(
@@ -324,7 +369,9 @@ Respond with JSON: {"companyName": string|null, "services": string[], "areasCove
     companyName: aiData.companyName || siteName || title,
     website: url.toString(),
     logoUrl,
-    brandColor: themeColor && /^#[0-9A-Fa-f]{6}$/.test(themeColor) ? themeColor : null,
+    brandColor:
+      themeColor && /^#[0-9A-Fa-f]{6}$/.test(themeColor) ? themeColor : logoColors.primary,
+    secondaryColor: logoColors.secondary,
     description,
     services: Array.isArray(aiData.services) ? aiData.services : [],
     areasCovered: Array.isArray(aiData.areasCovered) ? aiData.areasCovered : [],

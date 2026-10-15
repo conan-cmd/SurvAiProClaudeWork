@@ -83,6 +83,7 @@ export default function OnboardingPage() {
         reviewCount: data.reviewCount ? String(data.reviewCount) : prev.reviewCount,
         whyChooseUs: data.whyChooseUs || prev.whyChooseUs,
         brandColor: data.brandColor || prev.brandColor,
+        secondaryColor: data.secondaryColor || prev.secondaryColor,
         proposalTone: data.suggestedTone || prev.proposalTone,
       }))
       if (data.logoUrl) setLogoUrl(data.logoUrl)
