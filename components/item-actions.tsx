@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
-  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check, ExternalLink, MapPin, BellRing, Link2,
+  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check, ExternalLink, MapPin, BellRing, Link2, XCircle,
 } from "lucide-react"
 import { NudgeDialog } from "@/components/nudge-dialog"
 
@@ -109,6 +109,25 @@ export function ItemActions({
     } else {
       const d = await res.json().catch(() => ({}))
       toast.error(d.error || "Couldn't mark as won")
+    }
+  }
+
+  const markLost = async () => {
+    setOpen(false)
+    if (!window.confirm(`Mark "${title}" as lost? You can change it back from the proposal's status dropdown if they come around.`)) return
+    setBusy(true)
+    const res = await fetch(`/api/proposals/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "LOST" }),
+    })
+    setBusy(false)
+    if (res.ok) {
+      toast.success("Marked as lost")
+      router.refresh()
+    } else {
+      const d = await res.json().catch(() => ({}))
+      toast.error(d.error || "Couldn't mark as lost")
     }
   }
 
@@ -266,6 +285,12 @@ export function ItemActions({
                 <button onClick={(e) => { e.preventDefault(); markAccepted() }} className={menuItem}
                   title="Client agreed verbally or on paper — shows as Won, Not signed">
                   <Check className="w-4 h-4" /> Mark as won
+                </button>
+              )}
+              {kind === "proposal" && ["DRAFT", "READY", "SENT", "WON"].includes(proposalStatus || "") && (
+                <button onClick={(e) => { e.preventDefault(); markLost() }} className={menuItem}
+                  title="The client has gone elsewhere or declined — keeps the record for your win-rate stats">
+                  <XCircle className="w-4 h-4" /> Mark as lost
                 </button>
               )}
               {kind === "proposal" && siteVisited !== undefined && targetSurvey && (
