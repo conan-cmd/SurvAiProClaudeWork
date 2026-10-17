@@ -4,6 +4,7 @@ import { ShieldAlert, Check, MapPin } from "lucide-react"
 import { getCurrentUser } from "@/lib/session"
 import { db } from "@/lib/db"
 import { ListSearch } from "@/components/list-search"
+import { SortToggle } from "@/components/sort-toggle"
 import { NewRamsButton } from "@/components/new-rams-modal"
 import { DraggableRow } from "@/components/draggable-row"
 
@@ -22,7 +23,7 @@ function signedCount(sections: string | null): { signed: number; total: number }
 export default async function RamsListPage({
   searchParams,
 }: {
-  searchParams: { q?: string }
+  searchParams: { q?: string; sort?: string }
 }) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
@@ -43,7 +44,11 @@ export default async function RamsListPage({
           }
         : {}),
     },
-    orderBy: [{ sortIndex: { sort: "asc", nulls: "first" } }, { updatedAt: "desc" }],
+    // Explicit date sort (?sort=new|old) overrides manual drag order.
+      orderBy:
+        searchParams.sort === "old" ? { createdAt: "asc" as const }
+        : searchParams.sort === "new" ? { createdAt: "desc" as const }
+        : [{ sortIndex: { sort: "asc" as const, nulls: "first" as const } }, { updatedAt: "desc" as const }],
     include: { survey: { select: { title: true, clientName: true, clientAddress: true } } },
   })
 
@@ -57,7 +62,10 @@ export default async function RamsListPage({
         <NewRamsButton />
       </div>
 
-      <ListSearch placeholder="Search by job, client or address…" />
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+        <div className="flex-1"><ListSearch placeholder="Search by job, client or address…" /></div>
+        <SortToggle />
+      </div>
 
       {rams.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-8 text-center text-gray-500">

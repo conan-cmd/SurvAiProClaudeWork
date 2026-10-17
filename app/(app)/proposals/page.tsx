@@ -7,6 +7,7 @@ import { isApprover } from "@/lib/permissions"
 import { formatDate, formatCurrency, calculateProposalTotals, formatNetPlusVat } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
 import { ListSearch } from "@/components/list-search"
+import { SortToggle } from "@/components/sort-toggle"
 import { DateRangeFilter } from "@/components/date-range-filter"
 import { DraggableRow } from "@/components/draggable-row"
 import { parseNudgeHistory } from "@/lib/nudge"
@@ -52,7 +53,7 @@ export default async function ProposalsPage({
 }: {
   searchParams: {
     folder?: string; scope?: string; status?: string; q?: string; member?: string
-    period?: string; viewed?: string; visit?: string; from?: string; to?: string
+    period?: string; viewed?: string; visit?: string; from?: string; to?: string; sort?: string
   }
 }) {
   const user = await getCurrentUser()
@@ -106,6 +107,7 @@ export default async function ProposalsPage({
       from: searchParams.from,
       to: searchParams.to,
       viewed: notViewed ? "no" : undefined,
+      sort: searchParams.sort,
       visit: searchParams.visit,
       q: searchParams.q,
       ...overrides,
@@ -166,7 +168,11 @@ export default async function ProposalsPage({
         ...(notViewed ? { views: { none: {} } } : {}),
         ...(andWhere.length ? { AND: andWhere } : {}),
       },
-      orderBy: [{ sortIndex: { sort: "asc", nulls: "first" } }, { updatedAt: "desc" }],
+      // Explicit date sort (?sort=new|old) overrides manual drag order.
+      orderBy:
+        searchParams.sort === "old" ? { createdAt: "asc" as const }
+        : searchParams.sort === "new" ? { createdAt: "desc" as const }
+        : [{ sortIndex: { sort: "asc" as const, nulls: "first" as const } }, { updatedAt: "desc" as const }],
       include: {
         pricingLineItems: true,
         survey: { select: { title: true, clientAddress: true, surveyedInPerson: true } },
@@ -192,7 +198,10 @@ export default async function ProposalsPage({
         </Link>
       </div>
 
-      <ListSearch placeholder="Search by job, client, company, email or address…" />
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+        <div className="flex-1"><ListSearch placeholder="Search by job, client, company, email or address…" /></div>
+        <SortToggle />
+      </div>
 
       {canViewAll && (
         <div className="flex flex-wrap items-center gap-2 text-sm">

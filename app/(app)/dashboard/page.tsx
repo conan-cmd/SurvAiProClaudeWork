@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Plus, TrendingUp, Clock, FileText, ClipboardList, MapPin } from "lucide-react"
+import { Plus, TrendingUp, Clock, FileText, ClipboardList, MapPin, Eye } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { formatCurrency, formatDate, calculateProposalTotals, formatNetPlusVat } from "@/lib/utils"
@@ -71,6 +71,7 @@ export default async function DashboardPage({
       include: {
         pricingLineItems: true,
         survey: { select: { createdAt: true, surveyedInPerson: true } },
+        _count: { select: { views: true } },
       },
     }),
   ])
@@ -373,10 +374,16 @@ export default async function DashboardPage({
                         {formatNetPlusVat(calculateProposalTotals(p.pricingLineItems))} · {formatDate(p.updatedAt)}
                       </div>
                     </div>
-                    <span
-                      className={`shrink-0 ml-2 whitespace-nowrap text-xs font-semibold px-2 py-1 rounded-full ${STATUS_STYLES[p.status]}`}
-                    >
-                      {p.status}
+                    <span className="shrink-0 ml-2 inline-flex items-center gap-1.5">
+                      {p._count.views > 0 && (
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2 py-1 rounded-full bg-emerald-50 text-emerald-700"
+                          title={`Opened by the client${p._count.views > 1 ? ` — ${p._count.views} times` : ""}`}>
+                          <Eye className="w-3 h-3" /> Viewed
+                        </span>
+                      )}
+                      <span className={`whitespace-nowrap text-xs font-semibold px-2 py-1 rounded-full ${STATUS_STYLES[p.status]}`}>
+                        {p.status}
+                      </span>
                     </span>
                   </Link>
                 </li>

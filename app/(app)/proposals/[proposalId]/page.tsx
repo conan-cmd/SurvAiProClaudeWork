@@ -1427,10 +1427,20 @@ export default function ProposalEditorPage() {
             </button>
           </div>
 
-          <button onClick={() => setMode("preview")}
-            className="w-full inline-flex items-center justify-center gap-2 py-3.5 bg-brand-navy text-white rounded-xl font-semibold hover:bg-slate-800 transition">
-            <Eye className="w-5 h-5" /> Preview proposal
-          </button>
+          {/* Bottom actions — after building the proposal, no scroll back to the top */}
+          <div className="grid sm:grid-cols-2 gap-3">
+            <button onClick={() => setMode("preview")}
+              className="w-full inline-flex items-center justify-center gap-2 py-3.5 bg-brand-navy text-white rounded-xl font-semibold hover:bg-slate-800 transition">
+              <Eye className="w-5 h-5" /> Preview proposal
+            </button>
+            {(proposal.me.canSend || proposal.approvalStatus === "APPROVED") && (
+              <button onClick={openSend} disabled={sending}
+                className="w-full inline-flex items-center justify-center gap-2 py-3.5 bg-brand-blue text-white rounded-xl font-semibold hover:bg-blue-700 transition disabled:opacity-50">
+                {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                Send to client
+              </button>
+            )}
+          </div>
         </div>
       )}
 
