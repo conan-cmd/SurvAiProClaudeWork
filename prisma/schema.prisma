@@ -463,6 +463,9 @@ model Proposal {
   // manual move to a won-stage status. Cleared if moved back to an open stage.
   wonAt                 DateTime?
   lastNudgeAt           DateTime?
+  // Phone follow-ups: JSON CallRecord[] (lib/calls.ts) — when, who, and an
+  // AI-tidied summary of each call's dictated/typed note.
+  callLog               String?
   // Manual list position (drag to reorder). Null = untouched → newest-first.
   sortIndex             Int?
   // Pipeline board column (stage id from Organization.pipelineStages). Null =

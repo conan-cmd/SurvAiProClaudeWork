@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import {
-  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check, ExternalLink, MapPin, BellRing, Link2, XCircle,
+  MoreVertical, Pencil, Copy, Trash2, Loader2, Folder, FolderInput, Plus, Send, Check, ExternalLink, MapPin, BellRing, Link2, XCircle, Phone as PhoneIcon,
 } from "lucide-react"
 import { NudgeDialog } from "@/components/nudge-dialog"
+import { CallNoteDialog, startCall } from "@/components/call-client"
 
 type FolderOption = { id: string; name: string }
 
@@ -21,7 +22,9 @@ export function ItemActions({
   siteVisited,
   clientEmail,
   clientName,
+  clientPhone,
   nudgeHistory,
+  callLog,
 }: {
   kind: "survey" | "proposal"
   id: string
@@ -35,13 +38,16 @@ export function ItemActions({
   // For the in-place nudge dialog on proposal rows.
   clientEmail?: string | null
   clientName?: string | null
+  clientPhone?: string | null
   nudgeHistory?: string | null
+  callLog?: string | null
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [showFolders, setShowFolders] = useState(false)
   const [nudgeOpen, setNudgeOpen] = useState(false)
+  const [callOpen, setCallOpen] = useState(false)
   const [dropUp, setDropUp] = useState(false)
   const [folders, setFolders] = useState<FolderOption[] | null>(null)
   const ref = useRef<HTMLDivElement>(null)
@@ -281,6 +287,13 @@ export function ItemActions({
                   <BellRing className="w-4 h-4" /> Nudge client
                 </button>
               )}
+              {kind === "proposal" && clientPhone && (
+                <button onClick={(e) => { e.preventDefault(); setOpen(false); startCall(id, clientPhone); setCallOpen(true) }}
+                  className={menuItem}
+                  title="Opens your phone's dialler, logs the call, and takes an after-call note">
+                  <PhoneIcon className="w-4 h-4" /> Call client
+                </button>
+              )}
               {kind === "proposal" && ["DRAFT", "READY", "SENT"].includes(proposalStatus || "") && (
                 <button onClick={(e) => { e.preventDefault(); markAccepted() }} className={menuItem}
                   title="Client agreed verbally or on paper — shows as Won, Not signed">
@@ -356,6 +369,15 @@ export function ItemActions({
             </>
           )}
         </div>
+      )}
+      {callOpen && (
+        <CallNoteDialog
+          proposalId={id}
+          clientName={clientName}
+          callLog={callLog ?? null}
+          onClose={() => setCallOpen(false)}
+          onSaved={() => router.refresh()}
+        />
       )}
       {nudgeOpen && (
         <NudgeDialog

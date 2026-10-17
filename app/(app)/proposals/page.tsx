@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Eye, EyeOff, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing, KanbanSquare, MapPin, Video, Mic } from "lucide-react"
+import { Eye, EyeOff, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing, KanbanSquare, MapPin, Video, Mic, PhoneCall } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { isApprover } from "@/lib/permissions"
@@ -11,6 +11,7 @@ import { SortToggle } from "@/components/sort-toggle"
 import { DateRangeFilter } from "@/components/date-range-filter"
 import { DraggableRow } from "@/components/draggable-row"
 import { parseNudgeHistory } from "@/lib/nudge"
+import { parseCallLog } from "@/lib/calls"
 import { ProposalStatus } from "@prisma/client"
 
 function relTime(d: Date | string): string {
@@ -175,7 +176,7 @@ export default async function ProposalsPage({
         : [{ sortIndex: { sort: "asc" as const, nulls: "first" as const } }, { updatedAt: "desc" as const }],
       include: {
         pricingLineItems: true,
-        survey: { select: { title: true, clientAddress: true, surveyedInPerson: true } },
+        survey: { select: { title: true, clientAddress: true, surveyedInPerson: true, clientPhone: true } },
         createdBy: { select: { name: true, email: true } },
         _count: { select: { views: true } },
         views: { select: { updatedAt: true }, orderBy: { updatedAt: "desc" }, take: 1 },
@@ -412,6 +413,20 @@ export default async function ProposalsPage({
                       </span>
                     )
                   })()}
+                  {(() => {
+                    const calls = parseCallLog(p.callLog)
+                    if (!calls.length) return null
+                    const last = calls[calls.length - 1]
+                    return (
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-sky-50 text-sky-700"
+                        title={last.summary
+                          ? `${last.summary}${last.nextStep ? ` · Next: ${last.nextStep}` : ""} — open the proposal and tap Call for the full log`
+                          : "Call logged — no note taken"}>
+                        <PhoneCall className="w-3.5 h-3.5" />
+                        Called{calls.length > 1 ? ` ×${calls.length}` : ""} {relTime(last.at)}
+                      </span>
+                    )
+                  })()}
                   {/* A signed / deposit-paid deal is a won deal — say so alongside the stage */}
                   {["SIGNED", "DEPOSIT_PAID"].includes(p.status) && (
                     <span className="whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700"
@@ -442,7 +457,8 @@ export default async function ProposalsPage({
               </Link>
               <ItemActions kind="proposal" id={p.id} surveyId={p.surveyId} title={p.survey.title}
                 proposalStatus={p.status} siteVisited={p.survey.surveyedInPerson}
-                clientEmail={p.clientEmail} clientName={p.clientName} nudgeHistory={p.nudgeHistory} />
+                clientEmail={p.clientEmail} clientName={p.clientName} clientPhone={p.survey.clientPhone}
+                nudgeHistory={p.nudgeHistory} callLog={p.callLog} />
             </DraggableRow>
           ))}
         </div>
