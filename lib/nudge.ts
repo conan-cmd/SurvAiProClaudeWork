@@ -65,9 +65,14 @@ export function parseNudgeTemplates(org: {
         )
         if (valid.length) {
           // Orgs that saved templates before the deposit chaser existed still
-          // get it — unless they already have their own deposit template.
+          // get it — unless they already have their own deposit template, or
+          // deliberately deleted it (kept as an empty-body tombstone entry).
           const deposit = DEFAULT_NUDGE_TEMPLATES.find((t) => t.id === "deposit")
-          if (deposit && !valid.some((t) => /deposit/i.test(t.name) || /deposit/i.test(t.body))) {
+          const hasDeposit = arr.some(
+            (t) =>
+              t && (t.id === "deposit" || /deposit/i.test(t.name || "") || /deposit/i.test(t.body || ""))
+          )
+          if (deposit && !hasDeposit) {
             return [...valid, deposit]
           }
           return valid

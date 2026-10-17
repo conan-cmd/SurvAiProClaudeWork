@@ -12,13 +12,13 @@ import {
 import { formatCurrency } from "@/lib/utils"
 import { ProposalDocument } from "@/components/proposal-document"
 import { AddressInput } from "@/components/address-input"
-import { MediaNoteRecorder } from "@/components/media-note-recorder"
 import { WhatsAppLink } from "@/components/whatsapp-link"
 import { DropZone } from "@/components/drop-zone"
 import { PricingEditor, EditableLineItem } from "@/components/pricing-editor"
 import { uploadSurveyPhotos, type UploadedPhoto } from "@/lib/photo-upload"
 import { RamsButton } from "@/components/rams-button"
-import { parseNudgeTemplates, parseNudgeHistory, type NudgeTemplate } from "@/lib/nudge"
+import { parseNudgeHistory } from "@/lib/nudge"
+import { NudgeDialog } from "@/components/nudge-dialog"
 
 function relTime(d: Date | string): string {
   const mins = Math.round((Date.now() - new Date(d).getTime()) / 60000)
@@ -320,51 +320,10 @@ export default function ProposalEditorPage() {
     }
   }
 
-  // Gentle follow-up on an unsigned proposal — pick a template, see past nudges.
-  // Templates are managed in Settings; history lives on the proposal.
+  // Gentle follow-up on an unsigned proposal — the shared NudgeDialog handles
+  // templates (editable in place), history, email capture and media messages.
   const [nudgeOpen, setNudgeOpen] = useState(false)
-  const [nudging, setNudging] = useState(false)
-  const [nudgeTemplates, setNudgeTemplates] = useState<NudgeTemplate[] | null>(null)
-  const [nudgeTemplateId, setNudgeTemplateId] = useState<string | null>(null)
-  // Inline custom message ("__custom__" pseudo-template) + optional save-back.
-  const [nudgeCustom, setNudgeCustom] = useState("")
-  const [nudgeSaveTemplate, setNudgeSaveTemplate] = useState(false)
-  const [nudgeTemplateName, setNudgeTemplateName] = useState("")
-  // Missing client email can be added right here instead of via the survey.
-  const [nudgeEmail, setNudgeEmail] = useState("")
-  // Personal selfie-video / voice-note message recorded for this nudge.
-  const [recorderMode, setRecorderMode] = useState<"video" | "audio" | null>(null)
-  const [nudgeMedia, setNudgeMedia] = useState<{
-    blob: Blob; mime: string; kind: "video" | "audio"; url: string; poster: Blob | null
-  } | null>(null)
-  const clearNudgeMedia = () => {
-    setNudgeMedia((m) => {
-      if (m) URL.revokeObjectURL(m.url)
-      return null
-    })
-  }
-  // Lock the page behind the nudge modal — on mobile, touch-scrolling the
-  // dialog otherwise scrolls the background page instead of the options.
-  useEffect(() => {
-    if (!nudgeOpen) return
-    const prev = document.body.style.overflow
-    document.body.style.overflow = "hidden"
-    return () => { document.body.style.overflow = prev }
-  }, [nudgeOpen])
-  const openNudge = async () => {
-    setNudgeOpen(true)
-    if (nudgeTemplates) return
-    try {
-      const org = await fetch("/api/organization").then((r) => r.json())
-      const t = parseNudgeTemplates(org || {})
-      setNudgeTemplates(t)
-      setNudgeTemplateId(t[0]?.id ?? null)
-    } catch {
-      const t = parseNudgeTemplates({})
-      setNudgeTemplates(t)
-      setNudgeTemplateId(t[0]?.id ?? null)
-    }
-  }
+  const openNudge = () => setNudgeOpen(true)
   // Arriving via a list row's "Nudge client" (?nudge=1): open the reminder
   // dialog as soon as the proposal has loaded. window.location avoids the
   // useSearchParams suspense requirement.
@@ -378,103 +337,6 @@ export default function ProposalEditorPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proposal])
-  const sendNudge = async () => {
-    if (!proposal) return
-    const usingCustom = nudgeTemplateId === "__custom__"
-    if (usingCustom && !nudgeCustom.trim()) {
-      toast.error("Write your custom message first")
-      return
-    }
-    if (!proposal.clientEmail && !/.+@.+\..+/.test(nudgeEmail.trim())) {
-      toast.error("Add the client's email address first")
-      return
-    }
-    setNudging(true)
-    try {
-      // No email on the proposal yet — save the one typed in the dialog first.
-      if (!proposal.clientEmail) {
-        const emailRes = await fetch(`/api/proposals/${proposalId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clientEmail: nudgeEmail.trim() }),
-        })
-        if (!emailRes.ok) throw new Error((await emailRes.json()).error || "Couldn't save the email")
-        setProposal((p) => (p ? { ...p, clientEmail: nudgeEmail.trim() } : p))
-      }
-      // Recorded video/voice note: upload to Blob first, then send its URL.
-      let media: { mediaUrl: string; mediaType: "video" | "audio"; mediaPosterUrl?: string } | undefined
-      if (nudgeMedia) {
-        try {
-          const { upload } = await import("@vercel/blob/client")
-          const org = await fetch("/api/organization").then((r) => r.json())
-          const ext = nudgeMedia.mime.includes("mp4")
-            ? nudgeMedia.kind === "audio" ? "m4a" : "mp4"
-            : nudgeMedia.mime.includes("ogg") ? "ogg" : "webm"
-          const stamp = Date.now()
-          const blob = await upload(
-            `organizations/${org.id}/nudge-media/${proposalId}-${stamp}.${ext}`,
-            nudgeMedia.blob,
-            { access: "public", handleUploadUrl: "/api/blob/upload", contentType: nudgeMedia.mime }
-          )
-          media = { mediaUrl: blob.url, mediaType: nudgeMedia.kind }
-          if (nudgeMedia.poster) {
-            // Thumbnail for the email — best-effort, the text link still works.
-            try {
-              const poster = await upload(
-                `organizations/${org.id}/nudge-media/${proposalId}-${stamp}-poster.jpg`,
-                nudgeMedia.poster,
-                { access: "public", handleUploadUrl: "/api/blob/upload", contentType: "image/jpeg" }
-              )
-              media.mediaPosterUrl = poster.url
-            } catch {
-              // Email falls back to the text link.
-            }
-          }
-        } catch {
-          throw new Error("Couldn't upload your recording — check your connection and try again")
-        }
-      }
-      const res = await fetch(`/api/proposals/${proposalId}/nudge`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          usingCustom
-            ? { message: nudgeCustom.trim(), messageName: nudgeSaveTemplate && nudgeTemplateName.trim() ? nudgeTemplateName.trim() : undefined, ...media }
-            : { templateId: nudgeTemplateId, ...media }
-        ),
-      })
-      const d = await res.json()
-      if (!res.ok) throw new Error(d.error)
-      setProposal((p) => (p ? { ...p, lastNudgeAt: d.lastNudgeAt, nudgeHistory: d.nudgeHistory } : p))
-      // Save the custom message back as a reusable template without a Settings trip.
-      if (usingCustom && nudgeSaveTemplate && nudgeTemplates) {
-        const name = nudgeTemplateName.trim() || "My template"
-        const next = [...nudgeTemplates, { id: `t-${Date.now()}`, name, body: nudgeCustom.trim() }]
-        const saved = await fetch("/api/organization", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nudgeTemplates: JSON.stringify(next) }),
-        })
-        if (saved.ok) {
-          setNudgeTemplates(next)
-          toast.success(`Saved "${name}" as a template`)
-        } else {
-          toast.error("Reminder sent, but the template couldn't be saved")
-        }
-      }
-      setNudgeOpen(false)
-      setNudgeCustom("")
-      setNudgeSaveTemplate(false)
-      setNudgeTemplateName("")
-      clearNudgeMedia()
-      toast.success("Reminder sent")
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Couldn't send the reminder")
-    } finally {
-      setNudging(false)
-    }
-  }
-
   // Verbal / on-paper go-ahead: the deal is WON, but there's no signature — the
   // proposal shows "Not signed" and the client can still sign digitally later.
   const markAccepted = async () => {
@@ -1063,162 +925,19 @@ export default function ProposalEditorPage() {
               </div>
             </div>
           )}
-          {nudgeOpen && (
-            <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4 overscroll-contain"
-              onClick={() => !nudging && setNudgeOpen(false)}>
-              <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-4 max-h-[85dvh] overflow-y-auto overscroll-contain"
-                onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-brand-navy">Send a reminder</h3>
-                  <button onClick={() => setNudgeOpen(false)} disabled={nudging} aria-label="Close"
-                    className="p-1 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
-                </div>
-                {(() => {
-                  const history = parseNudgeHistory(proposal.nudgeHistory)
-                  return history.length > 0 ? (
-                    <div className="bg-gray-50 border rounded-lg p-3">
-                      <p className="text-xs font-semibold text-gray-500 mb-1.5">
-                        Nudged {history.length} time{history.length === 1 ? "" : "s"}
-                      </p>
-                      <ul className="space-y-1">
-                        {history.slice().reverse().map((r, i) => (
-                          <li key={i} className="text-xs text-gray-600 flex items-center gap-1.5 flex-wrap">
-                            {new Date(r.at).toLocaleDateString("en-GB")} — {r.templateName}
-                            {r.by ? <span className="text-gray-400">· {r.by}</span> : null}
-                            {r.mediaType && r.mediaUrl && (
-                              <a href={r.mediaUrl} target="_blank" rel="noopener noreferrer"
-                                title={`Play the ${r.mediaType === "video" ? "video" : "voice"} message that went with this nudge`}
-                                className="inline-flex items-center gap-1 text-brand-blue font-medium hover:underline">
-                                {r.mediaType === "video" ? <Video className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
-                                {r.mediaType === "video" ? "video message" : "voice note"}
-                              </a>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-400">No reminders sent yet for this proposal.</p>
-                  )
-                })()}
-                {!proposal.clientEmail && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                    <label className="block text-sm font-medium text-amber-800 mb-1.5">
-                      No client email on this proposal yet — add it here:
-                    </label>
-                    <input type="email" value={nudgeEmail} placeholder="client@example.co.uk"
-                      onChange={(e) => setNudgeEmail(e.target.value)}
-                      className="w-full text-sm px-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue" />
-                  </div>
-                )}
-                {!nudgeTemplates ? (
-                  <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
-                    <Loader2 className="w-4 h-4 animate-spin" /> Loading templates…
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-gray-700">Choose a message</p>
-                    {nudgeTemplates.map((t) => (
-                      <label key={t.id}
-                        className={`block border rounded-lg p-3 cursor-pointer transition ${
-                          nudgeTemplateId === t.id ? "border-brand-blue ring-1 ring-brand-blue bg-blue-50/50" : "hover:border-gray-400"
-                        }`}>
-                        <span className="flex items-center gap-2">
-                          <input type="radio" name="nudge-template" checked={nudgeTemplateId === t.id}
-                            onChange={() => setNudgeTemplateId(t.id)} className="accent-blue-600" />
-                          <span className="text-sm font-semibold text-gray-800">{t.name}</span>
-                        </span>
-                        <span className="block text-xs text-gray-500 mt-1.5 leading-relaxed">{t.body}</span>
-                      </label>
-                    ))}
-                    <label
-                      className={`block border rounded-lg p-3 cursor-pointer transition ${
-                        nudgeTemplateId === "__custom__" ? "border-brand-blue ring-1 ring-brand-blue bg-blue-50/50" : "hover:border-gray-400"
-                      }`}>
-                      <span className="flex items-center gap-2">
-                        <input type="radio" name="nudge-template" checked={nudgeTemplateId === "__custom__"}
-                          onChange={() => setNudgeTemplateId("__custom__")} className="accent-blue-600" />
-                        <span className="text-sm font-semibold text-gray-800">Custom message</span>
-                      </span>
-                      {nudgeTemplateId === "__custom__" && (
-                        <span className="block mt-2 space-y-2" onClick={(e) => e.preventDefault()}>
-                          <textarea spellCheck rows={3} value={nudgeCustom} autoFocus
-                            placeholder="Write your reminder…"
-                            onChange={(e) => setNudgeCustom(e.target.value)}
-                            className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" />
-                          <span className="flex items-center gap-2">
-                            <input type="checkbox" checked={nudgeSaveTemplate}
-                              onChange={(e) => setNudgeSaveTemplate(e.target.checked)}
-                              className="rounded accent-blue-600" id="nudge-save-template" />
-                            <label htmlFor="nudge-save-template" className="text-xs text-gray-600 cursor-pointer">
-                              Save as a template for next time
-                            </label>
-                          </span>
-                          {nudgeSaveTemplate && (
-                            <input value={nudgeTemplateName} placeholder="Template name (e.g. Price-hold reminder)"
-                              onChange={(e) => setNudgeTemplateName(e.target.value)}
-                              className="w-full text-sm px-3 py-1.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" />
-                          )}
-                        </span>
-                      )}
-                    </label>
-                    <p className="text-xs text-gray-400">
-                      Edit saved templates in Settings → Follow-up reminders.
-                    </p>
-                  </div>
-                )}
-                {/* Personal video / voice message — recorded and reviewed before sending */}
-                <div className="rounded-lg border p-3 space-y-2">
-                  <p className="text-sm font-medium text-gray-700">
-                    Add a personal touch <span className="text-xs text-gray-400 font-normal">(optional)</span>
-                  </p>
-                  {nudgeMedia ? (
-                    <div className="space-y-2">
-                      {nudgeMedia.kind === "video" ? (
-                        <video src={nudgeMedia.url} controls playsInline className="w-full max-h-64 rounded-lg bg-black" />
-                      ) : (
-                        <audio src={nudgeMedia.url} controls className="w-full" />
-                      )}
-                      <div className="flex items-center gap-3 text-xs font-medium">
-                        <button type="button" onClick={() => { clearNudgeMedia(); setRecorderMode(nudgeMedia.kind) }}
-                          className="text-brand-blue hover:underline">Re-record</button>
-                        <button type="button" onClick={clearNudgeMedia}
-                          className="text-gray-400 hover:text-red-600">Remove</button>
-                        <span className="text-gray-400 font-normal">Sends with the reminder — the client watches it on their proposal page.</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => setRecorderMode("video")}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:border-brand-blue hover:text-brand-blue">
-                        <Video className="w-4 h-4" /> Record video
-                      </button>
-                      <button type="button" onClick={() => setRecorderMode("audio")}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:border-brand-blue hover:text-brand-blue">
-                        <Mic className="w-4 h-4" /> Record voice note
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <div className="flex justify-end gap-2 pt-1">
-                  <button onClick={() => setNudgeOpen(false)} disabled={nudging}
-                    className="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
-                  <button onClick={sendNudge} disabled={nudging || !nudgeTemplates}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
-                    {nudging ? <Loader2 className="w-4 h-4 animate-spin" /> : <BellRing className="w-4 h-4" />}
-                    Send reminder
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-          {recorderMode && (
-            <MediaNoteRecorder
-              mode={recorderMode}
-              onCancel={() => setRecorderMode(null)}
-              onUse={(blob, mime, poster) => {
-                setNudgeMedia({ blob, mime, kind: recorderMode, url: URL.createObjectURL(blob), poster })
-                setRecorderMode(null)
+          {nudgeOpen && proposal && (
+            <NudgeDialog
+              proposalId={proposalId}
+              clientEmail={proposal.clientEmail}
+              clientName={proposal.clientName}
+              nudgeHistory={proposal.nudgeHistory}
+              onClose={() => setNudgeOpen(false)}
+              onSent={() => {
+                // Refresh nudge history / lastNudgeAt (and any email added in the dialog).
+                fetch(`/api/proposals/${proposalId}`)
+                  .then((r) => (r.ok ? r.json() : null))
+                  .then((p) => p && setProposal(p))
+                  .catch(() => {})
               }}
             />
           )}

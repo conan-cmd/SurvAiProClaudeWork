@@ -3,23 +3,25 @@
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { toast } from "sonner"
-import { X, Loader2, BellRing, Video, Mic } from "lucide-react"
+import { X, Loader2, BellRing, Video, Mic, Pencil, Trash2 } from "lucide-react"
 import { parseNudgeTemplates, parseNudgeHistory, type NudgeTemplate } from "@/lib/nudge"
 import { MediaNoteRecorder } from "@/components/media-note-recorder"
 
-// Self-contained "Send a reminder" dialog — the same flow as the proposal
-// editor's nudge (templates, custom message + save-back, missing-email
-// capture, optional video/voice message), but usable straight from a list
-// row without opening the proposal. Portaled so row transforms can't trap it.
+// Self-contained "Send a reminder" dialog — templates (editable/deletable in
+// place), custom message + save-back, missing-email capture, optional
+// video/voice message. Used from list rows and the proposal editor alike.
+// Portaled so row transforms can't trap it.
 export function NudgeDialog({
   proposalId,
   clientEmail,
+  clientName,
   nudgeHistory,
   onClose,
   onSent,
 }: {
   proposalId: string
   clientEmail: string | null
+  clientName?: string | null
   nudgeHistory: string | null
   onClose: () => void
   onSent?: () => void
@@ -33,6 +35,11 @@ export function NudgeDialog({
   const [email, setEmail] = useState("")
   const [sending, setSending] = useState(false)
   const [recorderMode, setRecorderMode] = useState<"video" | "audio" | null>(null)
+  // In-place template editing — fix a typo without a Settings trip.
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editBody, setEditBody] = useState("")
+  const [tplBusy, setTplBusy] = useState(false)
   const [media, setMedia] = useState<{
     blob: Blob; mime: string; kind: "video" | "audio"; url: string; poster: Blob | null
   } | null>(null)
@@ -68,6 +75,54 @@ export function NudgeDialog({
   }, [])
 
   const history = parseNudgeHistory(nudgeHistory)
+
+  // Persist a changed template list for the whole org. The display list hides
+  // empty-body tombstones (used to keep a deleted default deleted).
+  const persistTemplates = async (next: NudgeTemplate[]): Promise<boolean> => {
+    setTplBusy(true)
+    try {
+      const res = await fetch("/api/organization", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nudgeTemplates: JSON.stringify(next) }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error || "Couldn't save the templates")
+      setTemplates(next.filter((t) => t.body.trim() !== ""))
+      return true
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't save the templates")
+      return false
+    } finally {
+      setTplBusy(false)
+    }
+  }
+
+  const saveEdit = async () => {
+    if (!templates || !editingId || !editBody.trim()) return
+    const next = templates.map((t) =>
+      t.id === editingId ? { ...t, name: editName.trim() || t.name, body: editBody.trim() } : t
+    )
+    if (await persistTemplates(next)) {
+      setEditingId(null)
+      toast.success("Template updated")
+    }
+  }
+
+  const deleteTemplate = async (t: NudgeTemplate) => {
+    if (!templates) return
+    if (!confirm(`Delete the "${t.name}" template? This removes it for the whole team.`)) return
+    let next = templates.filter((x) => x.id !== t.id)
+    // Deleting the deposit chaser leaves a tombstone so it isn't auto-restored.
+    const depositish = t.id === "deposit" || /deposit/i.test(t.name) || /deposit/i.test(t.body)
+    if (depositish && !next.some((x) => x.id === "deposit" || /deposit/i.test(x.name) || /deposit/i.test(x.body))) {
+      next = [...next, { id: "deposit", name: "Pay your deposit", body: "" }]
+    }
+    if (await persistTemplates(next)) {
+      if (templateId === t.id) setTemplateId(next.find((x) => x.body.trim())?.id ?? "__custom__")
+      if (editingId === t.id) setEditingId(null)
+      toast.success("Template deleted")
+    }
+  }
 
   const send = async () => {
     const usingCustom = templateId === "__custom__"
@@ -210,6 +265,13 @@ export function NudgeDialog({
           ) : (
             <div className="space-y-2">
               <p className="text-sm font-medium text-gray-700">Choose a message</p>
+              <p className="text-xs text-gray-500">
+                Every reminder email opens with{" "}
+                <span className="font-medium text-gray-700">
+                  &ldquo;Hi {clientName?.trim() ? clientName.trim().split(/\s+/)[0] : "{first name}"},&rdquo;
+                </span>{" "}
+                automatically — no need to type a greeting.
+              </p>
               {templates.map((t) => (
                 <label key={t.id}
                   className={`block border rounded-lg p-3 cursor-pointer transition ${
@@ -218,9 +280,48 @@ export function NudgeDialog({
                   <span className="flex items-center gap-2">
                     <input type="radio" name="nudge-dialog-template" checked={templateId === t.id}
                       onChange={() => setTemplateId(t.id)} className="accent-blue-600" />
-                    <span className="text-sm font-semibold text-gray-800">{t.name}</span>
+                    <span className="text-sm font-semibold text-gray-800 flex-1 min-w-0">{t.name}</span>
+                    <button type="button" aria-label={`Edit the ${t.name} template`} disabled={tplBusy}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setEditingId(t.id)
+                        setEditName(t.name)
+                        setEditBody(t.body)
+                      }}
+                      className="p-1 text-gray-400 hover:text-brand-blue shrink-0">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button type="button" aria-label={`Delete the ${t.name} template`} disabled={tplBusy}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        deleteTemplate(t)
+                      }}
+                      className="p-1 text-gray-400 hover:text-red-600 shrink-0">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </span>
-                  <span className="block text-xs text-gray-500 mt-1.5 leading-relaxed">{t.body}</span>
+                  {editingId === t.id ? (
+                    <span className="block mt-2 space-y-2" onClick={(e) => e.preventDefault()}>
+                      <input value={editName} onChange={(e) => setEditName(e.target.value)}
+                        placeholder="Template name"
+                        className="w-full text-sm px-3 py-1.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+                      <textarea spellCheck rows={3} value={editBody} autoFocus
+                        onChange={(e) => setEditBody(e.target.value)}
+                        className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" />
+                      <span className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setEditingId(null)} disabled={tplBusy}
+                          className="px-3 py-1.5 border rounded-lg text-xs font-medium hover:bg-gray-50">Cancel</button>
+                        <button type="button" onClick={saveEdit} disabled={tplBusy || !editBody.trim()}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand-blue text-white rounded-lg text-xs font-semibold hover:bg-blue-700 disabled:opacity-50">
+                          {tplBusy && <Loader2 className="w-3 h-3 animate-spin" />} Save template
+                        </button>
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="block text-xs text-gray-500 mt-1.5 leading-relaxed">{t.body}</span>
+                  )}
                 </label>
               ))}
               <label
@@ -255,7 +356,7 @@ export function NudgeDialog({
                 )}
               </label>
               <p className="text-xs text-gray-400">
-                Edit saved templates in Settings → Follow-up reminders.
+                The ✎ and 🗑 fix or remove a template right here — changes apply for the whole team.
               </p>
             </div>
           )}
