@@ -187,14 +187,28 @@ export async function POST(request: NextRequest) {
       })
       if (testimonials.length) {
         const jobText = `${survey.serviceType} ${survey.title} ${survey.writtenDescription || ""}`.toLowerCase()
-        const terms = jobText.split(/[^a-z]+/).filter((t) => t.length > 3)
+        // Generic trade words appear in nearly every review, which used to make
+        // unrelated items (especially videos) score a false match — only
+        // distinctive terms count.
+        const STOP = new Set([
+          "clean", "cleaning", "cleaned", "cleans", "exterior", "service", "services",
+          "wash", "washed", "washing", "work", "works", "job", "jobs", "property",
+          "house", "home", "team", "great", "company", "professional", "survey",
+          "quote", "proposal", "clean", "from", "with", "your", "this", "that",
+        ])
+        const terms = jobText.split(/[^a-z]+/).filter((t) => t.length > 3 && !STOP.has(t))
         const matches = testimonials
           .map((t) => {
-            const hay = `${t.serviceTags || ""} ${t.title || ""} ${t.text || ""}`.toLowerCase()
+            const isVideo = Boolean(t.fileUrl || t.youtubeUrl) || /video/i.test(String(t.kind))
+            const tagHay = `${t.serviceTags || ""} ${t.title || ""}`.toLowerCase()
+            const hay = `${tagHay} ${t.text || ""}`.toLowerCase()
             const score = terms.reduce((s, term) => s + (hay.includes(term) ? 1 : 0), 0)
-            return { t, score }
+            // Videos only auto-attach on a confident match: their tags or title
+            // must name the service being quoted, not just share filler words.
+            const tagScore = terms.reduce((s, term) => s + (tagHay.includes(term) ? 1 : 0), 0)
+            return { t, score, eligible: isVideo ? tagScore > 0 : score > 0 }
           })
-          .filter((x) => x.score > 0)
+          .filter((x) => x.eligible)
           .sort((a, b) => b.score - a.score)
           .slice(0, 3)
           .map((x) => ({

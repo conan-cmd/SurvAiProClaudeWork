@@ -1904,6 +1904,11 @@ function TestimonialPicker({
 }) {
   const [all, setAll] = useState<TestimonialPick[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Search + live sources (Google / Trustpilot, fetched on demand, not imported).
+  const [q, setQ] = useState("")
+  const [source, setSource] = useState<"saved" | "google" | "trustpilot">("saved")
+  const [live, setLive] = useState<Record<string, TestimonialPick[] | string | undefined>>({})
+  const [liveLoading, setLiveLoading] = useState(false)
 
   useEffect(() => {
     fetch("/api/testimonials")
@@ -1914,6 +1919,19 @@ function TestimonialPicker({
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load testimonials"))
   }, [])
+
+  const openSource = (s: "saved" | "google" | "trustpilot") => {
+    setSource(s)
+    if (s === "saved" || live[s]) return
+    setLiveLoading(true)
+    fetch(`/api/testimonials/live?source=${s}`)
+      .then(async (r) => {
+        const data = await r.json()
+        setLive((prev) => ({ ...prev, [s]: r.ok ? data.items : String(data.error || "Couldn't fetch reviews") }))
+      })
+      .catch(() => setLive((prev) => ({ ...prev, [s]: "Couldn't fetch reviews — try again" })))
+      .finally(() => setLiveLoading(false))
+  }
 
   let selected: TestimonialPick[] = []
   try {
@@ -1941,37 +1959,70 @@ function TestimonialPicker({
       </div>
     )
   }
-  if (!all.length) {
-    return (
-      <p className="text-sm text-gray-400">
-        No reviews or testimonial videos yet — add them in{" "}
-        <a href="/settings" className="font-semibold text-brand-blue underline">Settings → Reviews &amp; testimonials</a>.
-      </p>
-    )
-  }
+
+  const sourceItems = source === "saved" ? all : live[source]
+  const needle = q.trim().toLowerCase()
+  const list = Array.isArray(sourceItems)
+    ? sourceItems.filter((t) =>
+        !needle ||
+        `${t.title || ""} ${t.text || ""} ${t.author || ""} ${t.serviceTags || ""}`.toLowerCase().includes(needle)
+      )
+    : []
+
   return (
     <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
+        {([["saved", "Saved"], ["google", "Google (live)"], ["trustpilot", "Trustpilot (live)"]] as const).map(([v, label]) => (
+          <button key={v} type="button" onClick={() => openSource(v)}
+            className={`px-2.5 py-1 rounded-full border transition ${
+              source === v ? "bg-brand-navy text-white border-brand-navy" : "bg-white text-gray-600 hover:border-gray-400"
+            }`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <input value={q} onChange={(e) => setQ(e.target.value)}
+        placeholder="Search reviews — e.g. render, gutters, roof…"
+        className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue" />
       <p className="text-xs text-gray-500">
         Tick the reviews and videos to show on this proposal ({selected.length} selected).
+        {source !== "saved" && " Live reviews go straight onto the proposal — no import needed."}
       </p>
-      {all.map((t) => {
-        const on = selected.some((s) => s.id === t.id)
-        return (
-          <button key={t.id} type="button" onClick={() => toggle(t)}
-            className={`w-full text-left border rounded-lg p-3 transition ${
-              on ? "border-brand-blue ring-1 ring-brand-blue bg-blue-50/40" : "opacity-70 hover:opacity-100 hover:border-gray-400"
-            }`}>
-            <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
-              {on && <Check className="w-4 h-4 text-brand-blue shrink-0" />}
-              <span className="truncate">
-                {t.kind === "video" ? "🎬 " : ""}{t.title || t.author || "Untitled"}
-              </span>
-              {t.rating ? <span className="text-amber-400 text-xs shrink-0">{"★".repeat(t.rating)}</span> : null}
-            </div>
-            {t.text && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{t.text}</p>}
-          </button>
-        )
-      })}
+      {liveLoading && source !== "saved" ? (
+        <div className="flex items-center gap-2 text-gray-400 text-sm py-2">
+          <Loader2 className="w-4 h-4 animate-spin" /> Fetching live reviews…
+        </div>
+      ) : typeof sourceItems === "string" ? (
+        <p className="text-sm text-amber-600">{sourceItems}</p>
+      ) : !list.length ? (
+        <p className="text-sm text-gray-400">
+          {needle
+            ? "No reviews match that search."
+            : source === "saved"
+              ? <>No reviews or testimonial videos yet — add them in{" "}
+                <a href="/settings" className="font-semibold text-brand-blue underline">Settings → Reviews &amp; testimonials</a>, or try the live tabs above.</>
+              : "No reviews found."}
+        </p>
+      ) : (
+        list.map((t) => {
+          const on = selected.some((s) => s.id === t.id)
+          return (
+            <button key={t.id} type="button" onClick={() => toggle(t)}
+              className={`w-full text-left border rounded-lg p-3 transition ${
+                on ? "border-brand-blue ring-1 ring-brand-blue bg-blue-50/40" : "opacity-70 hover:opacity-100 hover:border-gray-400"
+              }`}>
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
+                {on && <Check className="w-4 h-4 text-brand-blue shrink-0" />}
+                <span className="truncate">
+                  {t.kind === "video" ? "🎬 " : ""}{t.title || t.author || "Untitled"}
+                </span>
+                {t.rating ? <span className="text-amber-400 text-xs shrink-0">{"★".repeat(t.rating)}</span> : null}
+              </div>
+              {t.text && <p className="text-xs text-gray-500 mt-1 line-clamp-2">{t.text}</p>}
+            </button>
+          )
+        })
+      )}
     </div>
   )
 }
