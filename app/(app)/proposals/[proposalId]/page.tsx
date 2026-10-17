@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import {
   Loader2, Sparkles, ChevronUp, ChevronDown, Trash2, Plus, Eye,
   Pencil, Link2, Printer, Check, Send, Copy, Share2, X, MessageCircle, MessageSquare,
-  ShieldCheck, ClipboardCheck, Clock, AlertTriangle, BellRing, MapPin, Play, PenLine,
+  ShieldCheck, ClipboardCheck, Clock, AlertTriangle, BellRing, MapPin, Play, PenLine, PhoneCall,
   ExternalLink, Video, Mic,
 } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
@@ -19,6 +19,8 @@ import { uploadSurveyPhotos, type UploadedPhoto } from "@/lib/photo-upload"
 import { RamsButton } from "@/components/rams-button"
 import { parseNudgeHistory } from "@/lib/nudge"
 import { NudgeDialog } from "@/components/nudge-dialog"
+import { CallNoteDialog, startCall } from "@/components/call-client"
+import { parseCallLog } from "@/lib/calls"
 
 function relTime(d: Date | string): string {
   const mins = Math.round((Date.now() - new Date(d).getTime()) / 60000)
@@ -58,12 +60,14 @@ type ProposalData = {
   pipedriveDealId: string | null
   lastNudgeAt: string | null
   nudgeHistory: string | null
+  callLog: string | null
   sections: Section[]
   pricingLineItems: EditableLineItem[]
   survey: {
     id: string
     title: string
     clientCompany: string | null
+    clientPhone: string | null
     clientAddress: string
     latitude: number | null
     longitude: number | null
@@ -324,6 +328,8 @@ export default function ProposalEditorPage() {
   // templates (editable in place), history, email capture and media messages.
   const [nudgeOpen, setNudgeOpen] = useState(false)
   const openNudge = () => setNudgeOpen(true)
+  // Click-to-call with after-call note (logged on the proposal's call log).
+  const [callOpen, setCallOpen] = useState(false)
   // Arriving via a list row's "Nudge client" (?nudge=1): open the reminder
   // dialog as soon as the proposal has loaded. window.location avoids the
   // useSearchParams suspense requirement.
@@ -835,6 +841,25 @@ export default function ProposalEditorPage() {
               </>
             )
           })()}
+          {/* Click-to-call: opens the dialler, logs the call, takes an AI-tidied note */}
+          {proposal.survey.clientPhone && (() => {
+            const calls = parseCallLog(proposal.callLog)
+            const lastCall = calls[calls.length - 1]
+            return (
+              <button
+                onClick={() => {
+                  startCall(proposalId, proposal.survey.clientPhone!)
+                  setCallOpen(true)
+                }}
+                title={lastCall
+                  ? `Last call ${new Date(lastCall.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}${lastCall.summary ? ` — ${lastCall.summary}` : ""}`
+                  : `Call ${proposal.clientName} (${proposal.survey.clientPhone}) — the call is logged automatically`}
+                className="inline-flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium bg-white hover:bg-gray-50">
+                <PhoneCall className="w-4 h-4" />
+                Call{calls.length > 0 ? ` (${calls.length})` : ""}
+              </button>
+            )
+          })()}
           {!proposal.signedAt && !["SIGNED", "DEPOSIT_PAID", "WON"].includes(proposal.status) && (
             <button onClick={markAccepted}
               title="Client agreed verbally or on paper — records the win without claiming a signature"
@@ -924,6 +949,15 @@ export default function ProposalEditorPage() {
                 </p>
               </div>
             </div>
+          )}
+          {callOpen && proposal && (
+            <CallNoteDialog
+              proposalId={proposalId}
+              clientName={proposal.clientName}
+              callLog={proposal.callLog}
+              onClose={() => setCallOpen(false)}
+              onSaved={(log) => setProposal((p) => (p ? { ...p, callLog: log } : p))}
+            />
           )}
           {nudgeOpen && proposal && (
             <NudgeDialog
