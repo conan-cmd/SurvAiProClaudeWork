@@ -223,11 +223,26 @@ export function PricingEditor({
               >
                 <GripVertical className="w-4 h-4" />
               </span>
-              <input
-                className={cell}
+              {/* Wrapping, auto-growing description — a single-line input made
+                  long text invisible on phones without side-scrolling. */}
+              <textarea
+                rows={1}
+                spellCheck
+                className={`${cell} resize-none leading-snug overflow-hidden`}
                 placeholder="Description (e.g. Full roof clean and moss treatment)"
                 value={item.description}
-                onChange={(e) => update(item.id, { description: e.target.value })}
+                ref={(el) => {
+                  if (el) {
+                    el.style.height = "auto"
+                    el.style.height = `${el.scrollHeight}px`
+                  }
+                }}
+                onChange={(e) => {
+                  update(item.id, { description: e.target.value.replace(/\r?\n/g, " ") })
+                  const el = e.currentTarget
+                  el.style.height = "auto"
+                  el.style.height = `${el.scrollHeight}px`
+                }}
               />
               <button type="button" onClick={() => duplicateItem(item.id)} title="Duplicate this line"
                 className="p-2 text-gray-400 hover:text-brand-blue hover:bg-blue-50 rounded-lg shrink-0">
