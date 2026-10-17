@@ -6,13 +6,14 @@ import { getCurrentUser } from "@/lib/session"
 import { formatDate } from "@/lib/utils"
 import { ItemActions } from "@/components/item-actions"
 import { ListSearch } from "@/components/list-search"
+import { SortToggle } from "@/components/sort-toggle"
 import { DraggableRow } from "@/components/draggable-row"
 import { BigChangeAutoSync } from "@/components/bigchange-autosync"
 
 export default async function SurveysPage({
   searchParams,
 }: {
-  searchParams: { folder?: string; scope?: string; q?: string; member?: string }
+  searchParams: { folder?: string; scope?: string; q?: string; member?: string; sort?: string }
 }) {
   const user = await getCurrentUser()
   if (!user) redirect("/auth/login")
@@ -28,6 +29,7 @@ export default async function SurveysPage({
     if (all) p.set("scope", "all")
     if (all && member) p.set("member", member)
     if (folder) p.set("folder", folder)
+    if (searchParams.sort) p.set("sort", searchParams.sort)
     const s = p.toString()
     return `/surveys${s ? `?${s}` : ""}`
   }
@@ -60,7 +62,11 @@ export default async function SurveysPage({
             }
           : {}),
       },
-      orderBy: [{ sortIndex: { sort: "asc", nulls: "first" } }, { updatedAt: "desc" }],
+      // Explicit date sort (?sort=new|old) overrides manual drag order.
+      orderBy:
+        searchParams.sort === "old" ? { createdAt: "asc" as const }
+        : searchParams.sort === "new" ? { createdAt: "desc" as const }
+        : [{ sortIndex: { sort: "asc" as const, nulls: "first" as const } }, { updatedAt: "desc" as const }],
       include: {
         proposal: { select: { id: true, status: true } },
         _count: { select: { photos: true, voiceNotes: true } },
@@ -80,7 +86,10 @@ export default async function SurveysPage({
         </Link>
       </div>
 
-      <ListSearch placeholder="Search by job, client, company or address…" />
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+        <div className="flex-1"><ListSearch placeholder="Search by job, client, company or address…" /></div>
+        <SortToggle />
+      </div>
 
       {canViewAll && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
