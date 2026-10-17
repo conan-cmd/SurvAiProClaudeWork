@@ -20,6 +20,7 @@ export function ItemActions({
   proposalStatus,
   siteVisited,
   clientEmail,
+  clientName,
   nudgeHistory,
 }: {
   kind: "survey" | "proposal"
@@ -33,6 +34,7 @@ export function ItemActions({
   siteVisited?: boolean
   // For the in-place nudge dialog on proposal rows.
   clientEmail?: string | null
+  clientName?: string | null
   nudgeHistory?: string | null
 }) {
   const router = useRouter()
@@ -334,6 +336,7 @@ export function ItemActions({
         <NudgeDialog
           proposalId={id}
           clientEmail={clientEmail ?? null}
+          clientName={clientName}
           nudgeHistory={nudgeHistory ?? null}
           onClose={() => setNudgeOpen(false)}
           onSent={() => router.refresh()}

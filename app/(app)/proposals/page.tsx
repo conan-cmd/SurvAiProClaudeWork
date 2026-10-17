@@ -433,7 +433,7 @@ export default async function ProposalsPage({
               </Link>
               <ItemActions kind="proposal" id={p.id} surveyId={p.surveyId} title={p.survey.title}
                 proposalStatus={p.status} siteVisited={p.survey.surveyedInPerson}
-                clientEmail={p.clientEmail} nudgeHistory={p.nudgeHistory} />
+                clientEmail={p.clientEmail} clientName={p.clientName} nudgeHistory={p.nudgeHistory} />
             </DraggableRow>
           ))}
         </div>
