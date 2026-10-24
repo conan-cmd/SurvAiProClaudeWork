@@ -40,11 +40,43 @@ export async function GET(request: NextRequest) {
       { signal: AbortSignal.timeout(6000) }
     )
     const data = await res.json()
-    const suggestions = (data.predictions || [])
+    if (data.status === "OK" || data.status === "ZERO_RESULTS") {
+      const suggestions = (data.predictions || [])
+        .slice(0, 5)
+        .map((p: { description: string }) => p.description)
+      return NextResponse.json(suggestions)
+    }
+    // Legacy endpoint refused (key restrictions, billing, or Google's phased
+    // retirement of legacy Places) — log the real reason and fall back to the
+    // new Places API, which uses the same key when enabled on the project.
+    console.error("Places autocomplete (legacy):", data.status, data.error_message)
+    const res2 = await fetch("https://places.googleapis.com/v1/places:autocomplete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key },
+      body: JSON.stringify({
+        input: q,
+        includedRegionCodes: ["GB"],
+        ...(lat && lng
+          ? { locationBias: { circle: { center: { latitude: Number(lat), longitude: Number(lng) }, radius: 3000 } } }
+          : {}),
+      }),
+      signal: AbortSignal.timeout(6000),
+    })
+    const d2 = (await res2.json().catch(() => ({}))) as {
+      error?: { message?: string }
+      suggestions?: { placePrediction?: { text?: { text?: string } } }[]
+    }
+    if (!res2.ok) {
+      console.error("Places autocomplete (new):", res2.status, d2.error?.message)
+      return NextResponse.json([])
+    }
+    const suggestions = (d2.suggestions || [])
+      .map((s) => s.placePrediction?.text?.text)
+      .filter((t): t is string => Boolean(t))
       .slice(0, 5)
-      .map((p: { description: string }) => p.description)
     return NextResponse.json(suggestions)
-  } catch {
+  } catch (err) {
+    console.error("Places autocomplete failed:", err)
     return NextResponse.json([])
   }
 }
