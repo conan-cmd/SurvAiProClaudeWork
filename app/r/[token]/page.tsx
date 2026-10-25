@@ -321,7 +321,7 @@ export default function PublicRamsPage() {
           </div>
         )}
 
-        <p className="text-center text-[11px] text-gray-400 pb-6">Powered by SurvAIPro</p>
+        <p className="text-center text-[11px] text-gray-400 pb-6">Powered by SurvAIPro®</p>
       </div>
     </div>
   )

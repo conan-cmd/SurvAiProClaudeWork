@@ -6,7 +6,7 @@ export default function Home() {
     <main className="min-h-screen bg-gradient-to-b from-brand-navy via-blue-50 to-white">
       {/* Navigation */}
       <nav className="flex justify-between items-center p-6 max-w-7xl mx-auto">
-        <div className="text-2xl font-bold text-brand-navy">SurvAI</div>
+        <div className="text-2xl font-bold text-brand-navy">SurvAIPro<sup className="text-[0.5em] font-normal ml-px">®</sup></div>
         <Link
           href="/auth/login"
           className="px-6 py-2 bg-brand-blue text-white rounded-lg font-medium hover:bg-blue-700 transition"
@@ -73,7 +73,7 @@ export default function Home() {
         </div>
 
         <div className="mt-12 bg-white p-8 md:p-12 rounded-xl shadow-sm">
-          <h3 className="text-2xl font-bold text-brand-navy mb-6">The SurvAIPro Workflow</h3>
+          <h3 className="text-2xl font-bold text-brand-navy mb-6">The SurvAIPro® Workflow</h3>
           <div className="space-y-4">
             {[
               "1. Add your company branding and details",
@@ -120,7 +120,7 @@ export default function Home() {
             <span className="text-gray-300">·</span>
             <Link href="/terms" className="hover:text-brand-blue hover:underline">Terms of Service</Link>
           </div>
-          <p>&copy; {new Date().getFullYear()} SurvAIPro. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} SurvAIPro®. All rights reserved.</p>
         </div>
       </footer>
     </main>

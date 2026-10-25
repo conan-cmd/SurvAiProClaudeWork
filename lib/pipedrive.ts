@@ -268,7 +268,7 @@ export async function syncProposalToPipedrive(
         const link = `${publicBaseUrl("")}/proposals/${proposal.id}`
         await pd(org, "/notes", {
           method: "POST",
-          body: { deal_id: dealId, content: `SurvAIPro proposal: <a href="${link}">${proposal.survey.title || "View proposal"}</a>` },
+          body: { deal_id: dealId, content: `SurvAIPro® proposal: <a href="${link}">${proposal.survey.title || "View proposal"}</a>` },
         }).catch(() => {})
       }
     } else {
@@ -360,7 +360,7 @@ export async function linkProposalToDeal(proposalId: string, dealId: number): Pr
     method: "POST",
     body: {
       deal_id: dealId,
-      content: `SurvAIPro proposal: <a href="${link}">${proposal.survey.title || "View proposal"}</a>`,
+      content: `SurvAIPro® proposal: <a href="${link}">${proposal.survey.title || "View proposal"}</a>`,
     },
   }).catch(() => {})
 

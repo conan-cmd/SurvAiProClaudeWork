@@ -1,8 +1,8 @@
 import Link from "next/link"
 
 export const metadata = {
-  title: "Privacy Policy — SurvAIPro",
-  description: "How SurvAIPro collects, uses and protects your data.",
+  title: "Privacy Policy — SurvAIPro®",
+  description: "How SurvAIPro® collects, uses and protects your data.",
 }
 
 // Public page (outside the authed app) so it has a stable URL for the Pipedrive
@@ -20,7 +20,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <p>
               This Privacy Policy explains how <strong>[LBC Clean Ltd]</strong> (&quot;SurvAIPro&quot;, &quot;we&quot;,
-              &quot;us&quot;) collects, uses and protects personal data when you use the SurvAIPro
+              &quot;us&quot;) collects, uses and protects personal data when you use the SurvAIPro®
               application and website (the &quot;Service&quot;). We are the data controller for the
               personal data described here. Contact: <strong>[privacy@lbcclean.co.uk]</strong>.
             </p>
@@ -29,7 +29,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-lg font-semibold text-brand-navy">1. Who we are</h2>
             <p>
-              SurvAIPro is software for exterior-cleaning and trade firms that turns a site
+              SurvAIPro® is software for exterior-cleaning and trade firms that turns a site
               survey into a client proposal, e-signature and deposit. Registered office:
               <strong> [company address]</strong>. Company number: <strong>[company number]</strong>.
             </p>

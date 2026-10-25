@@ -1,8 +1,8 @@
 import Link from "next/link"
 
 export const metadata = {
-  title: "Terms of Service — SurvAIPro",
-  description: "The terms governing use of SurvAIPro.",
+  title: "Terms of Service — SurvAIPro®",
+  description: "The terms governing use of SurvAIPro®.",
 }
 
 // Public page for the Pipedrive Marketplace submission + app footers. Starter
@@ -18,7 +18,7 @@ export default function TermsPage() {
         <div className="prose prose-sm max-w-none space-y-6 leading-relaxed">
           <section>
             <p>
-              These Terms govern your use of SurvAIPro (the &quot;Service&quot;), provided by
+              These Terms govern your use of SurvAIPro® (the &quot;Service&quot;), provided by
               <strong> [LBC Clean Ltd]</strong> (&quot;we&quot;, &quot;us&quot;). By creating an account or
               using the Service you agree to these Terms.
             </p>
@@ -27,7 +27,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-brand-navy">1. The Service</h2>
             <p>
-              SurvAIPro lets trade firms create site surveys, generate proposals (with AI
+              SurvAIPro® lets trade firms create site surveys, generate proposals (with AI
               assistance), send them, take e-signatures and deposits, produce RAMS, and — where
               connected — sync data to third-party tools such as Pipedrive.
             </p>

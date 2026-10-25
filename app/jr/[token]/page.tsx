@@ -60,7 +60,7 @@ export default function PublicJobReportPage() {
         <div ref={ref} className="bg-white rounded-xl shadow-sm p-4 md:p-10 print-area">
           <JobReportDocument data={data} />
         </div>
-        <p className="text-center text-xs text-gray-400 mt-6">Powered by SurvAIPro</p>
+        <p className="text-center text-xs text-gray-400 mt-6">Powered by SurvAIPro®</p>
       </div>
     </main>
   )

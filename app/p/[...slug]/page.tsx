@@ -254,7 +254,7 @@ export default async function SharedProposalPage({
         </div>
       </div>
       <p className="text-center text-xs text-gray-400 mt-6">
-        Prepared with SurvAIPro
+        Prepared with SurvAIPro®
       </p>
       <ReadTracker token={token} />
     </main>

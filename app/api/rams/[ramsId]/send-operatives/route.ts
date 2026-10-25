@@ -180,7 +180,7 @@ export async function POST(
       <a href="${signUrl}" style="display:inline-block;background:#2563EB;color:#fff;font-weight:700;text-decoration:none;padding:11px 22px;border-radius:8px">Review &amp; sign the RAMS &rarr;</a>
       <p style="margin:12px 0 0;color:#9ca3af;font-size:12px">Any questions, contact your site supervisor before works commence.</p>
     </div>
-    <p style="color:#9ca3af;font-size:12px;margin-top:16px">Sent via SurvAIPro on behalf of ${esc(org.name)}.</p>
+    <p style="color:#9ca3af;font-size:12px;margin-top:16px">Sent via SurvAIPro® on behalf of ${esc(org.name)}.</p>
   </div>`
 
   const subject = `RAMS — ${rams.survey.title}`

@@ -167,7 +167,7 @@ export function BigChangeConnect() {
       ) : (
         <>
           <p className="text-sm text-gray-600">
-            Connect BigChange and your booked survey jobs appear in SurvAIPro automatically,
+            Connect BigChange and your booked survey jobs appear in SurvAIPro® automatically,
             scheduled and ready for the surveyor. Create an API key in the BigChange Developer
             Portal (Account → Manage API Keys) and paste the details here — they&apos;re stored encrypted.
           </p>

@@ -180,7 +180,7 @@ export async function createSubscriptionCheckout(params: {
   cancelUrl: string
 }) {
   const interval = params.plan === "annual" ? "year" : "month"
-  const name = `SurvAIPro — ${params.founding ? "Founding " : ""}${params.plan === "annual" ? "Annual" : "Monthly"}`
+  const name = `SurvAIPro® — ${params.founding ? "Founding " : ""}${params.plan === "annual" ? "Annual" : "Monthly"}`
   const body: Record<string, string> = {
     mode: "subscription",
     "line_items[0][price_data][currency]": "gbp",

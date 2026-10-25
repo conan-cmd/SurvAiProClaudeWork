@@ -208,7 +208,7 @@ export async function createDepositInvoice(proposalId: string): Promise<DepositI
               Status: "DRAFT",
               LineItems: [
                 {
-                  Description: `Deposit (${pct}total job value ${totalStr}) — ${jobLabel} (paid via SurvAIPro)`,
+                  Description: `Deposit (${pct}total job value ${totalStr}) — ${jobLabel} (paid via SurvAIPro®)`,
                   Quantity: 1,
                   UnitAmount: gross,
                   TaxType: "OUTPUT2",
@@ -259,7 +259,7 @@ export async function createDepositInvoice(proposalId: string): Promise<DepositI
                     Description:
                       `Remaining balance — ${jobLabel}. ` +
                       `Total job value ${totalStr}, less deposit ${formatCurrency(gross)} ` +
-                      `paid ${paidOn} via SurvAIPro${re}.`,
+                      `paid ${paidOn} via SurvAIPro®${re}.`,
                     Quantity: 1,
                     UnitAmount: balance,
                     TaxType: "OUTPUT2",

@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       data: {
         id: Number(dealId),
-        header: "No SurvAIPro proposal linked",
+        header: "No SurvAIPro® proposal linked",
         status: "Not linked",
         quoted_net: "—",
         signed: "—",
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
     data: {
       // Pipedrive's panel schema requires id + header on every response.
       id: Number(dealId),
-      header: proposal.survey.title || "SurvAIPro proposal",
+      header: proposal.survey.title || "SurvAIPro® proposal",
       status: statusLabel[proposal.status] || proposal.status,
       quoted_net: `${formatCurrency(totals.subtotal)} + VAT`,
       signed: proposal.signedAt
