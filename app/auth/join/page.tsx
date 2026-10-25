@@ -61,7 +61,7 @@ function JoinForm() {
             </p>
             {info.existingAccount && (
               <p className="text-sm bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-amber-800">
-                This email already has a SurvAIPro account. Enter its password to{" "}
+                This email already has a SurvAIPro® account. Enter its password to{" "}
                 <strong>move your account into {info.organization}&apos;s team</strong>. Anything in
                 your old workspace stays behind.
               </p>

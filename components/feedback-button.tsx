@@ -60,8 +60,8 @@ export function FeedbackButton({ founding = false }: { founding?: boolean }) {
             </div>
             <p className="text-sm text-gray-500">
               {founding
-                ? "You're a founding member — your feedback directly shapes the roadmap. What would make SurvAIPro better?"
-                : "We're in beta and building fast. Tell us what would make SurvAIPro better — bugs, missing bits, ideas, anything."}
+                ? "You're a founding member — your feedback directly shapes the roadmap. What would make SurvAIPro® better?"
+                : "We're in beta and building fast. Tell us what would make SurvAIPro® better — bugs, missing bits, ideas, anything."}
             </p>
             <textarea spellCheck rows={5} value={message} onChange={(e) => setMessage(e.target.value)}
               placeholder="I'd love it if…"

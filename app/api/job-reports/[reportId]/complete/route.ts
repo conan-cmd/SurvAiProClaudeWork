@@ -77,10 +77,10 @@ async function notifyOffice(p: {
         <p><strong>${p.completedBy}</strong> has completed a job report.</p>
         <p>${siteLabel}</p>
         <p style="margin:18px 0">
-          <a href="${p.reportUrl}" style="color:#2563EB;font-weight:600">Open the report in SurvAIPro &rarr;</a><br/>
+          <a href="${p.reportUrl}" style="color:#2563EB;font-weight:600">Open the report in SurvAIPro® &rarr;</a><br/>
           <a href="${p.publicUrl}" style="color:#6B7280;font-size:13px">Client-viewable link</a>
         </p>
       </div>`,
-    text: `${p.completedBy} has completed a job report.\n${siteLabel}\n\nOpen in SurvAIPro: ${p.reportUrl}\nClient-viewable link: ${p.publicUrl}`,
+    text: `${p.completedBy} has completed a job report.\n${siteLabel}\n\nOpen in SurvAIPro®: ${p.reportUrl}\nClient-viewable link: ${p.publicUrl}`,
   })
 }

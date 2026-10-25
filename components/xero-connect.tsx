@@ -64,7 +64,7 @@ export function XeroConnect() {
             <Check className="w-4 h-4" /> Connected to {status.tenantName || "Xero"}
           </div>
           <p className="text-xs text-gray-500">
-            When a client pays their deposit through SurvAIPro, a draft deposit invoice
+            When a client pays their deposit through SurvAIPro®, a draft deposit invoice
             (VAT-inclusive, referencing the job) is created in Xero ready to approve and
             match against the Stripe payout.
           </p>
@@ -76,7 +76,7 @@ export function XeroConnect() {
       ) : (
         <>
           <p className="text-sm text-gray-600">
-            Connect Xero and SurvAIPro will raise a draft deposit invoice automatically
+            Connect Xero and SurvAIPro® will raise a draft deposit invoice automatically
             whenever a client pays a deposit — the office just approves it.
           </p>
           <a href="/api/xero/oauth/start"

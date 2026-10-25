@@ -78,7 +78,7 @@ export default function GalleryPage() {
       <div>
         <h1 className="text-2xl font-bold text-brand-navy">Project gallery</h1>
         <p className="text-gray-500 text-sm">
-          Your best before-and-after shots. SurvAIPro automatically adds matching examples
+          Your best before-and-after shots. SurvAIPro® automatically adds matching examples
           to proposals for similar jobs.
         </p>
       </div>

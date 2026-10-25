@@ -61,7 +61,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <header className="bg-brand-navy text-white sticky top-0 z-40">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 h-14">
           <Link href="/dashboard" className="font-bold text-lg tracking-tight">
-            Surv<span className="text-brand-green">AI</span>Pro
+            Surv<span className="text-brand-green">AI</span>Pro<sup className="text-[0.5em] font-normal ml-px">®</sup>
           </Link>
           <nav className="hidden md:flex items-center gap-1">
             {NAV.map(({ href, label, badge }) => (

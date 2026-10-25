@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         to: email,
         replyTo: user.email,
         fromUserId: user.id,
-        subject: `You've been invited to join ${user.organization.name} on SurvAIPro`,
+        subject: `You've been invited to join ${user.organization.name} on SurvAIPro®`,
         html: `<div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto"><h2>Join ${user.organization.name}</h2><p>${user.name || "A colleague"} has invited you to their SurvAIPro team.</p><p><a href="${joinUrl}" style="background:#2563EB;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Accept invitation</a></p><p style="color:#64748b;font-size:13px">This link expires in 7 days.</p></div>`,
       })
     } catch (err) {

@@ -213,7 +213,7 @@ export default function OnboardingPage() {
             <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-blue-50 flex items-center justify-center">
               <Sparkles className="w-8 h-8 text-brand-blue" />
             </div>
-            <h1 className="text-2xl md:text-3xl font-bold text-brand-navy mb-3">Welcome to SurvAIPro 🎉</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-brand-navy mb-3">Welcome to SurvAIPro® 🎉</h1>
             <p className="text-gray-600 mb-2 max-w-md mx-auto">
               Let&apos;s take two minutes to add your company details, branding and services.
             </p>
@@ -292,7 +292,7 @@ export default function OnboardingPage() {
                 <input type="url" placeholder="https://www.youtube.com/@YourChannel" className={inputCls}
                   value={form.youtubeChannelUrl} onChange={(e) => set("youtubeChannelUrl", e.target.value)} />
                 <p className="text-xs text-gray-400 mt-1">
-                  SurvAIPro will suggest videos of similar jobs to include in your proposals.
+                  SurvAIPro® will suggest videos of similar jobs to include in your proposals.
                 </p>
               </div>
               <div>

@@ -6,7 +6,7 @@ import { Providers } from "@/components/providers"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "SurvAIPro - From Survey to Proposal in Seconds",
+  title: "SurvAIPro® - From Survey to Proposal in Seconds",
   description: "Turn site survey photos and notes into polished, branded proposals instantly.",
   manifest: "/manifest.json",
   icons: {
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "SurvAIPro",
+    title: "SurvAIPro®",
     statusBarStyle: "default",
   },
 }

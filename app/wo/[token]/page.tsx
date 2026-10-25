@@ -281,7 +281,7 @@ export default function WorksOrderPage() {
             <span style={{ opacity: 0.85 }}>{[org.phone, org.email].filter(Boolean).join(" · ")}</span>
           </div>
         </div>
-        <p className="text-center text-xs text-gray-400 mt-6">Internal document — not for the client. Powered by SurvAIPro</p>
+        <p className="text-center text-xs text-gray-400 mt-6">Internal document — not for the client. Powered by SurvAIPro®</p>
       </div>
     </main>
   )

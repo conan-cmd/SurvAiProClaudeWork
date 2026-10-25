@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
   const origin = publicBaseUrl(request.nextUrl.origin)
   try {
     const { hostedUrl } = await createCharge({
-      name: `SurvAIPro — ${founding ? "Founding " : ""}Annual (Bitcoin)`,
-      description: "12 months' access to SurvAIPro, paid in Bitcoin.",
+      name: `SurvAIPro® — ${founding ? "Founding " : ""}Annual (Bitcoin)`,
+      description: "12 months' access to SurvAIPro®, paid in Bitcoin.",
       amountGBP,
       organizationId: org.id,
       founding,
