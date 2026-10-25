@@ -3,6 +3,8 @@ import Link from "next/link"
 import { getCurrentUser } from "@/lib/session"
 import { isPlatformAdmin } from "@/lib/admin"
 import { db } from "@/lib/db"
+import { AdminAccountDetail } from "@/components/admin-account-detail"
+import { stripeEnabled, retrieveSubscription, totalPaidPence, depositFeesByAccount } from "@/lib/stripe"
 
 export const dynamic = "force-dynamic"
 
@@ -24,6 +26,35 @@ type OrgRow = {
   cryptoAccessUntil: Date | null
   subscriptionStatus: string | null
 }
+const gbp = (pence: number) =>
+  "£" + (pence / 100).toLocaleString("en-GB", { minimumFractionDigits: pence % 100 ? 2 : 0, maximumFractionDigits: 2 })
+
+type Billing = {
+  plan: string | null      // e.g. "Monthly", "Annual"
+  monthlyPence: number | null
+  paying: boolean          // subscription currently billing (not trial/cancelled)
+  paidPence: number | null // total actually paid to date (after discounts)
+}
+
+// Live figures from Stripe: the subscription's price (annual shown per month)
+// and everything the customer has paid. Best-effort — a Stripe hiccup shows "?".
+async function stripeBilling(o: { subscriptionId: string | null; stripeCustomerId: string | null }): Promise<Billing | null> {
+  if (!stripeEnabled() || (!o.subscriptionId && !o.stripeCustomerId)) return null
+  const [sub, paid] = await Promise.all([
+    o.subscriptionId ? retrieveSubscription(o.subscriptionId).catch(() => null) : null,
+    o.stripeCustomerId ? totalPaidPence(o.stripeCustomerId).catch(() => null) : 0,
+  ])
+  const item = sub?.items?.data?.[0]
+  const amount = item?.price?.unit_amount != null ? item.price.unit_amount * (item.quantity || 1) : null
+  const interval = item?.price?.recurring?.interval as string | undefined
+  return {
+    plan: interval === "year" ? "Annual" : interval === "month" ? "Monthly" : null,
+    monthlyPence: amount == null ? null : interval === "year" ? Math.round(amount / 12) : amount,
+    paying: sub?.status === "active" || sub?.status === "past_due",
+    paidPence: paid,
+  }
+}
+
 function statusLabel(o: OrgRow): string {
   if (o.billingExempt) return "Comped"
   if (o.freeAccess) return "Free (code)"
@@ -41,6 +72,8 @@ export default async function AdminUsagePage() {
       id: true, name: true, createdAt: true,
       subscriptionStatus: true, billingExempt: true, freeAccess: true,
       cryptoAccessUntil: true, isFoundingMember: true,
+      referralCode: true, referredByCode: true,
+      stripeCustomerId: true, subscriptionId: true, stripeAccountId: true,
       users: {
         select: { email: true, name: true, role: true, lastLoginAt: true, lastActiveAt: true },
         orderBy: { createdAt: "asc" },
@@ -49,10 +82,28 @@ export default async function AdminUsagePage() {
     },
   })
 
+  const [billing, feesByAccount] = await Promise.all([
+    Promise.all(orgs.map((o) => stripeBilling(o))),
+    stripeEnabled() ? depositFeesByAccount().catch(() => null) : Promise.resolve(new Map<string, number>()),
+  ])
+  // 1% platform fee on client deposits. Fees from an account a firm has since
+  // replaced (e.g. Express -> their own linked account) can't be tied back to
+  // the firm, so they only count in the header total.
+  const depositFeesTotalPence = feesByAccount ? Array.from(feesByAccount.values()).reduce((s, v) => s + v, 0) : null
+  const unmatchedFeesPence = feesByAccount && depositFeesTotalPence != null
+    ? depositFeesTotalPence - orgs.reduce((s, o) => s + (o.stripeAccountId ? feesByAccount.get(o.stripeAccountId) || 0 : 0), 0)
+    : 0
+  const mrrPence = billing.reduce((s, b) => s + (b?.paying && b.monthlyPence ? b.monthlyPence : 0), 0)
+  const payingCount = billing.filter((b) => b?.paying).length
+  const paidTotalPence = billing.reduce((s, b) => s + (b?.paidPence || 0), 0)
+
   const maxDate = (ds: (Date | null)[]): Date | null => {
     const t = ds.filter((d): d is Date => !!d).map((d) => d.getTime())
     return t.length ? new Date(Math.max(...t)) : null
   }
+
+  // Referral code -> the firm whose link it is, to name who referred each account.
+  const byReferralCode = new Map(orgs.filter((o) => o.referralCode).map((o) => [o.referralCode as string, o.name]))
 
   const totalProposals = orgs.reduce((s, o) => s + o._count.proposals, 0)
 
@@ -63,6 +114,9 @@ export default async function AdminUsagePage() {
           <h1 className="text-xl font-bold text-brand-navy">Admin · Usage</h1>
           <p className="text-sm text-gray-500">
             {orgs.length} account{orgs.length !== 1 ? "s" : ""} · {totalProposals} proposal{totalProposals !== 1 ? "s" : ""} generated in total.
+            {" "}{payingCount} paying · {gbp(mrrPence)}/month recurring · {gbp(paidTotalPence)} paid to date ·
+            {" "}{depositFeesTotalPence == null ? "deposit fees unavailable" : `${gbp(depositFeesTotalPence)} deposit fees collected`}
+            {unmatchedFeesPence > 0 ? ` (incl. ${gbp(unmatchedFeesPence)} from previously connected accounts)` : ""}.
           </p>
         </div>
         <Link href="/admin" className="text-sm text-brand-blue hover:underline whitespace-nowrap">← Access codes</Link>
@@ -74,7 +128,12 @@ export default async function AdminUsagePage() {
             <tr className="text-left text-gray-400 border-b">
               <th className="p-3 font-medium">Account</th>
               <th className="p-3 font-medium">Status</th>
+              <th className="p-3 font-medium">Plan</th>
+              <th className="p-3 font-medium text-right">Per month</th>
+              <th className="p-3 font-medium text-right">Paid to date</th>
+              <th className="p-3 font-medium text-right">Deposit fees</th>
               <th className="p-3 font-medium">Joined</th>
+              <th className="p-3 font-medium">Referred by</th>
               <th className="p-3 font-medium">Last login</th>
               <th className="p-3 font-medium">Last active</th>
               <th className="p-3 font-medium text-right">Surveys</th>
@@ -83,20 +142,42 @@ export default async function AdminUsagePage() {
             </tr>
           </thead>
           <tbody>
-            {orgs.map((o) => {
+            {orgs.map((o, i) => {
+              const b = billing[i]
               const owner = o.users.find((u) => u.role === "OWNER") || o.users[0]
               const lastLogin = maxDate(o.users.map((u) => u.lastLoginAt))
               const lastActive = maxDate(o.users.map((u) => u.lastActiveAt))
               return (
                 <tr key={o.id} className="border-b border-gray-100">
                   <td className="p-3">
-                    <div className="font-medium text-gray-900">{o.name}{o.isFoundingMember ? " ⭐" : ""}</div>
+                    <div>
+                      <AdminAccountDetail orgId={o.id} name={`${o.name}${o.isFoundingMember ? " ⭐" : ""}`}
+                        ownerEmail={owner?.email || null} />
+                    </div>
                     <div className="text-xs text-gray-500">
                       {owner?.name || owner?.email || "—"}{o.users.length > 1 ? ` +${o.users.length - 1} team` : ""}
                     </div>
                   </td>
                   <td className="p-3 text-gray-600">{statusLabel(o)}</td>
+                  <td className="p-3 text-gray-600">
+                    {b?.plan ? `${b.plan}${o.isFoundingMember ? " · founding" : ""}` : "—"}
+                  </td>
+                  <td className="p-3 text-right">
+                    {b?.monthlyPence == null ? <span className="text-gray-400">—</span>
+                      : b.paying ? <span className="font-semibold text-emerald-700">{gbp(b.monthlyPence)}</span>
+                      : <span className="text-gray-400" title="Not currently billing (trial, paused or cancelled)">{gbp(b.monthlyPence)}</span>}
+                  </td>
+                  <td className="p-3 text-right text-gray-700">
+                    {b == null ? <span className="text-gray-400">—</span> : b.paidPence == null ? "?" : gbp(b.paidPence)}
+                  </td>
+                  <td className="p-3 text-right text-gray-700">
+                    {!o.stripeAccountId ? <span className="text-gray-400">—</span>
+                      : feesByAccount == null ? "?" : gbp(feesByAccount.get(o.stripeAccountId) || 0)}
+                  </td>
                   <td className="p-3 text-gray-500">{fmtDate(o.createdAt)}</td>
+                  <td className="p-3 text-gray-600">
+                    {o.referredByCode ? byReferralCode.get(o.referredByCode) || `code ${o.referredByCode}` : "—"}
+                  </td>
                   <td className="p-3 text-gray-500">{rel(lastLogin)}</td>
                   <td className="p-3 text-gray-500">{rel(lastActive)}</td>
                   <td className="p-3 text-right text-gray-700">{o._count.surveys}</td>
@@ -110,7 +191,7 @@ export default async function AdminUsagePage() {
       </div>
 
       <p className="text-xs text-gray-400">
-        &quot;Last active&quot; updates as a user moves around the app (to the nearest few minutes). New columns start filling in from now — accounts that haven&apos;t signed in since this was added show &quot;never&quot; until their next visit.
+        &quot;Last active&quot; updates as a user moves around the app (to the nearest few minutes). "Per month" is the plan's list price (annual ÷ 12) — green when it's actually billing, grey during a trial or after cancelling; promo-code discounts show in "Paid to date", which is what Stripe has collected. Bitcoin payments aren't included. "Deposit fees" is SurvAIPro's 1% on client deposits taken through the firm's connected Stripe account, net of refunds. New columns start filling in from now — accounts that haven&apos;t signed in since this was added show &quot;never&quot; until their next visit.
       </p>
     </div>
   )
