@@ -3,6 +3,7 @@ import Link from "next/link"
 import { getCurrentUser } from "@/lib/session"
 import { isPlatformAdmin } from "@/lib/admin"
 import { db } from "@/lib/db"
+import { AdminAccountDetail } from "@/components/admin-account-detail"
 import { stripeEnabled, retrieveSubscription, totalPaidPence, depositFeesByAccount } from "@/lib/stripe"
 
 export const dynamic = "force-dynamic"
@@ -149,7 +150,10 @@ export default async function AdminUsagePage() {
               return (
                 <tr key={o.id} className="border-b border-gray-100">
                   <td className="p-3">
-                    <div className="font-medium text-gray-900">{o.name}{o.isFoundingMember ? " ⭐" : ""}</div>
+                    <div>
+                      <AdminAccountDetail orgId={o.id} name={`${o.name}${o.isFoundingMember ? " ⭐" : ""}`}
+                        ownerEmail={owner?.email || null} />
+                    </div>
                     <div className="text-xs text-gray-500">
                       {owner?.name || owner?.email || "—"}{o.users.length > 1 ? ` +${o.users.length - 1} team` : ""}
                     </div>
