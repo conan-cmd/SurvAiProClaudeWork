@@ -46,7 +46,7 @@ export async function PATCH(
       "clientName", "clientCompany", "clientEmail", "clientPhone", "clientAddress",
       "title", "serviceType", "isResidential", "clientPriorities", "accessNotes",
       "measurements", "exclusions", "writtenDescription", "status", "folderId",
-      "chemicalsRequired", "waterSupply", "surveyedInPerson",
+      "chemicalsRequired", "waterSupply", "customAnswers", "surveyedInPerson",
       "scheduledAt", "assignedToId",
     ]
     const data: Record<string, unknown> = {}

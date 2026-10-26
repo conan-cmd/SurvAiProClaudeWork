@@ -134,6 +134,11 @@ model Organization {
   // office + ops). Empty/null = fall back to the org Contact email.
   reportAlertEmails     String?
 
+  // The firm's trade (seeds the survey-question preset) and their customised
+  // question set (JSON SurveyFieldDef[], lib/survey-fields.ts; null = preset).
+  trade                 String?
+  surveyFields          String?
+
   // Comma-separated emails alerted when a client pays a deposit. Empty/null =
   // fall back to the proposal creator, then the org Contact email.
   depositAlertEmails    String?
@@ -305,6 +310,9 @@ model SiteSurvey {
   // Exterior-cleaning prompts for the surveyor
   chemicalsRequired     String?  // e.g. sodium hypochlorite, biocide, softwash mix
   waterSupply           String?  // on-site tap? bring bowser? access/pressure notes
+  // Answers to the org's trade-specific survey questions (JSON {fieldId: text},
+  // lib/survey-fields.ts). Fields with a legacyKey write the columns above.
+  customAnswers         String?
 
   // Content
   writtenDescription    String?

@@ -12,6 +12,7 @@ import { SiteLocation } from "@/components/site-location"
 import { AreaMeasure } from "@/components/area-measure"
 import { SiteMap } from "@/components/site-map"
 import { SiteAddress, LocationUpdate } from "@/components/site-address"
+import { parseSurveyFields, parseCustomAnswers, type SurveyFieldDef } from "@/lib/survey-fields"
 
 type Survey = {
   id: string
@@ -30,6 +31,7 @@ type Survey = {
   exclusions: string | null
   chemicalsRequired: string | null
   waterSupply: string | null
+  customAnswers: string | null
   writtenDescription: string | null
   latitude: number | null
   longitude: number | null
@@ -199,6 +201,19 @@ export default function SurveyDetailPage() {
   }
 
   // Appends dictated speech to a field's current value
+  // The org's trade-specific questions (lib/survey-fields.ts presets, editable
+  // in Settings). Loaded once; answers autosave into customAnswers JSON.
+  const [fieldDefs, setFieldDefs] = useState<SurveyFieldDef[] | null>(null)
+  useEffect(() => {
+    fetch("/api/organization")
+      .then((r) => r.json())
+      .then((org) => setFieldDefs(parseSurveyFields(org || {})))
+      .catch(() => setFieldDefs(parseSurveyFields({})))
+  }, [])
+  const answers = parseCustomAnswers(survey?.customAnswers)
+  const updateAnswer = (id: string, value: string) =>
+    updateField("customAnswers", JSON.stringify({ ...answers, [id]: value }))
+
   const dictateInto = (field: keyof Survey) => (text: string) =>
     updateField(field, (((survey[field] as string) || "") + " " + text).trim())
 
@@ -305,18 +320,18 @@ export default function SurveyDetailPage() {
             <textarea spellCheck rows={2} className={inputCls} value={survey.exclusions || ""}
               onChange={(e) => updateField("exclusions", e.target.value)} />
           </div>
-          <div>
-            <FieldLabel label="Chemicals required" onText={dictateInto("chemicalsRequired")} />
-            <textarea spellCheck rows={2} className={inputCls} value={survey.chemicalsRequired || ""}
-              placeholder="e.g. sodium hypochlorite 5%, biocide, softwash mix"
-              onChange={(e) => updateField("chemicalsRequired", e.target.value)} />
-          </div>
-          <div>
-            <FieldLabel label="Water supply" onText={dictateInto("waterSupply")} />
-            <textarea spellCheck rows={2} className={inputCls} value={survey.waterSupply || ""}
-              placeholder="e.g. outside tap on-site / bring bowser / low pressure"
-              onChange={(e) => updateField("waterSupply", e.target.value)} />
-          </div>
+          {(fieldDefs || []).map((f) => {
+            const value = (f.legacyKey ? survey[f.legacyKey] : answers[f.id]) || ""
+            const set = (v: string) => (f.legacyKey ? updateField(f.legacyKey, v) : updateAnswer(f.id, v))
+            return (
+              <div key={f.id}>
+                <FieldLabel label={f.label} onText={(text) => set((value + " " + text).trim())} />
+                <textarea spellCheck rows={2} className={inputCls} value={value}
+                  placeholder={f.hint || ""}
+                  onChange={(e) => set(e.target.value)} />
+              </div>
+            )
+          })}
         </div>
       </section>
 

@@ -10,6 +10,7 @@ import { SignatureDraw } from "@/components/signature-draw"
 import { PipedriveConnect } from "@/components/pipedrive-connect"
 import { XeroConnect } from "@/components/xero-connect"
 import { BigChangeConnect } from "@/components/bigchange-connect"
+import { SurveyFieldsEditor } from "@/components/survey-fields-editor"
 import { HIDEABLE_SECTIONS, visibleSectionKeys } from "@/lib/nav-sections"
 import { parseNudgeTemplates, type NudgeTemplate } from "@/lib/nudge"
 import { DropZone } from "@/components/drop-zone"
@@ -1003,6 +1004,13 @@ export default function SettingsPage() {
         <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
           <h2 className="font-semibold text-brand-navy">BigChange job bookings</h2>
           <BigChangeConnect />
+        </section>
+      )}
+
+      {(me?.role === "OWNER" || me?.role === "ADMIN") && (
+        <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+          <h2 className="font-semibold text-brand-navy">Trade &amp; survey questions</h2>
+          <SurveyFieldsEditor />
         </section>
       )}
 
