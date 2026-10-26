@@ -265,6 +265,62 @@ async function suggestColorsFromLogo(
 }
 
 
+
+// Candidate person-photos from the page (alt/class/src hints), vision-checked
+// so we only ever suggest a genuine single-person headshot.
+function extractHeadshotCandidates(html: string, base: URL): string[] {
+  const out: string[] = []
+  const imgRe = /<img[^>]+>/gi
+  let m: RegExpExecArray | null
+  while ((m = imgRe.exec(html)) !== null && out.length < 6) {
+    const tag = m[0]
+    if (!/headshot|team|founder|owner|director|staff|about|profile|portrait/i.test(tag)) continue
+    if (/logo|icon|favicon/i.test(tag)) continue
+    for (const attr of ["data-src", "data-lazy-src", "src"]) {
+      const mm = tag.match(new RegExp(`${attr}=["']([^"']+)["']`, "i"))
+      if (mm && !isPlaceholder(mm[1])) {
+        try {
+          out.push(new URL(mm[1], base).toString())
+        } catch {
+          /* skip */
+        }
+        break
+      }
+    }
+  }
+  return Array.from(new Set(out)).slice(0, 3)
+}
+
+async function pickHeadshot(candidates: string[]): Promise<string | null> {
+  if (!candidates.length) return null
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text:
+                "These images are from a company website. Which ONE is a clear photo of a single person (an owner/team headshot or portrait)? " +
+                'Respond ONLY with JSON {"index": number|null} — zero-based, null if none shows a single person clearly.',
+            },
+            ...candidates.map((u) => ({ type: "image_url" as const, image_url: { url: u } })),
+          ],
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0,
+      max_tokens: 30,
+    })
+    const j = JSON.parse(response.choices[0].message.content || "{}") as { index?: number | null }
+    return typeof j.index === "number" && candidates[j.index] ? candidates[j.index] : null
+  } catch {
+    return null
+  }
+}
+
 // Validate the AI's trade guess and, for an org that hasn't picked a trade or
 // customised its questions yet, apply it so their survey preset is right from
 // the first import. A suggestion never overrides an existing choice.
@@ -350,6 +406,10 @@ export async function POST(request: NextRequest) {
   const rawLogoUrl = extractLogo(html, url)
   // Store on our domain so it renders reliably; fall back to the source URL.
   const logoUrl = rawLogoUrl ? (await storeLogo(rawLogoUrl)) || rawLogoUrl : null
+  // Owner/team headshot suggestion — saves them re-uploading a photo they
+  // already have on their site. Best-effort.
+  const headshotCandidate = await pickHeadshot(extractHeadshotCandidates(html, url))
+  const suggestedHeadshotUrl = headshotCandidate ? await storeLogo(headshotCandidate) : null
   // Brand colours from the logo image; an explicitly declared theme-color
   // still wins for the primary.
   const logoColors = logoUrl ? await suggestColorsFromLogo(logoUrl) : { primary: null, secondary: null }
@@ -393,6 +453,7 @@ Respond with JSON: {"companyName": string|null, "services": string[], "areasCove
     // (except the trade preset, applied only when none was chosen yet).
     companyName: aiData.companyName || siteName || title,
     suggestedTrade: await applySuggestedTrade(user.organizationId, aiData.trade),
+    suggestedHeadshotUrl,
     website: url.toString(),
     logoUrl,
     brandColor:

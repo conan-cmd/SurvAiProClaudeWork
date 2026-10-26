@@ -59,10 +59,52 @@ export async function createAccountLink(accountId: string, refreshUrl: string, r
 }
 
 // Current status of a connected account (charges_enabled once onboarding is done).
+// `type` is "standard" for a firm's own pre-existing account linked via OAuth.
 export async function retrieveAccount(accountId: string): Promise<{
-  id: string; charges_enabled: boolean; details_submitted: boolean; payouts_enabled: boolean
+  id: string; type?: string; charges_enabled: boolean; details_submitted: boolean; payouts_enabled: boolean
 }> {
   return stripeFetch(`/accounts/${encodeURIComponent(accountId)}`)
+}
+
+// --- Stripe Connect OAuth (Standard) — link a Stripe account the firm already has ---
+// Needs the platform's Connect client id (ca_…, Dashboard → Connect → Settings →
+// OAuth) and the callback URL registered there as a redirect URI.
+
+export function stripeOAuthAvailable(): boolean {
+  return stripeEnabled() && Boolean(process.env.STRIPE_CONNECT_CLIENT_ID)
+}
+
+export function stripeOAuthUrl(state: string, redirectUri: string, email?: string | null): string {
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: process.env.STRIPE_CONNECT_CLIENT_ID || "",
+    scope: "read_write",
+    redirect_uri: redirectUri,
+    state,
+    // They already have an account — open on sign-in, not sign-up.
+    stripe_landing: "login",
+  })
+  if (email) params.set("stripe_user[email]", email)
+  return `https://connect.stripe.com/oauth/authorize?${params.toString()}`
+}
+
+// Exchanges the OAuth code for the linked account's id (acct_…). Charges are
+// then made on it with the Stripe-Account header, same as Express accounts.
+export async function exchangeStripeOAuthCode(code: string): Promise<{ stripe_user_id: string }> {
+  const res = await fetch("https://connect.stripe.com/oauth/token", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: form({ grant_type: "authorization_code", code }),
+    signal: AbortSignal.timeout(15000),
+  })
+  const data = await res.json()
+  if (!res.ok || !data.stripe_user_id) {
+    throw new Error(data.error_description || data.error || `Stripe OAuth ${res.status}`)
+  }
+  return data
 }
 
 // SurvAIPro's platform fee on deposits processed through a firm's connected
@@ -163,6 +205,28 @@ export async function createSubscriptionCheckout(params: {
 
 export async function retrieveSubscription(subscriptionId: string) {
   return stripeFetch(`/subscriptions/${encodeURIComponent(subscriptionId)}`)
+}
+
+// Platform fees (pence, net of refunds) collected on client deposits, grouped by
+// the connected account they came from. Admin usage view only; capped at 1,000.
+export async function depositFeesByAccount(): Promise<Map<string, number>> {
+  const byAccount = new Map<string, number>()
+  let startingAfter: string | undefined
+  for (let page = 0; page < 10; page++) {
+    const res = await stripeFetch(`/application_fees?limit=100${startingAfter ? `&starting_after=${startingAfter}` : ""}`)
+    const fees = res.data as { id: string; account: string; amount: number; amount_refunded: number }[]
+    for (const f of fees) byAccount.set(f.account, (byAccount.get(f.account) || 0) + f.amount - (f.amount_refunded || 0))
+    if (!res.has_more || !fees.length) break
+    startingAfter = fees[fees.length - 1].id
+  }
+  return byAccount
+}
+
+// Total (pence) a customer has actually paid the platform — after discounts and
+// promo codes. Admin usage view only; the last 100 paid invoices is plenty.
+export async function totalPaidPence(customerId: string): Promise<number> {
+  const res = await stripeFetch(`/invoices?customer=${encodeURIComponent(customerId)}&status=paid&limit=100`)
+  return (res.data as { amount_paid: number }[]).reduce((s, inv) => s + (inv.amount_paid || 0), 0)
 }
 
 // Cancels at the end of the paid period (they keep access until it runs out).
