@@ -61,6 +61,32 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // Seed a sample survey so the first session has something to open and a
+    // one-tap route to generating a first proposal. Best-effort.
+    try {
+      const owner = await db.user.findUnique({ where: { email }, select: { id: true } })
+      await db.siteSurvey.create({
+        data: {
+          organizationId: organization.id,
+          createdById: owner?.id ?? null,
+          title: "Sample job — try me",
+          clientName: "Sam Sample",
+          clientAddress: "10 Example Street, Your Town",
+          serviceType: "Example job",
+          isResidential: true,
+          clientPriorities: "Wants it done before the end of the month; tidy finish matters.",
+          accessNotes: "Side gate access — park on the drive.",
+          measurements: "Approx. 90 m\u00b2 of work area.",
+          exclusions: "Rear outbuilding not included.",
+          writtenDescription:
+            "This is a sample survey so you can see how SurvAIPro works. Open it, look around, " +
+            "then tap Open proposal to generate your first AI proposal from it. Delete it whenever you like.",
+        },
+      })
+    } catch (err) {
+      console.error("Sample survey seed failed:", err)
+    }
+
     return NextResponse.json({ success: true, organizationId: organization.id })
   } catch (error) {
     console.error("Registration error:", error)
