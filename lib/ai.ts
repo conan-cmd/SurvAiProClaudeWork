@@ -47,6 +47,8 @@ export type GenerationInput = {
     writtenDescription?: string | null
     clientPriorities?: string | null
     accessNotes?: string | null
+    // Trade-specific survey answers (label: value), per the org's question set.
+    siteDetails?: { label: string; value: string }[]
     measurements?: string | null
     exclusions?: string | null
   }
@@ -131,6 +133,7 @@ JOB:
 - Access notes: ${input.survey.accessNotes || "none provided"}
 - Measurements: ${input.survey.measurements || "none provided"}
 - Exclusions stated by surveyor: ${input.survey.exclusions || "none provided"}
+${(input.survey.siteDetails || []).map((d) => `- ${d.label}: ${d.value}`).join("\n")}
 
 APPROVED VOICE-NOTE TRANSCRIPTS (surveyor's own words from site):
 ${input.approvedTranscripts.length ? input.approvedTranscripts.map((t, i) => `[${i + 1}] ${t}`).join("\n") : "none"}

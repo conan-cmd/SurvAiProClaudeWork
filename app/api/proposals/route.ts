@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
+import { parseSurveyFields, answeredPairs } from "@/lib/survey-fields"
 import { getTemplate } from "@/lib/templates"
 import { generateProposalSections, friendlyAIError } from "@/lib/ai"
 import { fetchChannelVideos, rankRelevantVideos } from "@/lib/youtube"
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
         accessNotes: survey.accessNotes,
         measurements: survey.measurements,
         exclusions: survey.exclusions,
+        siteDetails: answeredPairs(parseSurveyFields(org), survey),
       },
       approvedTranscripts: survey.transcripts.map((t) => t.text),
       photoCaptions: survey.photos.filter((p) => p.caption).map((p) => p.caption as string),

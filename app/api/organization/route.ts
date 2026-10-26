@@ -43,6 +43,10 @@ const updateOrgSchema = z.object({
   reportAlertEmails: z.string().max(500).optional(),
   // Comma-separated emails alerted when a client pays a deposit.
   depositAlertEmails: z.string().max(500).optional(),
+  // The firm's trade + customised survey questions (JSON SurveyFieldDef[],
+  // lib/survey-fields.ts). "" clears back to the trade preset.
+  trade: z.string().max(40).optional(),
+  surveyFields: z.string().max(20000).optional(),
   // JSON PipelineStage[] (lib/pipeline.ts). "" clears back to the app defaults.
   pipelineStages: z.string().max(4000).optional(),
   youtubeChannelUrl: z.string().optional(),

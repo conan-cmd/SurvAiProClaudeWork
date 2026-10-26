@@ -19,7 +19,7 @@ export default function TermsPage() {
           <section>
             <p>
               These Terms govern your use of SurvAIPro® (the &quot;Service&quot;), provided by
-              <strong> [LBC Clean Ltd]</strong> (&quot;we&quot;, &quot;us&quot;). By creating an account or
+              <strong> SURVAIPRO LTD</strong> (&quot;we&quot;, &quot;us&quot;). By creating an account or
               using the Service you agree to these Terms.
             </p>
           </section>

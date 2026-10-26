@@ -19,7 +19,7 @@ export default function PrivacyPolicyPage() {
         <div className="prose prose-sm max-w-none space-y-6 leading-relaxed">
           <section>
             <p>
-              This Privacy Policy explains how <strong>[LBC Clean Ltd]</strong> (&quot;SurvAIPro&quot;, &quot;we&quot;,
+              This Privacy Policy explains how <strong>SURVAIPRO LTD</strong> (&quot;SurvAIPro&quot;, &quot;we&quot;,
               &quot;us&quot;) collects, uses and protects personal data when you use the SurvAIPro®
               application and website (the &quot;Service&quot;). We are the data controller for the
               personal data described here. Contact: <strong>[privacy@lbcclean.co.uk]</strong>.
