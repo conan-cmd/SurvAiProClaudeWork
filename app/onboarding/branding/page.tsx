@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { ArrowRight, ArrowLeft, Sparkles, Loader2, Globe, Clock } from "lucide-react"
+import { ArrowRight, ArrowLeft, Sparkles, Loader2, Globe, Clock, Search, Check } from "lucide-react"
+import { StripeConnect } from "@/components/stripe-connect"
 
 const TONES = [
   { value: "FRIENDLY", label: "Friendly", desc: "Warm and approachable" },
@@ -12,7 +13,7 @@ const TONES = [
   { value: "TECHNICAL", label: "Technical", desc: "Detailed and precise" },
 ]
 
-const STEP_TITLES = ["Company details", "Brand & positioning", "Review sections"]
+const STEP_TITLES = ["Company details", "Brand & positioning", "Review sections", "Get paid & sign-off"]
 
 type Sections = {
   aboutUsSection: string
@@ -28,6 +29,18 @@ export default function OnboardingPage() {
   const [generating, setGenerating] = useState(false)
   const [importing, setImporting] = useState(false)
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  // Step 4: deposits, Google reviews and personal sign-off.
+  const [suggestedHeadshot, setSuggestedHeadshot] = useState<string | null>(null)
+  const [headshotUrl, setHeadshotUrl] = useState<string | null>(null)
+  const [signOffName, setSignOffName] = useState("")
+  const [depositRes, setDepositRes] = useState("50")   // % | "0" | "fixed"
+  const [depositCom, setDepositCom] = useState("25")
+  const [depositResFixed, setDepositResFixed] = useState("")
+  const [depositComFixed, setDepositComFixed] = useState("")
+  const [gQuery, setGQuery] = useState("")
+  const [gHits, setGHits] = useState<{ placeId: string; name: string; address: string }[] | null>(null)
+  const [gBusy, setGBusy] = useState(false)
+  const [gConnected, setGConnected] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     website: "",
@@ -87,6 +100,7 @@ export default function OnboardingPage() {
         proposalTone: data.suggestedTone || prev.proposalTone,
       }))
       if (data.logoUrl) setLogoUrl(data.logoUrl)
+      if (data.suggestedHeadshotUrl) setSuggestedHeadshot(data.suggestedHeadshotUrl)
 
       toast.success("Details imported — please check everything before continuing")
     } catch (err) {
@@ -157,8 +171,23 @@ export default function OnboardingPage() {
       generateSections()
       return
     }
+    if (step === 3) {
+      // Persist the reviewed sections before the final step.
+      await fetch("/api/organization", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sections),
+      }).catch(() => {})
+    }
     setStep(step + 1)
   }
+
+  const depositRule = (choice: string, fixed: string) =>
+    choice === "0"
+      ? { type: "NONE", value: 0 }
+      : choice === "fixed"
+        ? { type: "FIXED", value: parseFloat(fixed) || 0 }
+        : { type: "PERCENT", value: parseInt(choice) || 0 }
 
   const finish = async () => {
     setSaving(true)
@@ -166,9 +195,27 @@ export default function OnboardingPage() {
       const res = await fetch("/api/organization", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...sections, onboardingComplete: true }),
+        body: JSON.stringify({
+          ...sections,
+          depositRules: JSON.stringify({
+            residential: depositRule(depositRes, depositResFixed),
+            commercial: depositRule(depositCom, depositComFixed),
+          }),
+          onboardingComplete: true,
+        }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
+      // Personal sign-off (best-effort — editable in Settings any time).
+      if (signOffName.trim() || headshotUrl) {
+        await fetch("/api/me", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...(signOffName.trim() ? { signOffName: signOffName.trim() } : {}),
+            ...(headshotUrl ? { headshotUrl } : {}),
+          }),
+        }).catch(() => {})
+      }
       toast.success("Setup complete!")
       router.push("/dashboard")
     } catch (e) {
@@ -193,14 +240,14 @@ export default function OnboardingPage() {
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold text-brand-navy">
-                Step {step} of 3 · <span className="font-medium text-gray-500">{STEP_TITLES[step - 1]}</span>
+                Step {step} of 4 · <span className="font-medium text-gray-500">{STEP_TITLES[step - 1]}</span>
               </span>
               <button onClick={skip} className="text-sm text-gray-400 hover:text-gray-600 font-medium">
                 Skip for now
               </button>
             </div>
             <div className="flex items-center gap-2">
-              {[1, 2, 3].map((s) => (
+              {[1, 2, 3, 4].map((s) => (
                 <div key={s}
                   className={`h-2 flex-1 rounded-full transition ${s <= step ? "bg-brand-blue" : "bg-gray-200"}`} />
               ))}
@@ -417,6 +464,149 @@ export default function OnboardingPage() {
           </div>
         )}
 
+        {step === 4 && (
+          <div className="space-y-5 animate-fadeIn">
+            <div className="bg-white rounded-xl shadow-sm p-6 md:p-8">
+              <h1 className="text-2xl font-bold text-brand-navy mb-1">Get paid &amp; sign off</h1>
+              <p className="text-gray-600 mb-5">
+                Three quick wins — all optional, all changeable later in Settings.
+              </p>
+
+              {/* Deposits */}
+              <div className="space-y-3 border rounded-xl p-4 mb-4">
+                <p className="font-semibold text-brand-navy text-sm">Deposits</p>
+                <p className="text-xs text-gray-500">
+                  When a client signs a proposal, SurvAIPro® can take a deposit by card there and then.
+                </p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {([["Residential jobs", depositRes, setDepositRes, depositResFixed, setDepositResFixed],
+                     ["Commercial jobs", depositCom, setDepositCom, depositComFixed, setDepositComFixed]] as const
+                  ).map(([label, value, setValue, fixed, setFixed]) => (
+                    <div key={label}>
+                      <label className={labelCls}>{label}</label>
+                      <select className={inputCls} value={value} onChange={(e) => setValue(e.target.value)}>
+                        <option value="0">No deposit</option>
+                        <option value="10">10% deposit</option>
+                        <option value="25">25% deposit</option>
+                        <option value="50">50% deposit</option>
+                        <option value="fixed">Fixed amount (£)</option>
+                      </select>
+                      {value === "fixed" && (
+                        <input type="number" min="0" className={`${inputCls} mt-2`} placeholder="e.g. 100"
+                          value={fixed} onChange={(e) => setFixed(e.target.value)} />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <StripeConnect />
+
+              {/* Google reviews */}
+              <div className="space-y-3 border rounded-xl p-4 my-4">
+                <p className="font-semibold text-brand-navy text-sm">Google reviews</p>
+                {gConnected ? (
+                  <p className="text-sm text-emerald-700 flex items-center gap-1.5">
+                    <Check className="w-4 h-4" /> Connected to {gConnected} — your best reviews will be suggested on proposals.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-xs text-gray-500">
+                      Find your Google Business profile and we&apos;ll pull in your most relevant reviews
+                      to show on proposals.
+                    </p>
+                    <div className="flex gap-2">
+                      <input className={inputCls} placeholder="Your business name & town"
+                        value={gQuery} onChange={(e) => setGQuery(e.target.value)} />
+                      <button type="button" disabled={gBusy || !gQuery.trim()}
+                        onClick={async () => {
+                          setGBusy(true)
+                          try {
+                            const d = await fetch(`/api/google-reviews?q=${encodeURIComponent(gQuery)}`).then((r) => r.json())
+                            setGHits(Array.isArray(d.results) ? d.results : [])
+                          } catch { toast.error("Search failed") } finally { setGBusy(false) }
+                        }}
+                        className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 border rounded-lg text-sm font-medium hover:border-brand-blue hover:text-brand-blue disabled:opacity-50">
+                        {gBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />} Find
+                      </button>
+                    </div>
+                    {gHits && (gHits.length ? (
+                      <div className="space-y-1.5">
+                        {gHits.map((h) => (
+                          <button key={h.placeId} type="button" disabled={gBusy}
+                            onClick={async () => {
+                              setGBusy(true)
+                              try {
+                                const res = await fetch("/api/google-reviews", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ placeId: h.placeId }),
+                                })
+                                const d = await res.json()
+                                if (!res.ok) throw new Error(d.error)
+                                setGConnected(d.name || h.name)
+                                toast.success(`Connected to ${d.name || h.name}`)
+                              } catch (e) {
+                                toast.error(e instanceof Error ? e.message : "Couldn't connect")
+                              } finally { setGBusy(false) }
+                            }}
+                            className="w-full text-left border rounded-lg p-2.5 text-sm hover:border-brand-blue">
+                            <span className="font-medium text-gray-800">{h.name}</span>
+                            <span className="block text-xs text-gray-500">{h.address}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : <p className="text-xs text-gray-400">No matches — try adding your town.</p>)}
+                  </>
+                )}
+              </div>
+
+              {/* Personal sign-off */}
+              <div className="space-y-3 border rounded-xl p-4">
+                <p className="font-semibold text-brand-navy text-sm">Your sign-off</p>
+                <p className="text-xs text-gray-500">
+                  Shown at the bottom of proposals you send — a name and a friendly face win trust.
+                </p>
+                <div>
+                  <label className={labelCls}>Your name (as signed)</label>
+                  <input className={inputCls} placeholder="e.g. Sam Taylor, Director"
+                    value={signOffName} onChange={(e) => setSignOffName(e.target.value)} />
+                </div>
+                <div className="flex items-center gap-4">
+                  {(headshotUrl || suggestedHeadshot) && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={headshotUrl || suggestedHeadshot || ""} alt="Headshot"
+                      className={`w-16 h-16 rounded-full object-cover border-2 ${headshotUrl ? "border-emerald-400" : "border-gray-200"}`} />
+                  )}
+                  <div className="space-y-1.5">
+                    {suggestedHeadshot && !headshotUrl && (
+                      <button type="button" onClick={() => { setHeadshotUrl(suggestedHeadshot); toast.success("Headshot set — saved when you finish") }}
+                        className="block text-sm font-medium text-brand-blue hover:underline">
+                        Use this photo from your website
+                      </button>
+                    )}
+                    {headshotUrl && <p className="text-xs text-emerald-700">Headshot ready — saved when you finish.</p>}
+                    <label className="block text-sm font-medium text-gray-500 hover:text-brand-blue cursor-pointer">
+                      {headshotUrl || suggestedHeadshot ? "Upload a different photo" : "Upload a headshot"}
+                      <input type="file" accept="image/*" className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          const fd = new FormData()
+                          fd.append("file", file)
+                          fd.append("kind", "headshot")
+                          const res = await fetch("/api/organization/logo", { method: "POST", body: fd })
+                          if (res.ok) { setHeadshotUrl((await res.json()).url); toast.success("Headshot uploaded") }
+                          else toast.error("Upload failed")
+                        }} />
+                    </label>
+                    <p className="text-xs text-gray-400">You can draw your signature in Settings later.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Nav buttons */}
         {step >= 1 && (
         <div className="flex justify-between mt-6">
@@ -429,8 +619,8 @@ export default function OnboardingPage() {
             <div />
           )}
 
-          {step < 3 ? (
-            <button onClick={handleNext} disabled={saving}
+          {step < 4 ? (
+            <button onClick={handleNext} disabled={saving || (step === 3 && generating)}
               className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-blue text-white rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50">
               {saving ? "Saving…" : "Continue"} <ArrowRight className="w-4 h-4" />
             </button>
