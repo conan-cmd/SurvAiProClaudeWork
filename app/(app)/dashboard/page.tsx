@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/session"
 import { formatCurrency, formatDate, calculateProposalTotals, formatNetPlusVat } from "@/lib/utils"
 import { OnboardingNudge } from "@/components/onboarding-nudge"
 import { BigChangeAutoSync } from "@/components/bigchange-autosync"
+import { GettingStarted } from "@/components/getting-started"
 
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-600",
@@ -47,7 +48,7 @@ export default async function DashboardPage({
   // unconfigured — so established orgs are never nagged.
   const org = await db.organization.findUnique({
     where: { id: user.organizationId },
-    select: { onboardingComplete: true, logoUrl: true, mainServices: true },
+    select: { onboardingComplete: true, logoUrl: true, mainServices: true, stripeChargesEnabled: true },
   })
   const hasBasics = Boolean(org?.logoUrl) || Boolean(org?.mainServices && org.mainServices.replace(/[[\]\s]/g, "").length > 0)
   const showNudge = !!org && !org.onboardingComplete && !hasBasics
@@ -75,6 +76,17 @@ export default async function DashboardPage({
       },
     }),
   ])
+
+  // First-week checklist flags (own survey = anything beyond the seeded sample).
+  const ownSurveyCount = await db.siteSurvey.count({
+    where: { organizationId: user.organizationId, NOT: { title: { startsWith: "Sample job" } } },
+  })
+  const gettingStartedSteps = {
+    branding: hasBasics,
+    stripe: Boolean(org?.stripeChargesEnabled),
+    survey: ownSurveyCount > 0,
+    sent: proposals.some((p) => p.sentAt || !["DRAFT", "READY"].includes(p.status)),
+  }
 
   // Stats respect the selected time period and team-member filter
   const filterUser = searchParams.user
@@ -153,6 +165,7 @@ export default async function DashboardPage({
   return (
     <div className="space-y-6 overflow-x-hidden">
       {showNudge && <OnboardingNudge />}
+      {!showNudge && <GettingStarted steps={gettingStartedSteps} />}
       <BigChangeAutoSync />
 
       <div className="flex flex-wrap items-center justify-between gap-3">

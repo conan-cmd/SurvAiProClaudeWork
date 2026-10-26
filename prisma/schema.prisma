@@ -12,6 +12,9 @@ model User {
   email                 String          @unique
   name                  String?
   password              String? // hashed via NextAuth
+  // Password reset: sha256 of the emailed token + its expiry (1 hour).
+  resetTokenHash        String?   @unique
+  resetTokenExpiresAt   DateTime?
   emailVerified         DateTime?
   image                 String?
 
