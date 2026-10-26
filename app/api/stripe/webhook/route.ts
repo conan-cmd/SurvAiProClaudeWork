@@ -37,6 +37,13 @@ export async function POST(request: NextRequest) {
         const sub = await retrieveSubscription(subId)
         await applySubscription(sub)
         await forwardToGhl(obj.customer as string | undefined, "trial_started", null, request.nextUrl.origin)
+        // Tell the platform admins a trial just started (checkout completes
+        // exactly once, so no dedupe needed). Best-effort.
+        if ((sub as { status?: string }).status === "trialing") {
+          notifyTrialStarted(sub as TrialSub, request.nextUrl.origin).catch((err) =>
+            console.error("Trial alert failed:", err)
+          )
+        }
       } else if (obj.payment_status === "paid") {
         // One-off payment session = a client deposit. The proposal id rides in
         // the session metadata; older sessions are matched by stored session id.
@@ -95,5 +102,53 @@ async function forwardToGhl(customerId: string | undefined, ghlEvent: string, st
     plan: org.subscriptionPlan,
     status,
     billingUrl: `${publicBaseUrl(origin)}/settings`,
+  })
+}
+
+type TrialSub = {
+  customer?: string
+  trial_end?: number
+  metadata?: { organizationId?: string; plan?: string; founding?: string }
+}
+
+// "🎉 new trial" email to the platform admin list, with the essentials for a
+// personal welcome: who, which firm, what plan, and the admin drill-down link.
+async function notifyTrialStarted(sub: TrialSub, origin: string) {
+  const { emailEnabled, sendEmail } = await import("@/lib/email")
+  if (!emailEnabled()) return
+  const { adminEmails } = await import("@/lib/admin")
+
+  const orgId = sub.metadata?.organizationId
+  const org = await db.organization.findFirst({
+    where: orgId ? { id: orgId } : { stripeCustomerId: sub.customer },
+    select: {
+      name: true, website: true, trade: true, createdAt: true,
+      users: { where: { role: "OWNER" }, select: { name: true, email: true }, take: 1 },
+    },
+  })
+  if (!org) return
+  const owner = org.users[0]
+  const plan = sub.metadata?.plan === "annual" ? "Annual" : "Monthly"
+  const founding = sub.metadata?.founding === "true" ? " · founding price" : ""
+  const trialEnds = sub.trial_end
+    ? new Date(sub.trial_end * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+    : null
+  const usageUrl = `${publicBaseUrl(origin)}/admin/usage`
+
+  await sendEmail({
+    to: adminEmails(),
+    subject: `🎉 New SurvAIPro trial — ${org.name}`,
+    html: `
+      <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.7;color:#111827;max-width:540px">
+        <p><strong>${org.name}</strong> just started a free trial (${plan}${founding}${trialEnds ? `, converts ${trialEnds}` : ""}).</p>
+        <p style="margin:4px 0">
+          ${owner ? `${owner.name || "Owner"} — <a href="mailto:${owner.email}">${owner.email}</a><br/>` : ""}
+          ${org.website ? `<a href="${org.website}">${org.website}</a><br/>` : ""}
+          ${org.trade ? `Trade: ${org.trade}` : ""}
+        </p>
+        <p style="margin:16px 0"><a href="${usageUrl}" style="color:#2563EB;font-weight:600">Open the account in Admin &rarr;</a></p>
+        <p style="color:#6b7280;font-size:13px">A personal hello in their first hour converts trials — the admin page can send one in two clicks.</p>
+      </div>`,
+    text: `${org.name} just started a free trial (${plan}${founding}).${owner ? ` Owner: ${owner.name || ""} ${owner.email}.` : ""}\n\n${usageUrl}`,
   })
 }
