@@ -139,6 +139,20 @@ export default function SurveyDetailPage() {
     [surveyId]
   )
 
+  // The org's trade-specific questions (lib/survey-fields.ts presets, editable
+  // in Settings). Loaded once; answers autosave into customAnswers JSON.
+  const [fieldDefs, setFieldDefs] = useState<SurveyFieldDef[] | null>(null)
+  useEffect(() => {
+    fetch("/api/organization")
+      .then((r) => r.json())
+      .then((org) => setFieldDefs(parseSurveyFields(org || {})))
+      .catch(() => setFieldDefs(parseSurveyFields({})))
+  }, [])
+  const answers = parseCustomAnswers(survey?.customAnswers)
+  const updateAnswer = (id: string, value: string) =>
+    updateField("customAnswers", JSON.stringify({ ...answers, [id]: value }))
+
+
   const generateProposal = async () => {
     if (!survey || !template) return
     const unapproved = survey.voiceNotes.filter(
@@ -201,19 +215,6 @@ export default function SurveyDetailPage() {
   }
 
   // Appends dictated speech to a field's current value
-  // The org's trade-specific questions (lib/survey-fields.ts presets, editable
-  // in Settings). Loaded once; answers autosave into customAnswers JSON.
-  const [fieldDefs, setFieldDefs] = useState<SurveyFieldDef[] | null>(null)
-  useEffect(() => {
-    fetch("/api/organization")
-      .then((r) => r.json())
-      .then((org) => setFieldDefs(parseSurveyFields(org || {})))
-      .catch(() => setFieldDefs(parseSurveyFields({})))
-  }, [])
-  const answers = parseCustomAnswers(survey?.customAnswers)
-  const updateAnswer = (id: string, value: string) =>
-    updateField("customAnswers", JSON.stringify({ ...answers, [id]: value }))
-
   const dictateInto = (field: keyof Survey) => (text: string) =>
     updateField(field, (((survey[field] as string) || "") + " " + text).trim())
 
