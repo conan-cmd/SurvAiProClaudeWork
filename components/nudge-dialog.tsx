@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { toast } from "sonner"
-import { X, Loader2, BellRing, Video, Mic, Pencil, Trash2 } from "lucide-react"
+import { X, Loader2, BellRing, Video, Mic, Pencil, Trash2, CalendarClock } from "lucide-react"
 import { parseNudgeTemplates, parseNudgeHistory, type NudgeTemplate } from "@/lib/nudge"
+import { parseScheduledNudge } from "@/lib/scheduled-nudge-parse"
 import { MediaNoteRecorder } from "@/components/media-note-recorder"
 
 // Self-contained "Send a reminder" dialog — templates (editable/deletable in
@@ -16,6 +17,7 @@ export function NudgeDialog({
   clientEmail,
   clientName,
   nudgeHistory,
+  scheduledNudge,
   onClose,
   onSent,
 }: {
@@ -23,6 +25,7 @@ export function NudgeDialog({
   clientEmail: string | null
   clientName?: string | null
   nudgeHistory: string | null
+  scheduledNudge?: string | null
   onClose: () => void
   onSent?: () => void
 }) {
@@ -40,6 +43,10 @@ export function NudgeDialog({
   const [editName, setEditName] = useState("")
   const [editBody, setEditBody] = useState("")
   const [tplBusy, setTplBusy] = useState(false)
+  // Boomerang-style schedule: pick when the reminder goes out.
+  const [sendAt, setSendAt] = useState("")
+  const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [pending, setPending] = useState(() => parseScheduledNudge(scheduledNudge))
   const [media, setMedia] = useState<{
     blob: Blob; mime: string; kind: "video" | "audio"; url: string; poster: Blob | null
   } | null>(null)
@@ -124,6 +131,33 @@ export function NudgeDialog({
     }
   }
 
+
+  // datetime-local value (local time) for quick picks like "Monday 8am".
+  const localAt = (d: Date) => {
+    const pad = (n: number) => String(n).padStart(2, "0")
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+  const quickPick = (daysAheadToWeekday: "tomorrow" | "monday") => {
+    const d = new Date()
+    if (daysAheadToWeekday === "tomorrow") d.setDate(d.getDate() + 1)
+    else d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)) // next Monday
+    d.setHours(8, 0, 0, 0)
+    setScheduleOpen(true)
+    setSendAt(localAt(d))
+  }
+
+  const cancelScheduled = async () => {
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/nudge`, { method: "DELETE" })
+      if (!res.ok) throw new Error((await res.json()).error)
+      setPending(null)
+      toast.success("Scheduled reminder cancelled")
+      onSent?.()
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't cancel")
+    }
+  }
+
   const send = async () => {
     const usingCustom = templateId === "__custom__"
     if (usingCustom && !custom.trim()) {
@@ -184,8 +218,13 @@ export function NudgeDialog({
                 message: custom.trim(),
                 messageName: saveTemplate && templateName.trim() ? templateName.trim() : undefined,
                 ...mediaBody,
+                ...(scheduleOpen && sendAt ? { sendAt: new Date(sendAt).toISOString() } : {}),
               }
-            : { templateId, ...mediaBody }
+            : {
+                templateId,
+                ...mediaBody,
+                ...(scheduleOpen && sendAt ? { sendAt: new Date(sendAt).toISOString() } : {}),
+              }
         ),
       })
       const d = await res.json()
@@ -203,7 +242,11 @@ export function NudgeDialog({
         else toast.error("Reminder sent, but the template couldn't be saved")
       }
       clearMedia()
-      toast.success("Reminder sent")
+      toast.success(
+        d.scheduled
+          ? `Scheduled for ${new Date(d.at).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+          : "Reminder sent"
+      )
       onSent?.()
       onClose()
     } catch (e) {
@@ -247,6 +290,18 @@ export function NudgeDialog({
             </div>
           ) : (
             <p className="text-xs text-gray-400">No reminders sent yet for this proposal.</p>
+          )}
+          {pending && (
+            <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 flex flex-wrap items-center gap-2">
+              <CalendarClock className="w-4 h-4 text-violet-600 shrink-0" />
+              <p className="text-sm text-violet-800 flex-1 min-w-[180px]">
+                A reminder is scheduled for{" "}
+                <strong>{new Date(pending.at).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</strong>
+                {pending.byName ? ` (by ${pending.byName.split(" ")[0]})` : ""}. Sending or scheduling again replaces it.
+              </p>
+              <button type="button" onClick={cancelScheduled}
+                className="text-xs font-medium text-red-600 hover:underline">Cancel it</button>
+            </div>
           )}
           {!clientEmail && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
@@ -393,13 +448,38 @@ export function NudgeDialog({
               </div>
             )}
           </div>
+          {/* Boomerang-style send-later: Sunday planning, Monday-morning sending */}
+          <div className="rounded-lg border p-3 space-y-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+              <input type="checkbox" checked={scheduleOpen}
+                onChange={(e) => { setScheduleOpen(e.target.checked); if (!e.target.checked) setSendAt("") }}
+                className="rounded accent-violet-600" />
+              <CalendarClock className="w-4 h-4 text-violet-600" /> Schedule for later
+            </label>
+            {scheduleOpen && (
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-1.5 text-xs font-medium">
+                  <button type="button" onClick={() => quickPick("tomorrow")}
+                    className="px-2.5 py-1 rounded-full border bg-white text-gray-600 hover:border-violet-400">Tomorrow 8am</button>
+                  <button type="button" onClick={() => quickPick("monday")}
+                    className="px-2.5 py-1 rounded-full border bg-white text-gray-600 hover:border-violet-400">Monday 8am</button>
+                </div>
+                <input type="datetime-local" value={sendAt} min={localAt(new Date())}
+                  onChange={(e) => setSendAt(e.target.value)}
+                  className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-400" />
+                <p className="text-xs text-gray-400">
+                  Goes out automatically at that time (your local time) — no need to be online.
+                </p>
+              </div>
+            )}
+          </div>
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={onClose} disabled={sending}
               className="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
             <button onClick={send} disabled={sending || !templates}
               className="inline-flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
-              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <BellRing className="w-4 h-4" />}
-              Send reminder
+              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : scheduleOpen && sendAt ? <CalendarClock className="w-4 h-4" /> : <BellRing className="w-4 h-4" />}
+              {scheduleOpen && sendAt ? "Schedule reminder" : "Send reminder"}
             </button>
           </div>
         </div>

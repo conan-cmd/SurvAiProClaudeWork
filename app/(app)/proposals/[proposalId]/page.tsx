@@ -60,6 +60,7 @@ type ProposalData = {
   pipedriveDealId: string | null
   lastNudgeAt: string | null
   nudgeHistory: string | null
+  scheduledNudge: string | null
   callLog: string | null
   sections: Section[]
   pricingLineItems: EditableLineItem[]
@@ -965,6 +966,7 @@ export default function ProposalEditorPage() {
               clientEmail={proposal.clientEmail}
               clientName={proposal.clientName}
               nudgeHistory={proposal.nudgeHistory}
+              scheduledNudge={proposal.scheduledNudge}
               onClose={() => setNudgeOpen(false)}
               onSent={() => {
                 // Refresh nudge history / lastNudgeAt (and any email added in the dialog).

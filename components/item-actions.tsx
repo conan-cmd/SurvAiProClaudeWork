@@ -24,6 +24,7 @@ export function ItemActions({
   clientName,
   clientPhone,
   nudgeHistory,
+  scheduledNudge,
   callLog,
 }: {
   kind: "survey" | "proposal"
@@ -40,6 +41,7 @@ export function ItemActions({
   clientName?: string | null
   clientPhone?: string | null
   nudgeHistory?: string | null
+  scheduledNudge?: string | null
   callLog?: string | null
 }) {
   const router = useRouter()
@@ -385,6 +387,7 @@ export function ItemActions({
           clientEmail={clientEmail ?? null}
           clientName={clientName}
           nudgeHistory={nudgeHistory ?? null}
+          scheduledNudge={scheduledNudge}
           onClose={() => setNudgeOpen(false)}
           onSent={() => router.refresh()}
         />

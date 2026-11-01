@@ -477,6 +477,9 @@ model Proposal {
   // Phone follow-ups: JSON CallRecord[] (lib/calls.ts) — when, who, and an
   // AI-tidied summary of each call's dictated/typed note.
   callLog               String?
+  // Boomerang-style scheduled follow-up (JSON ScheduledNudge,
+  // lib/scheduled-nudges.ts) — sent by the cron/traffic dispatcher when due.
+  scheduledNudge        String?
   // Manual list position (drag to reorder). Null = untouched → newest-first.
   sortIndex             Int?
   // Pipeline board column (stage id from Organization.pipelineStages). Null =

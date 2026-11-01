@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Eye, EyeOff, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing, KanbanSquare, MapPin, Video, Mic, PhoneCall } from "lucide-react"
+import { Eye, EyeOff, ShieldAlert, Clock, AlertTriangle, ShieldCheck, BellRing, KanbanSquare, MapPin, Video, Mic, PhoneCall, CalendarClock } from "lucide-react"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
 import { isApprover } from "@/lib/permissions"
@@ -12,6 +12,7 @@ import { DateRangeFilter } from "@/components/date-range-filter"
 import { DraggableRow } from "@/components/draggable-row"
 import { parseNudgeHistory } from "@/lib/nudge"
 import { parseCallLog } from "@/lib/calls"
+import { parseScheduledNudge } from "@/lib/scheduled-nudge-parse"
 import { ProposalStatus } from "@prisma/client"
 
 function relTime(d: Date | string): string {
@@ -427,6 +428,17 @@ export default async function ProposalsPage({
                       </span>
                     )
                   })()}
+                  {(() => {
+                    const sched = parseScheduledNudge(p.scheduledNudge)
+                    if (!sched) return null
+                    return (
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-50 text-violet-700"
+                        title={`A follow-up is scheduled${sched.byName ? ` by ${sched.byName}` : ""} — open Nudge to change or cancel it`}>
+                        <CalendarClock className="w-3.5 h-3.5" />
+                        {new Date(sched.at).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    )
+                  })()}
                   {/* A signed / deposit-paid deal is a won deal — say so alongside the stage */}
                   {["SIGNED", "DEPOSIT_PAID"].includes(p.status) && (
                     <span className="whitespace-nowrap text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700"
@@ -458,7 +470,7 @@ export default async function ProposalsPage({
               <ItemActions kind="proposal" id={p.id} surveyId={p.surveyId} title={p.survey.title}
                 proposalStatus={p.status} siteVisited={p.survey.surveyedInPerson}
                 clientEmail={p.clientEmail} clientName={p.clientName} clientPhone={p.survey.clientPhone}
-                nudgeHistory={p.nudgeHistory} callLog={p.callLog} />
+                nudgeHistory={p.nudgeHistory} scheduledNudge={p.scheduledNudge} callLog={p.callLog} />
             </DraggableRow>
           ))}
         </div>

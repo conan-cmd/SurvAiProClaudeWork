@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation"
 export function BigChangeAutoSync() {
   const router = useRouter()
   useEffect(() => {
+    // Due scheduled follow-ups go out on any page load too, not just the cron.
+    fetch("/api/cron/nudges", { method: "POST" }).catch(() => {})
     fetch("/api/bigchange/sync?auto=1", { method: "POST" })
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {

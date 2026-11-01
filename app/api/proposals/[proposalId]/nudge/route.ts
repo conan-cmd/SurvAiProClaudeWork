@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { randomBytes } from "crypto"
 import { db } from "@/lib/db"
 import { getCurrentUser } from "@/lib/session"
-import { canSend, sendEmail } from "@/lib/email"
-import { resolveProposalIdentity } from "@/lib/proposal-identity"
-import { slugify } from "@/lib/utils"
+import { canSend } from "@/lib/email"
+import { performNudge } from "@/lib/nudge-send"
 import { publicBaseUrl } from "@/lib/public-url"
 import { z } from "zod"
-import { parseNudgeTemplates, parseNudgeHistory, type NudgeRecord } from "@/lib/nudge"
 
 const nudgeSchema = z.object({
   templateId: z.string().max(100).optional(),
@@ -20,11 +17,12 @@ const nudgeSchema = z.object({
   mediaType: z.enum(["video", "audio"]).optional(),
   // Still-frame thumbnail (play badge baked in) for the email body.
   mediaPosterUrl: z.string().url().max(1000).optional(),
+  // Boomerang-style schedule: ISO time to send instead of sending now.
+  sendAt: z.string().datetime().optional(),
 })
 
-// Sends the client a gentle follow-up on an unsigned proposal — e.g. after a
-// verbal go-ahead. Body text comes from Organization.nudgeMessage (Settings),
-// falling back to the app default.
+// Sends (or schedules) the client a gentle follow-up on an unsigned proposal.
+// The email itself lives in lib/nudge-send so the scheduler can fire it too.
 export async function POST(
   request: NextRequest,
   { params }: { params: { proposalId: string } }
@@ -41,18 +39,9 @@ export async function POST(
 
   const proposal = await db.proposal.findFirst({
     where: { id: params.proposalId, organizationId: user.organizationId },
-    include: {
-      organization: true,
-      survey: { select: { title: true } },
-      createdBy: {
-        select: { id: true, name: true, email: true, signOffName: true, headshotUrl: true, signatureImageUrl: true },
-      },
-    },
+    select: { id: true, depositPaidAt: true, status: true, clientEmail: true },
   })
   if (!proposal) return NextResponse.json({ error: "Not found" }, { status: 404 })
-  // Chase-able until the money lands: unsigned proposals need the signature,
-  // signed ones may still owe their deposit (e.g. the "Pay your deposit"
-  // template). Once the deposit is paid there's nothing left to nudge for.
   if (proposal.depositPaidAt || proposal.status === "DEPOSIT_PAID") {
     return NextResponse.json({ error: "This proposal's deposit is already paid — nothing to chase" }, { status: 409 })
   }
@@ -65,113 +54,30 @@ export async function POST(
 
   const parsed = nudgeSchema.safeParse(await request.json().catch(() => ({})))
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 })
+  const { sendAt, ...opts } = parsed.data
 
-  const identity = await resolveProposalIdentity(proposal)
-  const org = proposal.organization
-
-  // Which message: an inline custom one wins; otherwise the requested template,
-  // else the first configured/default.
-  const templates = parseNudgeTemplates(org)
-  const template = parsed.data.message
-    ? { id: "custom", name: parsed.data.messageName || "Custom message", body: parsed.data.message }
-    : templates.find((t) => t.id === parsed.data.templateId) || templates[0]
-
-  // Fresh secure link, same as a normal send.
-  const token = randomBytes(16).toString("base64url")
-  // Links no longer expire — far-future date satisfies the non-null column.
-  const expiresAt = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000)
-  await db.shareLink.create({ data: { proposalId: proposal.id, token, expiresAt } })
-  const origin = publicBaseUrl(request.nextUrl.origin)
-  const url = `${origin}/p/${slugify(proposal.survey.title || "proposal")}/${token}`
-
-  const message = template.body.trim()
-  const safeMsg = message.replace(/</g, "&lt;").replace(/\n/g, "<br/>")
-  // A recorded video/voice note plays in a banner on the proposal page, so the
-  // email leads with it and the link does double duty.
-  const media = parsed.data.mediaUrl && parsed.data.mediaType
-    ? { url: parsed.data.mediaUrl, type: parsed.data.mediaType, poster: parsed.data.mediaPosterUrl || null }
-    : null
-  const senderFirst = (identity.name || user.name || org.name).split(/\s+/)[0]
-  const mediaLine = media
-    ? media.type === "video"
-      ? `${senderFirst} has recorded you a short video message — it plays at the top of your proposal.`
-      : `${senderFirst} has recorded you a voice message — it plays at the top of your proposal.`
-    : null
-  // Already-signed deals are being chased for the deposit, not a signature.
-  const baseLabelHtml = proposal.signedAt
-    ? "Open your proposal &amp; pay your deposit"
-    : "Review &amp; sign your proposal"
-  const baseLabelText = proposal.signedAt
-    ? "Open your proposal & pay your deposit"
-    : "Review & sign your proposal"
-  const linkLabel = media
-    ? media.type === "video" ? "Watch the message &amp; view your proposal" : "Listen &amp; view your proposal"
-    : baseLabelHtml
-  // Loom-style circular preview: a real frame from the recording (or the
-  // sender's headshot for voice notes), the whole thing linked — so the email
-  // clearly shows a genuine video, not just a bare link.
-  const posterImg = media
-    ? media.type === "video" && media.poster
-      ? { src: media.poster, alt: "Play the video message", size: 132 }
-      : media.type === "audio" && identity.headshotUrl
-        ? { src: identity.headshotUrl, alt: `${senderFirst}'s voice message`, size: 104 }
-        : null
-    : null
-  const posterHtml = posterImg
-    ? `<p style="margin:18px 0 6px"><a href="${url}" style="text-decoration:none">
-        <img src="${posterImg.src}" width="${posterImg.size}" height="${posterImg.size}" alt="${posterImg.alt}"
-          style="display:block;border-radius:50%;border:3px solid #2563EB;object-fit:cover" />
-      </a></p>
-      <p style="margin:0 0 14px"><a href="${url}" style="color:#2563EB;font-weight:600;font-size:13px">
-        ${media!.type === "video" ? "&#9654; Play video message" : "&#127908; Play voice message"}</a></p>`
-    : ""
-  const html = `
-    <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;max-width:520px">
-      <p>Hi ${proposal.clientName.split(/\s+/)[0]},</p>
-      ${mediaLine ? `<p>${media!.type === "video" ? "🎥" : "🎙"} <strong>${mediaLine}</strong></p>` : ""}
-      ${posterHtml}
-      <p>${safeMsg}</p>
-      <p style="margin:20px 0"><a href="${url}" style="color:#2563EB;font-weight:600">${linkLabel} &rarr;</a></p>
-      <p>Any questions at all, just reply to this email.</p>
-      <p>Kind regards,<br/>${identity.name || user.name || org.name}${org.phone ? `<br/>${org.phone}` : ""}</p>
-    </div>`
-  const text = [
-    `Hi ${proposal.clientName.split(/\s+/)[0]},`,
-    "",
-    ...(mediaLine ? [mediaLine, ""] : []),
-    message,
-    "",
-    `${media ? (media.type === "video" ? "Watch the message & view your proposal" : "Listen & view your proposal") : baseLabelText}: ${url}`,
-    "",
-    "Any questions at all, just reply to this email.",
-    "",
-    "Kind regards,",
-    `${identity.name || user.name || org.name}${org.phone ? `\n${org.phone}` : ""}`,
-  ].join("\n")
+  // Schedule for later (Boomerang-style): stored on the proposal, dispatched
+  // by the cron / page-load processor. Scheduling again overwrites.
+  if (sendAt && Date.parse(sendAt) > Date.now() + 60_000) {
+    if (Date.parse(sendAt) > Date.now() + 60 * 24 * 3600_000) {
+      return NextResponse.json({ error: "Pick a time within the next 60 days" }, { status: 400 })
+    }
+    await db.proposal.update({
+      where: { id: proposal.id },
+      data: {
+        scheduledNudge: JSON.stringify({ ...opts, at: sendAt, by: user.id, byName: user.name || user.email }),
+      },
+    })
+    return NextResponse.json({ scheduled: true, at: sendAt })
+  }
 
   try {
-    await sendEmail({
-      to: proposal.clientEmail,
-      replyTo: identity.email || org.email || user.email,
-      subject: media
-        ? `A ${media.type === "video" ? "video" : "voice"} message about your proposal from ${org.name}`
-        : `Your proposal from ${org.name} — ready when you are`,
-      html,
-      text,
-      fromUserId: identity.userId ?? user.id,
-    })
-    const record: NudgeRecord = {
-      at: new Date().toISOString(),
-      templateName: template.name,
-      by: user.name || user.email,
-      ...(media ? { mediaUrl: media.url, mediaType: media.type, ...(media.poster ? { mediaPosterUrl: media.poster } : {}) } : {}),
-    }
-    const history = [...parseNudgeHistory(proposal.nudgeHistory), record]
-    const updated = await db.proposal.update({
-      where: { id: proposal.id },
-      data: { lastNudgeAt: new Date(), nudgeHistory: JSON.stringify(history) },
-      select: { lastNudgeAt: true, nudgeHistory: true },
-    })
+    const updated = await performNudge(
+      proposal.id,
+      opts,
+      { id: user.id, name: user.name, email: user.email },
+      publicBaseUrl(request.nextUrl.origin)
+    )
     return NextResponse.json({ success: true, lastNudgeAt: updated.lastNudgeAt, nudgeHistory: updated.nudgeHistory })
   } catch (error) {
     console.error("Nudge email error:", error)
@@ -181,4 +87,20 @@ export async function POST(
         : "Failed to send the reminder. Please try again."
     return NextResponse.json({ error: msg }, { status: 500 })
   }
+}
+
+// Cancel a scheduled follow-up.
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: { proposalId: string } }
+) {
+  const user = await getCurrentUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const proposal = await db.proposal.findFirst({
+    where: { id: params.proposalId, organizationId: user.organizationId },
+    select: { id: true },
+  })
+  if (!proposal) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  await db.proposal.update({ where: { id: proposal.id }, data: { scheduledNudge: null } })
+  return NextResponse.json({ success: true })
 }
