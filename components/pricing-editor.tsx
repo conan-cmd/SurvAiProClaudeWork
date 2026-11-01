@@ -133,7 +133,7 @@ export function PricingEditor({
 
   // AI-suggested recurring-service upsells (maintenance plans, reduced-rate
   // return visits), reviewed by the user and added as optional extras.
-  type RecurringSuggestion = { description: string; unit: string; unitPrice: number; why: string | null }
+  type RecurringSuggestion = { kind?: string; description: string; unit: string; unitPrice: number; why: string | null }
   const [suggesting, setSuggesting] = useState(false)
   const [suggestions, setSuggestions] = useState<RecurringSuggestion[] | null>(null)
   const suggestRecurring = async () => {
@@ -143,7 +143,7 @@ export function PricingEditor({
       const d = await res.json()
       if (!res.ok) throw new Error(d.error)
       setSuggestions(d.suggestions)
-      if (!d.suggestions?.length) toast.message("No recurring option really fits this job")
+      if (!d.suggestions?.length) toast.message("No upsell really fits this job")
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't get suggestions")
     } finally {
@@ -392,7 +392,7 @@ export function PricingEditor({
           title="AI suggests a maintenance plan or reduced-rate return visits for this job — you review before anything is added"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-1 hover:bg-violet-100 disabled:opacity-50">
           {suggesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-          Suggest regular service
+          Suggest upsells
         </button>
         {area > 0 && (
           <button type="button" onClick={() => addMeasuredItem(area, "m²")}
@@ -411,22 +411,35 @@ export function PricingEditor({
       {suggestions && suggestions.length > 0 && (
         <div className="space-y-2">
           {suggestions.map((sg, i) => (
-            <div key={i} className="border border-violet-200 bg-violet-50/50 rounded-xl p-3 flex flex-wrap items-center gap-2">
-              <div className="flex-1 min-w-[200px]">
-                <p className="text-sm text-gray-800">{sg.description}</p>
-                <p className="text-xs text-gray-500">
-                  £{sg.unitPrice.toLocaleString("en-GB", { minimumFractionDigits: 2 })} / {sg.unit}
-                  {sg.why ? ` · ${sg.why}` : ""}
-                </p>
+            <div key={i} className="border border-violet-200 bg-violet-50/50 rounded-xl p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-violet-600 bg-white border border-violet-200 rounded-full px-2 py-0.5">
+                  {sg.kind === "upsell" ? "Add-on" : "Regular service"}
+                </span>
+                {sg.why && <span className="text-xs text-gray-500 truncate">{sg.why}</span>}
               </div>
-              <button type="button" onClick={() => addSuggestion(sg)}
-                className="px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-semibold hover:bg-violet-700">
-                Add as optional extra
-              </button>
-              <button type="button" onClick={() => setSuggestions((cur) => cur && cur.filter((x) => x !== sg))}
-                className="px-2 py-1.5 text-xs font-medium text-gray-400 hover:text-gray-600">
-                Dismiss
-              </button>
+              {/* Editable before accepting — tweak the pitch or the price here */}
+              <textarea spellCheck rows={2} value={sg.description}
+                onChange={(e) => setSuggestions((cur) =>
+                  cur && cur.map((x) => (x === sg ? { ...x, description: e.target.value } : x)))}
+                className="w-full text-sm px-3 py-2 border rounded-lg bg-white resize-none focus:outline-none focus:ring-1 focus:ring-violet-400" />
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-gray-500">£</span>
+                <input type="number" min="0" step="0.01" value={sg.unitPrice === 0 ? "" : sg.unitPrice}
+                  onChange={(e) => setSuggestions((cur) =>
+                    cur && cur.map((x) => (x === sg ? { ...x, unitPrice: parseFloat(e.target.value) || 0 } : x)))}
+                  className="w-28 text-sm px-3 py-1.5 border rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                <span className="text-xs text-gray-400">/ {sg.unit}</span>
+                <span className="flex-1" />
+                <button type="button" onClick={() => addSuggestion(sg)} disabled={!sg.description.trim() || sg.unitPrice <= 0}
+                  className="px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-semibold hover:bg-violet-700 disabled:opacity-50">
+                  Add as optional extra
+                </button>
+                <button type="button" onClick={() => setSuggestions((cur) => cur && cur.filter((x) => x !== sg))}
+                  className="px-2 py-1.5 text-xs font-medium text-gray-400 hover:text-gray-600">
+                  Dismiss
+                </button>
+              </div>
             </div>
           ))}
         </div>

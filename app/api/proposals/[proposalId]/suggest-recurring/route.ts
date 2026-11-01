@@ -39,13 +39,15 @@ export async function POST(_req: NextRequest, { params }: { params: { proposalId
       messages: [
         {
           role: "system",
-          content: `You suggest recurring-service upsells for a UK trade quote. Rules:
-- Suggest 1-2 options a client would genuinely value for THIS job: maintenance plans, quarterly/6-monthly/annual return visits at a reduced per-visit rate vs the one-off price, top-up treatments.
-- Price realistically: a recurring visit is typically 30-60% of the comparable one-off line (less prep/buildup), rounded to a sensible figure. Annual plans can be priced per visit or per year — say which in the description.
-- Each description is CLIENT-FACING: one sentence, benefit-led, includes the frequency. No hype.
+          content: `You suggest upsells for a UK trade quote. Two kinds:
+- RECURRING: maintenance plans, quarterly/6-monthly/annual return visits at a reduced per-visit rate vs the one-off price, top-up treatments. A recurring visit is typically 30-60% of the comparable one-off line (less prep/buildup). Say the frequency (and per-visit vs per-year) in the description.
+- UPSELL: a complementary ONE-OFF service that pairs naturally with this job, ideally from the firm's own services list — e.g. gutter clear while roof access is set up, re-sanding/sealing after a driveway clean. Price it sensibly for the add-on scope (often cheaper than standalone since access/setup is shared).
+Rules:
+- Suggest up to 3 total (mix of kinds) that a client would GENUINELY value for THIS job; don't duplicate what's already quoted.
+- Each description is CLIENT-FACING: one sentence, benefit-led. No hype.
 - unit is one of: each, visit, item. quantity is 1.
-- If no recurring option genuinely fits, return fewer or none.
-Respond ONLY JSON: {"suggestions": [{"description": string, "unit": "each"|"visit"|"item", "unitPrice": number, "why": string}]} — "why" is one short internal line for the tradesperson (not shown to the client).`,
+- If nothing genuinely fits, return fewer or none.
+Respond ONLY JSON: {"suggestions": [{"kind": "recurring"|"upsell", "description": string, "unit": "each"|"visit"|"item", "unitPrice": number, "why": string}]} — "why" is one short internal line for the tradesperson (not shown to the client).`,
         },
         {
           role: "user",
@@ -61,12 +63,13 @@ Respond ONLY JSON: {"suggestions": [{"description": string, "unit": "each"|"visi
       max_tokens: 400,
     })
     const parsed = JSON.parse(response.choices[0].message.content || "{}") as {
-      suggestions?: { description?: string; unit?: string; unitPrice?: number; why?: string }[]
+      suggestions?: { kind?: string; description?: string; unit?: string; unitPrice?: number; why?: string }[]
     }
     const suggestions = (parsed.suggestions || [])
       .filter((s) => typeof s.description === "string" && s.description.trim() && typeof s.unitPrice === "number" && s.unitPrice > 0)
-      .slice(0, 2)
+      .slice(0, 3)
       .map((s) => ({
+        kind: s.kind === "upsell" ? "upsell" : "recurring",
         description: s.description!.trim(),
         unit: ["each", "visit", "item"].includes(s.unit || "") ? s.unit : "visit",
         unitPrice: Math.round(s.unitPrice! * 100) / 100,
