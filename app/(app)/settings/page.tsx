@@ -11,6 +11,7 @@ import { PipedriveConnect } from "@/components/pipedrive-connect"
 import { XeroConnect } from "@/components/xero-connect"
 import { BigChangeConnect } from "@/components/bigchange-connect"
 import { SurveyFieldsEditor } from "@/components/survey-fields-editor"
+import { ChangeEmail } from "@/components/change-email"
 import { HIDEABLE_SECTIONS, visibleSectionKeys } from "@/lib/nav-sections"
 import { parseNudgeTemplates, type NudgeTemplate } from "@/lib/nudge"
 import { DropZone } from "@/components/drop-zone"
@@ -1013,6 +1014,11 @@ export default function SettingsPage() {
           <SurveyFieldsEditor />
         </section>
       )}
+
+      <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
+        <h2 className="font-semibold text-brand-navy">Account &amp; sign-in</h2>
+        {me && <ChangeEmail currentEmail={me.email} />}
+      </section>
 
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-4">
         <h2 className="font-semibold text-brand-navy">Your personal sign-off</h2>
