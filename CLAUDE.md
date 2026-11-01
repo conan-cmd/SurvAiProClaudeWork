@@ -179,3 +179,14 @@ Two deploys, both live; prod Neon migrated first each time.
 - API routes validate with `zod`, return `{ error }` + status on failure.
 - Best-effort side effects (imagery, email on invites) must never fail the main action.
 - `lib/*` server modules use `import "server-only"`.
+
+## Backlog — saved for later (2026-11-01)
+
+- **"Create prospect workspace" (sales tool, productised):** the manual motion works today
+  (sign up as conan+prospect@lbcclean.co.uk via plus-addressing → comp with an access code →
+  Import from website → demo under their branding → they take ownership via Settings →
+  Account & sign-in email change + Forgot password). Build when it's happening weekly:
+  an admin button that spins up the org, runs the website import automatically, and mints a
+  one-time CLAIM LINK ("your account's ready — click to take ownership") that sets their
+  email + password in one step. Keep per-org integrations (Stripe/Xero/Gmail) untouched in
+  prospect builds.
