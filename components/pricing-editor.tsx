@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Plus, Trash2, Copy, HardHat, GripVertical } from "lucide-react"
+import { Plus, Trash2, Copy, HardHat, GripVertical, Sparkles, Loader2 } from "lucide-react"
 import { formatCurrency, calculateProposalTotals, lineNet } from "@/lib/utils"
 
 export type EditableLineItem = {
@@ -130,6 +130,44 @@ export function PricingEditor({
 
   const removeItem = (id: string) =>
     setItems((prev) => prev.filter((i) => i.id !== id))
+
+  // AI-suggested recurring-service upsells (maintenance plans, reduced-rate
+  // return visits), reviewed by the user and added as optional extras.
+  type RecurringSuggestion = { description: string; unit: string; unitPrice: number; why: string | null }
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestions, setSuggestions] = useState<RecurringSuggestion[] | null>(null)
+  const suggestRecurring = async () => {
+    setSuggesting(true)
+    try {
+      const res = await fetch(`/api/proposals/${proposalId}/suggest-recurring`, { method: "POST" })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      setSuggestions(d.suggestions)
+      if (!d.suggestions?.length) toast.message("No recurring option really fits this job")
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't get suggestions")
+    } finally {
+      setSuggesting(false)
+    }
+  }
+  const addSuggestion = (sg: RecurringSuggestion) => {
+    setItems((prev) => [
+      ...prev,
+      {
+        id: `new-${Date.now()}`,
+        description: sg.description,
+        quantity: 1,
+        unit: UNITS.includes(sg.unit) ? sg.unit : "visit",
+        unitPrice: sg.unitPrice,
+        vat: 20,
+        discount: 0,
+        isOptional: true,
+        order: prev.length,
+      },
+    ])
+    setSuggestions((cur) => cur && cur.filter((x) => x !== sg))
+    toast.success("Added as an optional extra the client can tick")
+  }
 
   // Copy a line directly below itself — for breakdowns with near-identical rows.
   const duplicateItem = (id: string) =>
@@ -350,6 +388,12 @@ export function PricingEditor({
           className="inline-flex items-center gap-2 text-sm font-semibold text-brand-blue hover:underline">
           <Plus className="w-4 h-4" /> Add line item
         </button>
+        <button type="button" onClick={suggestRecurring} disabled={suggesting}
+          title="AI suggests a maintenance plan or reduced-rate return visits for this job — you review before anything is added"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-1 hover:bg-violet-100 disabled:opacity-50">
+          {suggesting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+          Suggest regular service
+        </button>
         {area > 0 && (
           <button type="button" onClick={() => addMeasuredItem(area, "m²")}
             className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1 hover:bg-emerald-100">
@@ -363,6 +407,30 @@ export function PricingEditor({
           </button>
         )}
       </div>
+
+      {suggestions && suggestions.length > 0 && (
+        <div className="space-y-2">
+          {suggestions.map((sg, i) => (
+            <div key={i} className="border border-violet-200 bg-violet-50/50 rounded-xl p-3 flex flex-wrap items-center gap-2">
+              <div className="flex-1 min-w-[200px]">
+                <p className="text-sm text-gray-800">{sg.description}</p>
+                <p className="text-xs text-gray-500">
+                  £{sg.unitPrice.toLocaleString("en-GB", { minimumFractionDigits: 2 })} / {sg.unit}
+                  {sg.why ? ` · ${sg.why}` : ""}
+                </p>
+              </div>
+              <button type="button" onClick={() => addSuggestion(sg)}
+                className="px-3 py-1.5 bg-violet-600 text-white rounded-lg text-xs font-semibold hover:bg-violet-700">
+                Add as optional extra
+              </button>
+              <button type="button" onClick={() => setSuggestions((cur) => cur && cur.filter((x) => x !== sg))}
+                className="px-2 py-1.5 text-xs font-medium text-gray-400 hover:text-gray-600">
+                Dismiss
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="border-t pt-3 space-y-1 text-sm">
         <div className="flex justify-between text-gray-500">
