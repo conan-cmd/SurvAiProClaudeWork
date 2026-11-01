@@ -288,6 +288,27 @@ export async function syncProposalToPipedrive(
   }
 }
 
+// Logs a completed activity on a deal so Pipedrive's "last activity" moves —
+// used when a follow-up (nudge) goes out via SurvAIPro. Best-effort.
+export async function logDealActivity(
+  org: PdOrg,
+  dealId: string,
+  subject: string,
+  note?: string
+): Promise<void> {
+  await pd(org, "/activities", {
+    method: "POST",
+    body: {
+      subject,
+      type: "email",
+      done: 1,
+      due_date: new Date().toISOString().slice(0, 10),
+      deal_id: Number(dealId),
+      ...(note ? { note } : {}),
+    },
+  })
+}
+
 export type PdDeal = {
   id: number
   title: string

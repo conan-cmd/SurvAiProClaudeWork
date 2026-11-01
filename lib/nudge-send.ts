@@ -147,9 +147,31 @@ export async function performNudge(
     ...(media ? { mediaUrl: media.url, mediaType: media.type, ...(media.poster ? { mediaPosterUrl: media.poster } : {}) } : {}),
   }
   const history = [...parseNudgeHistory(proposal.nudgeHistory), record]
-  return db.proposal.update({
+  const updated = await db.proposal.update({
     where: { id: proposal.id },
     data: { lastNudgeAt: new Date(), nudgeHistory: JSON.stringify(history) },
     select: { lastNudgeAt: true, nudgeHistory: true },
   })
+
+  // Linked Pipedrive deal: log a done "email" activity so the deal's
+  // last-activity date reflects the follow-up. Best-effort — never fails the
+  // nudge.
+  if (proposal.pipedriveDealId) {
+    try {
+      const { logDealActivity, pipedriveConfigured } = await import("@/lib/pipedrive")
+      if (pipedriveConfigured(org)) {
+        const kind = media ? (media.type === "video" ? "video message" : "voice message") : "email"
+        await logDealActivity(
+          org,
+          proposal.pipedriveDealId,
+          `Follow-up ${kind} sent via SurvAIPro® — ${template.name}`,
+          `Sent by ${sender.name || sender.email} to ${proposal.clientEmail}.\n\n${message}`
+        )
+      }
+    } catch (err) {
+      console.error("Pipedrive follow-up activity failed:", err)
+    }
+  }
+
+  return updated
 }
