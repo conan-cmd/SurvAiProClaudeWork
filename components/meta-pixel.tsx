@@ -14,7 +14,9 @@ declare global {
   }
 }
 
-const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID
+// The pixel id is a public identifier (visible in any page source); the env
+// var can override it per-deployment.
+const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "1065337965918378"
 
 export function metaTrack(event: string, params?: Record<string, unknown>) {
   try {
