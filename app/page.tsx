@@ -1,9 +1,11 @@
 import Link from "next/link"
+import { MetaPixel } from "@/components/meta-pixel"
 import { CheckCircle2, ArrowRight, Zap, Shield, Smartphone } from "lucide-react"
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-brand-navy via-blue-50 to-white">
+      <MetaPixel />
       {/* Navigation */}
       <nav className="flex justify-between items-center p-6 max-w-7xl mx-auto">
         <div className="text-2xl font-bold text-brand-navy">SurvAIPro<sup className="text-[0.5em] font-normal ml-px">®</sup></div>

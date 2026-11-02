@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { signIn } from "next-auth/react"
+import { MetaPixel, metaTrack } from "@/components/meta-pixel"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -74,6 +75,8 @@ export default function SignupPage() {
         password: formData.password,
         redirect: false,
       })
+      // Ad-conversion: a completed signup (fires only when a pixel id is set).
+      metaTrack("CompleteRegistration")
       if (signInResult?.error) {
         toast.success("Account created — please sign in")
         router.push("/auth/login")
@@ -91,6 +94,7 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-brand-navy to-blue-50 flex items-center justify-center p-4">
+      <MetaPixel />
       <div className="w-full max-w-md">
         <div className="bg-white rounded-xl shadow-lg p-8">
           <h1 className="text-3xl font-bold text-brand-navy mb-2">Create Account</h1>
