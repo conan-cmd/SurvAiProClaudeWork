@@ -7,15 +7,21 @@ import "server-only"
 // Config: GHL_WEBHOOK_URL = one URL all events POST to (GHL workflows filter on the
 // JSON `event` field); or GHL_WEBHOOK_URL_<EVENT> to give a specific event its own
 // workflow URL (overrides the shared one for that event).
+// Damian's shared inbound webhook (his GHL workflows filter on the `event`
+// field). Env vars override it, per-event or globally.
+const DEFAULT_WEBHOOK_URL =
+  "https://services.leadconnectorhq.com/hooks/y7h1Gk1PvxnuPPlQZGNs/webhook-trigger/Os0bSlP9u8nRqSdyRcoI"
+
 export function ghlEnabled(): boolean {
-  return Boolean(
-    process.env.GHL_WEBHOOK_URL ||
-      Object.keys(process.env).some((k) => k.startsWith("GHL_WEBHOOK_URL_"))
-  )
+  return true
 }
 
 function urlFor(event: string): string | undefined {
-  return process.env[`GHL_WEBHOOK_URL_${event.toUpperCase()}`] || process.env.GHL_WEBHOOK_URL
+  return (
+    process.env[`GHL_WEBHOOK_URL_${event.toUpperCase()}`] ||
+    process.env.GHL_WEBHOOK_URL ||
+    DEFAULT_WEBHOOK_URL
+  )
 }
 
 export type GhlPayload = {
