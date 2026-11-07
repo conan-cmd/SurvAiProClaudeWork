@@ -4,7 +4,7 @@ import {
   createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from "react"
 import { createPortal } from "react-dom"
-import { X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react"
+import { X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Highlighter } from "lucide-react"
 
 const MIN_ZOOM = 1
 const MAX_ZOOM = 6
@@ -18,7 +18,15 @@ const MAX_ZOOM = 6
 // the lightbox gains prev/next arrows, arrow-key and swipe navigation, and a
 // position counter, so viewers flick through every photo without closing.
 
-type GalleryItem = { id: number; src: string; alt: string; caption?: string | null }
+type GalleryItem = {
+  id: number
+  src: string
+  alt: string
+  caption?: string | null
+  // Where the viewer can mark scope on this photo (survey photo manager), the
+  // lightbox shows a "Mark scope" button that hands off to the annotator.
+  onAnnotate?: () => void
+}
 
 type GalleryApi = {
   register: (item: Omit<GalleryItem, "id">) => number
@@ -67,6 +75,7 @@ export function ZoomableGallery({ children }: { children: ReactNode }) {
           src={current.src}
           alt={current.alt}
           caption={current.caption}
+          onAnnotate={current.onAnnotate}
           onClose={() => setOpenId(null)}
           onPrev={ordered.length > 1 ? () => step(-1) : undefined}
           onNext={ordered.length > 1 ? () => step(1) : undefined}
@@ -82,11 +91,13 @@ export function ZoomableImage({
   alt,
   className,
   caption,
+  onAnnotate,
 }: {
   src: string
   alt: string
   className?: string
   caption?: string | null
+  onAnnotate?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const gallery = useContext(GalleryCtx)
@@ -94,9 +105,9 @@ export function ZoomableImage({
 
   useEffect(() => {
     if (!gallery) return
-    if (galleryId.current === null) galleryId.current = gallery.register({ src, alt, caption })
-    else gallery.update(galleryId.current, { src, alt, caption })
-  }, [gallery, src, alt, caption])
+    if (galleryId.current === null) galleryId.current = gallery.register({ src, alt, caption, onAnnotate })
+    else gallery.update(galleryId.current, { src, alt, caption, onAnnotate })
+  }, [gallery, src, alt, caption, onAnnotate])
   useEffect(() => {
     if (!gallery) return
     return () => {
@@ -117,7 +128,8 @@ export function ZoomableImage({
         }
       />
       {open && !gallery && (
-        <Lightbox src={src} alt={alt} caption={caption} onClose={() => setOpen(false)} />
+        <Lightbox src={src} alt={alt} caption={caption} onAnnotate={onAnnotate}
+          onClose={() => setOpen(false)} />
       )}
     </>
   )
@@ -133,6 +145,7 @@ function Lightbox({
   onPrev,
   onNext,
   position,
+  onAnnotate,
 }: {
   src: string
   alt: string
@@ -141,6 +154,7 @@ function Lightbox({
   onPrev?: () => void
   onNext?: () => void
   position?: string
+  onAnnotate?: () => void
 }) {
   const [view, setView] = useState<View>({ x: 0, y: 0, s: 1 })
   const viewRef = useRef(view)
@@ -322,6 +336,14 @@ function Lightbox({
         <div className="absolute top-4 left-1/2 -translate-x-1/2 text-sm font-medium text-white/80 bg-black/40 rounded-full px-3 py-1 pointer-events-none">
           {position}
         </div>
+      )}
+      {onAnnotate && (
+        <button type="button"
+          className={`absolute ${caption ? "bottom-14" : "bottom-6"} left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-full text-sm font-semibold shadow-lg`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onClose(); onAnnotate() }}>
+          <Highlighter className="w-4 h-4" /> Mark scope
+        </button>
       )}
       {caption && (
         <div className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-sm text-center px-4 py-2.5">

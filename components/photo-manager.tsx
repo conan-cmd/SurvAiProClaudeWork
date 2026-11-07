@@ -194,6 +194,7 @@ export function PhotoManager({
                   alt={photo.caption || photo.fileName}
                   caption={photo.caption}
                   className="w-full aspect-[4/3] object-cover"
+                  onAnnotate={() => setAnnotating(photo)}
                 />
               )}
               {photo.isCoverImage && (
