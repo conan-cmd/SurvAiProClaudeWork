@@ -1,10 +1,12 @@
 import { formatCurrency, calculateProposalTotals, lineNet, isVideoFile, PricingItem } from "@/lib/utils"
 import { ZoomableImage, ZoomableGallery } from "@/components/zoomable-image"
+import { parseAnnotations, AnnotationOverlay, AnnotationLegend } from "@/lib/photo-annotations"
 
 type Photo = {
   id: string
   fileUrl: string
   caption?: string | null
+  annotations?: string | null
 }
 
 type Section = {
@@ -163,8 +165,30 @@ function PhotosSection({ data, section }: { data: ProposalDocumentData; section:
   return (
     <ZoomableGallery>
     <div className="grid grid-cols-2 gap-4">
-      {photos.map((photo) => (
-        isVideoFile(photo.fileUrl) ? (
+      {photos.map((photo) => {
+        // Scope-marked photos render uncropped with the vector marks stretched
+        // over the image box — object-cover would shift the image under the
+        // overlay and misalign the marks.
+        const marks = parseAnnotations(photo.annotations)
+        if (marks.length && !isVideoFile(photo.fileUrl)) {
+          return (
+            <figure key={photo.id} className="break-inside-avoid">
+              <div className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photo.fileUrl} alt={photo.caption || "Site photo"}
+                  className="w-full h-auto rounded-lg" />
+                <AnnotationOverlay annotations={marks} />
+              </div>
+              <div className="mt-1.5 space-y-0.5">
+                <AnnotationLegend annotations={marks} />
+                {photo.caption && (
+                  <figcaption className="text-sm text-gray-500">{photo.caption}</figcaption>
+                )}
+              </div>
+            </figure>
+          )
+        }
+        return isVideoFile(photo.fileUrl) ? (
           // Videos play on the web view but can't rasterise onto paper —
           // no-print keeps them out of the PDF export.
           <figure key={photo.id} className="break-inside-avoid no-print">
@@ -187,7 +211,7 @@ function PhotosSection({ data, section }: { data: ProposalDocumentData; section:
           )}
         </figure>
         )
-      ))}
+      })}
     </div>
     </ZoomableGallery>
   )

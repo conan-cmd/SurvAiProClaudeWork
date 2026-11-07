@@ -396,6 +396,9 @@ model SurveyPhoto {
   isCoverImage          Boolean         @default(false)
   includeInProposal     Boolean         @default(true)
   internalOnly          Boolean         @default(false)
+  // Scope annotations drawn on the photo (JSON PhotoAnnotation[],
+  // lib/photo-annotations.tsx): green included / red excluded / amber optional.
+  annotations           String?
 
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt

@@ -82,6 +82,7 @@ type ProposalData = {
       caption: string | null
       includeInProposal: boolean
       internalOnly: boolean
+      annotations?: string | null
     }[]
   }
   createdBy: {

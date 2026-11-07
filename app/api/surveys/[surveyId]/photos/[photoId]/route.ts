@@ -10,6 +10,8 @@ const updatePhotoSchema = z.object({
   isCoverImage: z.boolean().optional(),
   includeInProposal: z.boolean().optional(),
   internalOnly: z.boolean().optional(),
+  // JSON PhotoAnnotation[] (lib/photo-annotations) — scope marks drawn on the photo.
+  annotations: z.string().max(20000).optional(),
 })
 
 async function getScopedPhoto(photoId: string, surveyId: string, organizationId: string) {

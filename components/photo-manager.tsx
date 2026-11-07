@@ -4,10 +4,13 @@ import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import {
   Camera, Trash2, Star, ChevronUp, ChevronDown, EyeOff, Loader2, Check, Download,
+  Highlighter,
 } from "lucide-react"
 import { uploadSurveyPhotos } from "@/lib/photo-upload"
 import { isVideoFile } from "@/lib/utils"
 import { DropZone } from "@/components/drop-zone"
+import { PhotoAnnotator } from "@/components/photo-annotator"
+import { parseAnnotations } from "@/lib/photo-annotations"
 import { ZoomableImage, ZoomableGallery } from "@/components/zoomable-image"
 
 export type Photo = {
@@ -19,6 +22,7 @@ export type Photo = {
   isCoverImage: boolean
   includeInProposal: boolean
   internalOnly: boolean
+  annotations?: string | null
 }
 
 export function PhotoManager({
@@ -33,6 +37,7 @@ export function PhotoManager({
   const fileInput = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [zipping, setZipping] = useState(false)
+  const [annotating, setAnnotating] = useState<Photo | null>(null)
 
   // All originals as one zip — built in the browser, shared/saved like the PDFs.
   const downloadAll = async () => {
@@ -196,6 +201,11 @@ export function PhotoManager({
                   Cover
                 </span>
               )}
+              {parseAnnotations(photo.annotations).length > 0 && (
+                <span className="absolute bottom-2 left-2 bg-violet-600/90 text-white text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Highlighter className="w-3 h-3" /> Scope marked
+                </span>
+              )}
               {photo.internalOnly && (
                 <span className="absolute top-2 right-2 bg-gray-800/80 text-white text-xs font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
                   <EyeOff className="w-3 h-3" /> Internal
@@ -225,6 +235,13 @@ export function PhotoManager({
                       <Star className="w-4 h-4" fill={photo.isCoverImage ? "currentColor" : "none"} />
                     </button>
                   )}
+                  {!isVideoFile(photo.fileName || photo.fileUrl) && (
+                    <button type="button" title="Mark what's included / not included on this photo"
+                      onClick={() => setAnnotating(photo)}
+                      className={`p-1.5 hover:bg-gray-100 rounded ${parseAnnotations(photo.annotations).length ? "text-violet-600" : ""}`}>
+                      <Highlighter className="w-4 h-4" />
+                    </button>
+                  )}
                   <button type="button" title="Internal only (never shown to client)"
                     onClick={() => patch(photo.id, { internalOnly: !photo.internalOnly })}
                     className={`p-1.5 hover:bg-gray-100 rounded ${photo.internalOnly ? "text-gray-900" : ""}`}>
@@ -251,6 +268,19 @@ export function PhotoManager({
         ))}
       </div>
       </ZoomableGallery>
+
+      {annotating && (
+        <PhotoAnnotator
+          surveyId={surveyId}
+          photoId={annotating.id}
+          src={annotating.fileUrl}
+          annotations={annotating.annotations ?? null}
+          onClose={() => setAnnotating(null)}
+          onSaved={(json) =>
+            onChange(photos.map((p) => (p.id === annotating.id ? { ...p, annotations: json } : p)))
+          }
+        />
+      )}
 
       {/* Second drop box after a long grid — no scroll back to the top to add more */}
       {photos.length > 2 && (
