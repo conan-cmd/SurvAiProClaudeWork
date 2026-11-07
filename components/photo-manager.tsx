@@ -251,6 +251,21 @@ export function PhotoManager({
         ))}
       </div>
       </ZoomableGallery>
+
+      {/* Second drop box after a long grid — no scroll back to the top to add more */}
+      {photos.length > 2 && (
+        <DropZone onFiles={upload} accept="image/*,video/*,.heic,.heif" disabled={uploading}>
+          <button
+            type="button"
+            onClick={() => fileInput.current?.click()}
+            disabled={uploading}
+            className="w-full border-2 border-dashed border-gray-300 rounded-xl py-5 flex items-center justify-center gap-2 text-gray-500 hover:border-brand-blue hover:text-brand-blue transition disabled:opacity-50"
+          >
+            {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
+            <span className="font-medium">{uploading ? "Uploading…" : "Add more photos & videos"}</span>
+          </button>
+        </DropZone>
+      )}
     </div>
   )
 }
