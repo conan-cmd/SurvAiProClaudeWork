@@ -117,6 +117,7 @@ async function notifySigned(p: SignedProposal, agreedTotal: number, origin: stri
     </div>`
   await sendEmail({
     to,
+    fromName: "SurvAIPro",
     subject: `✅ ${p.clientName} accepted your proposal`,
     html,
     text: `${p.clientName} has accepted your proposal for ${p.survey.title}. Agreed total: ${formatCurrency(agreedTotal)}.\n\nOpen it: ${url}`,

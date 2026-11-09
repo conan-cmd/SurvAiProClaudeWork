@@ -60,6 +60,7 @@ export async function POST(request: NextRequest, { params }: { params: { reportI
     const to = parsed.data.email.trim()
     await sendEmail({
       to,
+      fromName: org.name,
       replyTo: user.email,
       subject: `Your visit report from ${org.name} — ${site.address}`,
       html: `<div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;max-width:520px">
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest, { params }: { params: { reportI
   if (!to) return NextResponse.json({ error: "No office email on file — set one in Settings" }, { status: 400 })
   await sendEmail({
     to,
+    fromName: org.name,
     replyTo: user.email,
     subject: `Job report — ${site.clientName} (${site.address})`,
     html: `<div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;max-width:520px">

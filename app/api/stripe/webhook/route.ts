@@ -156,6 +156,7 @@ async function notifyTrialStarted(sub: TrialSub, origin: string) {
 
   await sendEmail({
     to: adminEmails(),
+    fromName: "SurvAIPro",
     subject: `🎉 New SurvAIPro trial — ${org.name}`,
     html: `
       <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.7;color:#111827;max-width:540px">

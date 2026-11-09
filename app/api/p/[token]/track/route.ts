@@ -90,6 +90,7 @@ async function notifyFirstView(proposalId: string, origin: string) {
     </div>`
   await sendEmail({
     to,
+    fromName: "SurvAIPro",
     subject: `👀 ${proposal.clientName} opened your proposal`,
     html,
     text: `${proposal.clientName} has just opened your proposal for ${title}.\n\nView it: ${url}`,

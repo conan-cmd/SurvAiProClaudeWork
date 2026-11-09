@@ -71,6 +71,7 @@ async function notifyOffice(p: {
   const siteLabel = `${p.site.clientName}${p.site.clientCompany ? ` · ${p.site.clientCompany}` : ""} — ${p.site.address}`
   await sendEmail({
     to: p.recipients,
+    fromName: p.orgName,
     subject: `Job report completed — ${p.site.clientName}, ${p.site.address}`,
     html: `
       <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;max-width:520px">

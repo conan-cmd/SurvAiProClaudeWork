@@ -13,9 +13,18 @@ export function emailEnabled(): boolean {
 // Resend account and gets spam-filtered everywhere else. Set EMAIL_FROM to an
 // address on a domain you've verified in Resend, e.g.
 //   EMAIL_FROM=LBC Clean <proposals@lbcclean.co.uk>
-function fromAddress(): string {
+function fromAddress(displayName?: string | null): string {
   const from = process.env.EMAIL_FROM?.trim()
-  if (from) return from
+  if (from) {
+    // Multi-tenant: the ADDRESS must stay on the verified domain, but the
+    // display name belongs to whoever is sending (their client knows the
+    // business, not the platform's shared sender).
+    if (displayName) {
+      const addr = from.match(/<([^>]+)>/)?.[1] || from
+      return `${JSON.stringify(displayName.trim())} <${addr}>`
+    }
+    return from
+  }
   if (process.env.NODE_ENV === "production") {
     throw new Error(
       "EMAIL_FROM is not set. Verify a domain in Resend and set EMAIL_FROM to a sender on that domain."
@@ -39,9 +48,15 @@ export async function sendEmail(params: {
   attachments?: { filename: string; path: string }[]
   // When set, and that user has connected their Gmail, the email is sent from
   // their own address via the Gmail API instead of the shared Resend sender.
+  // On the shared sender, their organization's name becomes the From display
+  // name so tenants' emails never carry another business's identity.
   fromUserId?: string
+  // Explicit From display name on the shared sender (wins over fromUserId's
+  // org name). Use for platform emails, e.g. "SurvAIPro".
+  fromName?: string
 }): Promise<void> {
   const recipients = Array.isArray(params.to) ? params.to : [params.to]
+  let senderOrgName: string | null = null
 
   if (params.fromUserId) {
     const sender = await db.user.findUnique({
@@ -53,6 +68,7 @@ export async function sendEmail(params: {
         organization: { select: { name: true } },
       },
     })
+    senderOrgName = sender?.organization?.name || null
     if (sender?.gmailAddress && sender.gmailRefreshToken) {
       const { decryptSecret } = await import("./crypto")
       const { sendViaGmail } = await import("./gmail")
@@ -87,7 +103,7 @@ export async function sendEmail(params: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: fromAddress(),
+      from: fromAddress(params.fromName || senderOrgName),
       to: recipients,
       ...(params.replyTo ? { reply_to: params.replyTo } : {}),
       subject: params.subject,

@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
       const url = `${publicBaseUrl(request.nextUrl.origin)}/auth/reset/${token}`
       await sendEmail({
         to: user.email,
+        fromName: "SurvAIPro",
         subject: "Reset your SurvAIPro® password",
         html: `
           <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.7;color:#111827;max-width:520px">

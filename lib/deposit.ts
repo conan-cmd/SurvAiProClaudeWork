@@ -48,6 +48,7 @@ async function notifyDepositPaid(proposalId: string) {
   const url = `${publicBaseUrl("")}/proposals/${p.id}`
   await sendEmail({
     to,
+    fromName: "SurvAIPro",
     subject: `💰 ${p.clientName} paid their deposit`,
     html: `
       <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.6;color:#111827;max-width:520px">

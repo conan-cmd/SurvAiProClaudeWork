@@ -36,6 +36,7 @@ export async function POST(request: NextRequest, { params }: { params: { orgId: 
       to: recipients,
       subject,
       fromUserId: user.id,
+      fromName: "SurvAIPro",
       replyTo: user.email,
       html: `
         <div style="font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;line-height:1.7;color:#111827;max-width:560px">
