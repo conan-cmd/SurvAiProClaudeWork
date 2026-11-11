@@ -46,6 +46,7 @@ type ProposalData = {
   clientEmail: string | null
   templateName: string
   status: string
+  sentAt: string | null
   signedAt: string | null
   signedName: string | null
   signedPosition: string | null
@@ -437,6 +438,12 @@ export default function ProposalEditorPage() {
   const [sendDocIds, setSendDocIds] = useState<string[]>([])
   const [orgDocs, setOrgDocs] = useState<{ id: string; name: string }[]>([])
 
+  // Already in the client's hands — resending is allowed but must look
+  // deliberate, so the buttons and dialog say "resend", not a fresh "Send".
+  const alreadySent = Boolean(
+    proposal && (proposal.sentAt || ["SENT", "SIGNED", "DEPOSIT_PAID", "WON"].includes(proposal.status))
+  )
+
   const openSend = () => {
     if (!proposal) return
     setSendTo(proposal.clientEmail || "")
@@ -452,6 +459,7 @@ export default function ProposalEditorPage() {
   }
 
   const doSend = async () => {
+    if (sending) return
     if (!proposal || !sendTo.trim()) {
       toast.error("Enter a recipient email")
       return
@@ -469,7 +477,7 @@ export default function ProposalEditorPage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      setProposal({ ...proposal, status: "SENT", clientEmail: sendTo.trim() })
+      setProposal({ ...proposal, status: "SENT", sentAt: new Date().toISOString(), clientEmail: sendTo.trim() })
       setSendOpen(false)
       toast.success(`Proposal emailed to ${sendTo.trim()}`)
     } catch (err) {
@@ -1015,8 +1023,8 @@ export default function ProposalEditorPage() {
           {(proposal.me.canSend || proposal.approvalStatus === "APPROVED") ? (
             <button onClick={openSend} disabled={sending}
               className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
-              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Send
+              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : alreadySent ? <Check className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+              {alreadySent ? "Sent — resend?" : "Send"}
             </button>
           ) : proposal.approvalStatus === "PENDING" ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-500">
@@ -1473,8 +1481,8 @@ export default function ProposalEditorPage() {
             {(proposal.me.canSend || proposal.approvalStatus === "APPROVED") && (
               <button onClick={openSend} disabled={sending}
                 className="w-full inline-flex items-center justify-center gap-2 py-3.5 bg-brand-blue text-white rounded-xl font-semibold hover:bg-blue-700 transition disabled:opacity-50">
-                {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-                Send to client
+                {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : alreadySent ? <Check className="w-5 h-5" /> : <Send className="w-5 h-5" />}
+                {alreadySent ? "Sent — resend?" : "Send to client"}
               </button>
             )}
           </div>
@@ -1498,7 +1506,15 @@ export default function ProposalEditorPage() {
           onClick={() => !sending && setSendOpen(false)}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-4"
             onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-bold text-brand-navy">Send proposal</h3>
+            <h3 className="font-bold text-brand-navy">{alreadySent ? "Resend proposal" : "Send proposal"}</h3>
+            {alreadySent && (
+              <div className="text-sm bg-amber-50 border border-amber-200 text-amber-800 rounded-lg px-3 py-2">
+                This proposal was already sent
+                {proposal?.sentAt ? ` on ${new Date(proposal.sentAt).toLocaleDateString("en-GB")}` : ""}
+                {proposal?.clientEmail ? ` to ${proposal.clientEmail}` : ""}.
+                Sending again emails the client another copy — to chase a reply, use Nudge instead.
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
               <input type="text" inputMode="email" value={sendTo} onChange={(e) => setSendTo(e.target.value)}
@@ -1537,7 +1553,7 @@ export default function ProposalEditorPage() {
               <button onClick={doSend} disabled={sending}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-brand-blue text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                Send
+                {alreadySent ? "Send again" : "Send"}
               </button>
             </div>
           </div>
