@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import { db } from "@/lib/db"
+import { publicBaseUrl } from "@/lib/public-url"
 import { calculateProposalTotals, formatCurrency } from "@/lib/utils"
 
 // Pipedrive JSON panel: shown on the deal detail view, rendered by Pipedrive
@@ -119,12 +120,26 @@ async function handle(request: NextRequest) {
     return panelMessage(dealId, "SurvAIPro® connection issue",
       "This Pipedrive account isn't linked to a SurvAIPro® organization — reconnect Pipedrive in Settings → Integrations")
   }
+  const base = publicBaseUrl(request.nextUrl.origin)
   if (!proposal) {
-    // Per Pipedrive's JSON panel contract, "no linked entity" is an EMPTY
-    // response — Pipedrive then renders its own "Nothing to show" state.
-    // A populated placeholder here makes the panel error instead.
+    // Schema v4: unlinked deals get a create link straight in the panel
+    // (/pd/open prefills a new survey from this deal and auto-links back).
     console.log("[pipedrive-panel] ok: no proposal linked to deal", { dealId })
-    return NextResponse.json({})
+    return NextResponse.json({
+      data: {
+        id: Number(dealId),
+        header: "No proposal yet",
+        status: "Not linked",
+        quoted_net: "—",
+        signed: "—",
+        deposit: "—",
+        client_views: "—",
+        survaipro: {
+          label: "Create this proposal in SurvAIPro®",
+          value: `${base}/pd/open?resource=deal&selectedIds=${encodeURIComponent(dealId)}`,
+        },
+      },
+    })
   }
   console.log("[pipedrive-panel] ok: serving linked proposal", { dealId, status: proposal.status })
 
@@ -160,6 +175,10 @@ async function handle(request: NextRequest) {
       client_views: proposal._count.views > 0
         ? `${proposal._count.views}× — last ${lastView ? lastView.toLocaleDateString("en-GB") : ""}`
         : "Not opened yet",
+      survaipro: {
+        label: "Open this proposal in SurvAIPro®",
+        value: `${base}/proposals/${proposal.id}`,
+      },
     },
   })
 }
