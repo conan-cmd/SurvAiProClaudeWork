@@ -30,22 +30,57 @@ function verifyJwt(token: string, secrets: string[]): Record<string, unknown> | 
   return null
 }
 
+// Pipedrive renders any non-200 as an unhelpful "Something went wrong", so
+// configuration failures answer 200 with the problem spelled out in the panel
+// fields themselves (no org data is exposed on these).
+function panelMessage(dealId: string, header: string, detail: string) {
+  return NextResponse.json({
+    data: {
+      id: Number(dealId) || 0,
+      header,
+      status: detail,
+      quoted_net: "—",
+      signed: "—",
+      deposit: "—",
+      client_views: "—",
+    },
+  })
+}
+
 export async function GET(request: NextRequest) {
   const auth = request.headers.get("authorization") || ""
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : request.nextUrl.searchParams.get("token") || ""
-  const payload = verifyJwt(token, [
-    process.env.PIPEDRIVE_PANEL_SECRET || "",
-    process.env.PIPEDRIVE_CLIENT_SECRET || "",
-  ])
-  if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  const companyId =
-    payload.company_id != null ? String(payload.company_id) : request.nextUrl.searchParams.get("companyId")
   const dealId =
     request.nextUrl.searchParams.get("selectedIds")?.split(",")[0] ||
     request.nextUrl.searchParams.get("id") ||
     ""
-  if (!companyId || !dealId) return NextResponse.json({ error: "Missing company or deal" }, { status: 400 })
+  const hasSecrets = Boolean(process.env.PIPEDRIVE_PANEL_SECRET || process.env.PIPEDRIVE_CLIENT_SECRET)
+  const payload = verifyJwt(token, [
+    process.env.PIPEDRIVE_PANEL_SECRET || "",
+    process.env.PIPEDRIVE_CLIENT_SECRET || "",
+  ])
+  if (!payload) {
+    // A real Pipedrive request that fails verification means the stored secret
+    // no longer matches the app; a request with no token at all is just a probe.
+    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    console.error("[pipedrive-panel] JWT verification failed", {
+      hasSecrets,
+      tokenParts: token.split(".").length,
+    })
+    return panelMessage(
+      dealId,
+      "SurvAIPro® connection issue",
+      hasSecrets
+        ? "Signature check failed — re-copy the app's Client secret from Pipedrive Developer Hub into Vercel (PIPEDRIVE_CLIENT_SECRET) and redeploy"
+        : "No panel secret configured — set PIPEDRIVE_CLIENT_SECRET on Vercel and redeploy"
+    )
+  }
+
+  const companyId =
+    payload.company_id != null ? String(payload.company_id) : request.nextUrl.searchParams.get("companyId")
+  if (!companyId || !dealId) {
+    return panelMessage(dealId, "SurvAIPro® connection issue", "Pipedrive sent no company/deal id — check the panel's URL settings in Developer Hub")
+  }
 
   const org = await db.organization.findFirst({
     where: { pipedriveCompanyId: companyId },
@@ -63,18 +98,13 @@ export async function GET(request: NextRequest) {
       })
     : null
 
+  if (!org) {
+    console.error("[pipedrive-panel] no organization for Pipedrive company", { companyId })
+    return panelMessage(dealId, "SurvAIPro® connection issue",
+      "This Pipedrive account isn't linked to a SurvAIPro® organization — reconnect Pipedrive in Settings → Integrations")
+  }
   if (!proposal) {
-    return NextResponse.json({
-      data: {
-        id: Number(dealId),
-        header: "No SurvAIPro® proposal linked",
-        status: "Not linked",
-        quoted_net: "—",
-        signed: "—",
-        deposit: "—",
-        client_views: "—",
-      },
-    })
+    return panelMessage(dealId, "No SurvAIPro® proposal linked", "Not linked")
   }
 
   const totals = calculateProposalTotals(proposal.pricingLineItems)
