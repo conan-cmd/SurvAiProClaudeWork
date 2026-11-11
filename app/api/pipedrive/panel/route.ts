@@ -60,20 +60,26 @@ export async function GET(request: NextRequest) {
     process.env.PIPEDRIVE_CLIENT_SECRET || "",
   ])
   if (!payload) {
-    // A real Pipedrive request that fails verification means the stored secret
-    // no longer matches the app; a request with no token at all is just a probe.
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    console.error("[pipedrive-panel] JWT verification failed", {
-      hasSecrets,
-      tokenParts: token.split(".").length,
+    // Real Pipedrive panel requests always carry identifying query params;
+    // anything without them is just a probe and gets a bare 401.
+    const q = request.nextUrl.searchParams
+    const looksLikePipedrive = Boolean(q.get("companyId") || q.get("selectedIds") || q.get("userId"))
+    const authKind = auth.startsWith("Bearer ") ? "a Bearer token"
+      : auth.startsWith("Basic ") ? "Basic auth credentials"
+      : token ? "a token query parameter"
+      : "no credentials"
+    console.error("[pipedrive-panel] unverified request", {
+      hasSecrets, authKind, looksLikePipedrive,
+      queryKeys: [...q.keys()],
+      tokenParts: token ? token.split(".").length : 0,
     })
-    return panelMessage(
-      dealId,
-      "SurvAIPro® connection issue",
-      hasSecrets
-        ? "Signature check failed — re-copy the app's Client secret from Pipedrive Developer Hub into Vercel (PIPEDRIVE_CLIENT_SECRET) and redeploy"
-        : "No panel secret configured — set PIPEDRIVE_CLIENT_SECRET on Vercel and redeploy"
-    )
+    if (!looksLikePipedrive && !token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const remedy = !hasSecrets
+      ? "set PIPEDRIVE_CLIENT_SECRET on Vercel and redeploy"
+      : token
+        ? "signature mismatch — re-copy the app's Client secret from Developer Hub into Vercel (PIPEDRIVE_CLIENT_SECRET), or set the panel's JWT secret to the same value"
+        : "in Developer Hub, open the panel's settings and set its JWT secret (leave HTTP auth empty) so requests are signed"
+    return panelMessage(dealId, "SurvAIPro® connection issue", `Pipedrive sent ${authKind} — ${remedy}`)
   }
 
   const companyId =
