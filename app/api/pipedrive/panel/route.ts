@@ -120,8 +120,13 @@ async function handle(request: NextRequest) {
       "This Pipedrive account isn't linked to a SurvAIPro® organization — reconnect Pipedrive in Settings → Integrations")
   }
   if (!proposal) {
-    return panelMessage(dealId, "No SurvAIPro® proposal linked", "Not linked")
+    // Per Pipedrive's JSON panel contract, "no linked entity" is an EMPTY
+    // response — Pipedrive then renders its own "Nothing to show" state.
+    // A populated placeholder here makes the panel error instead.
+    console.log("[pipedrive-panel] ok: no proposal linked to deal", { dealId })
+    return NextResponse.json({})
   }
+  console.log("[pipedrive-panel] ok: serving linked proposal", { dealId, status: proposal.status })
 
   const totals = calculateProposalTotals(proposal.pricingLineItems)
   const lastView = proposal.views[0]?.updatedAt
