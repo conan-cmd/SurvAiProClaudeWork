@@ -48,6 +48,16 @@ function panelMessage(dealId: string, header: string, detail: string) {
 }
 
 export async function GET(request: NextRequest) {
+  return handle(request)
+}
+
+// Pipedrive's panel fetches have changed verb between extension versions —
+// answer POST identically rather than 405ing the panel into an error.
+export async function POST(request: NextRequest) {
+  return handle(request)
+}
+
+async function handle(request: NextRequest) {
   const auth = request.headers.get("authorization") || ""
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : request.nextUrl.searchParams.get("token") || ""
   const dealId =
