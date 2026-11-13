@@ -122,22 +122,13 @@ async function handle(request: NextRequest) {
   }
   const base = publicBaseUrl(request.nextUrl.origin)
   if (!proposal) {
-    // Schema v4: unlinked deals get a create link straight in the panel
-    // (/pd/open prefills a new survey from this deal and auto-links back).
+    // Minimal schema-valid object: required fields only, so the unlinked path
+    // has the least possible surface for Pipedrive's response validation.
     console.log("[pipedrive-panel] ok: no proposal linked to deal", { dealId })
     return NextResponse.json({
       data: {
         id: Number(dealId),
-        header: "No proposal yet",
-        status: "Not linked",
-        quoted_net: "—",
-        signed: "—",
-        deposit: "—",
-        client_views: "—",
-        survaipro: {
-          label: "Create this proposal in SurvAIPro®",
-          value: `${base}/pd/open?resource=deal&selectedIds=${encodeURIComponent(dealId)}`,
-        },
+        header: "No SurvAIPro® proposal yet",
       },
     })
   }
