@@ -157,18 +157,16 @@ async function handle(request: NextRequest) {
       // Pipedrive's panel schema requires id + header on every response.
       id: Number(dealId),
       header: proposal.survey.title || "SurvAIPro® proposal",
-      status: statusLabel[proposal.status] || proposal.status,
+      // Diagnostic round: status + survaipro link withheld — Pipedrive's
+      // validator rejects the full field set and these are the suspects.
       quoted_net: `${formatCurrency(totals.subtotal)} + VAT`,
       signed: proposal.signedAt
         ? `Signed by ${proposal.signedName || proposal.clientName} on ${proposal.signedAt.toLocaleDateString("en-GB")}`
         : "Not signed",
       deposit,
       client_views: proposal._count.views > 0
-        ? `${proposal._count.views}× — last ${lastView ? lastView.toLocaleDateString("en-GB") : ""}`
+        ? `${proposal._count.views}x - last ${lastView ? lastView.toLocaleDateString("en-GB") : ""}`
         : "Not opened yet",
-      // Link fields accept a plain URL string; the labelled-object form is
-      // rejected by the panel's response validation.
-      survaipro: `${base}/proposals/${proposal.id}`,
     },
   })
 }
