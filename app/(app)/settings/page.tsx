@@ -75,6 +75,7 @@ type Me = {
   headshotUrl: string | null
   signatureImageUrl: string | null
   gmailAddress: string | null
+  microsoftEmail: string | null
   role: string
 }
 
@@ -241,9 +242,10 @@ export default function SettingsPage() {
 
   const disconnectEmail = async () => {
     if (!confirm("Disconnect your email? Proposals will send from the shared sender instead.")) return
-    const res = await fetch("/api/email/google/disconnect", { method: "POST" })
+    const provider = me?.microsoftEmail ? "microsoft" : "google"
+    const res = await fetch(`/api/email/${provider}/disconnect`, { method: "POST" })
     if (res.ok) {
-      setMe((m) => (m ? { ...m, gmailAddress: null } : m))
+      setMe((m) => (m ? { ...m, gmailAddress: null, microsoftEmail: null } : m))
       toast.success("Email disconnected")
     } else {
       toast.error("Couldn't disconnect")
@@ -559,23 +561,29 @@ export default function SettingsPage() {
       <section className="bg-white rounded-xl shadow-sm p-5 space-y-3">
         <h2 className="font-semibold text-brand-navy">Send proposals from your own email</h2>
         <p className="text-sm text-gray-500">
-          Connect your Google account and proposals send from your real email address — better
-          deliverability, and client replies come straight back to you.
+          Connect your Google or Microsoft account and proposals send from your real email
+          address — better deliverability, and client replies come straight back to you.
         </p>
-        {me?.gmailAddress ? (
+        {me?.gmailAddress || me?.microsoftEmail ? (
           <div className="flex flex-wrap items-center gap-3">
             <span className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5">
-              <Check className="w-4 h-4" /> Connected as {me.gmailAddress}
+              <Check className="w-4 h-4" /> Connected as {me.gmailAddress || me.microsoftEmail}
             </span>
             <button onClick={disconnectEmail} className="text-sm text-gray-500 hover:underline">
               Disconnect
             </button>
           </div>
         ) : (
-          <a href="/api/email/google/connect"
-            className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-semibold hover:bg-gray-50 w-fit">
-            <Globe className="w-4 h-4" /> Connect Google email
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <a href="/api/email/google/connect"
+              className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-semibold hover:bg-gray-50 w-fit">
+              <Globe className="w-4 h-4" /> Connect Google email
+            </a>
+            <a href="/api/email/microsoft/connect"
+              className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-semibold hover:bg-gray-50 w-fit">
+              <Globe className="w-4 h-4" /> Connect Microsoft email
+            </a>
+          </div>
         )}
       </section>
 

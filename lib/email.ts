@@ -65,6 +65,8 @@ export async function sendEmail(params: {
         name: true,
         gmailAddress: true,
         gmailRefreshToken: true,
+        microsoftEmail: true,
+        microsoftRefreshToken: true,
         organization: { select: { name: true } },
       },
     })
@@ -79,6 +81,21 @@ export async function sendEmail(params: {
           refreshToken,
           fromName,
           fromEmail: sender.gmailAddress,
+          to: recipient,
+          subject: params.subject,
+          html: params.html,
+          replyTo: params.replyTo,
+        })
+      }
+      return
+    }
+    if (sender?.microsoftEmail && sender.microsoftRefreshToken) {
+      const { decryptSecret } = await import("./crypto")
+      const { sendViaOutlook } = await import("./microsoft-mail")
+      const refreshToken = decryptSecret(sender.microsoftRefreshToken)
+      for (const recipient of recipients) {
+        await sendViaOutlook({
+          refreshToken,
           to: recipient,
           subject: params.subject,
           html: params.html,
@@ -123,6 +140,9 @@ export async function sendEmail(params: {
 // True when either the shared Resend sender or a per-user Gmail could be used.
 export async function canSend(userId: string): Promise<boolean> {
   if (process.env.RESEND_API_KEY) return true
-  const u = await db.user.findUnique({ where: { id: userId }, select: { gmailRefreshToken: true } })
-  return Boolean(u?.gmailRefreshToken)
+  const u = await db.user.findUnique({
+    where: { id: userId },
+    select: { gmailRefreshToken: true, microsoftRefreshToken: true },
+  })
+  return Boolean(u?.gmailRefreshToken || u?.microsoftRefreshToken)
 }

@@ -40,6 +40,8 @@ model User {
   // The refresh token is encrypted at rest (lib/crypto).
   gmailAddress          String?
   gmailRefreshToken     String?
+  microsoftEmail        String?
+  microsoftRefreshToken String?
 
   surveysCreated        SiteSurvey[]    @relation("SurveyCreator")
   surveysAssigned       SiteSurvey[]    @relation("SurveyAssignee")

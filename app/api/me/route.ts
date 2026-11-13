@@ -8,7 +8,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const conn = await db.user.findUnique({
     where: { id: user.id },
-    select: { gmailAddress: true },
+    select: { gmailAddress: true, microsoftEmail: true },
   })
   return NextResponse.json({
     id: user.id,
@@ -18,6 +18,7 @@ export async function GET() {
     headshotUrl: user.headshotUrl,
     signatureImageUrl: user.signatureImageUrl,
     gmailAddress: conn?.gmailAddress ?? null,
+    microsoftEmail: conn?.microsoftEmail ?? null,
     role: user.role,
   })
 }
