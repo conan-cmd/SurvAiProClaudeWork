@@ -166,10 +166,9 @@ async function handle(request: NextRequest) {
       client_views: proposal._count.views > 0
         ? `${proposal._count.views}× — last ${lastView ? lastView.toLocaleDateString("en-GB") : ""}`
         : "Not opened yet",
-      survaipro: {
-        label: "Open this proposal in SurvAIPro®",
-        value: `${base}/proposals/${proposal.id}`,
-      },
+      // Link fields accept a plain URL string; the labelled-object form is
+      // rejected by the panel's response validation.
+      survaipro: `${base}/proposals/${proposal.id}`,
     },
   })
 }
