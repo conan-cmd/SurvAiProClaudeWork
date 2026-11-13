@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import { db } from "@/lib/db"
-import { publicBaseUrl } from "@/lib/public-url"
 import { calculateProposalTotals, formatCurrency } from "@/lib/utils"
 
 // Pipedrive JSON panel: shown on the deal detail view, rendered by Pipedrive
@@ -120,7 +119,6 @@ async function handle(request: NextRequest) {
     return panelMessage(dealId, "SurvAIPro® connection issue",
       "This Pipedrive account isn't linked to a SurvAIPro® organization — reconnect Pipedrive in Settings → Integrations")
   }
-  const base = publicBaseUrl(request.nextUrl.origin)
   if (!proposal) {
     // Minimal schema-valid object: required fields only, so the unlinked path
     // has the least possible surface for Pipedrive's response validation.
@@ -136,10 +134,6 @@ async function handle(request: NextRequest) {
 
   const totals = calculateProposalTotals(proposal.pricingLineItems)
   const lastView = proposal.views[0]?.updatedAt
-  const statusLabel: Record<string, string> = {
-    DRAFT: "Draft", READY: "Ready to send", SENT: "Sent", SIGNED: "Accepted & signed",
-    DEPOSIT_PAID: "Deposit paid", WON: "Won", LOST: "Lost",
-  }
 
   // Deposit line: paid beats due; nothing shows before the client signs.
   let deposit = "—"
