@@ -8,6 +8,7 @@ import { isPlatformAdmin } from "@/lib/admin"
 import { db } from "@/lib/db"
 import { FeedbackButton } from "@/components/feedback-button"
 import { PresencePing } from "@/components/presence-ping"
+import { AssistantButton } from "@/components/assistant-button"
 import { SignOutButton } from "@/components/sign-out-button"
 import { LayoutDashboard, ClipboardList, FileText, Users, Images, Settings, ShieldAlert, KeyRound, ClipboardCheck } from "lucide-react"
 
@@ -110,6 +111,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <FeedbackButton founding={user.organization.isFoundingMember} />
       <PresencePing />
+      <AssistantButton />
 
       {/* Bottom tab bar (mobile) */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t z-40 overflow-hidden">
