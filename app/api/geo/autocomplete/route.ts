@@ -28,7 +28,14 @@ export async function GET(request: NextRequest) {
   }
 
   const q = sp.get("q")?.trim()
-  if (!q || q.length < 2 || !key) return NextResponse.json([])
+  // Authed diagnostic mode: report WHY Google refused instead of the silent []
+  // the address box shows (statuses only — never the key).
+  const debug = sp.get("debug") === "1"
+  if (!q || q.length < 2 || !key) {
+    return debug && !key
+      ? NextResponse.json({ debug: "GOOGLE_MAPS_API_KEY is not set" })
+      : NextResponse.json([])
+  }
 
   // Bias suggestions towards the device's location when provided -
   // the surveyor is usually standing at or near the property
@@ -68,7 +75,14 @@ export async function GET(request: NextRequest) {
     }
     if (!res2.ok) {
       console.error("Places autocomplete (new):", res2.status, d2.error?.message)
-      return NextResponse.json([])
+      return debug
+        ? NextResponse.json({
+            debug: {
+              legacy: { status: data.status, message: data.error_message },
+              new: { status: res2.status, message: d2.error?.message },
+            },
+          })
+        : NextResponse.json([])
     }
     const suggestions = (d2.suggestions || [])
       .map((s) => s.placePrediction?.text?.text)
