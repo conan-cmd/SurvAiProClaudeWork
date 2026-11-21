@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { toast } from "sonner"
 import { Loader2, Check } from "lucide-react"
+import { MetaPixel, metaTrack } from "@/components/meta-pixel"
 
 type Plan = "monthly" | "annual"
 
@@ -93,6 +94,7 @@ export function SubscribePlans({
 
   const start = async () => {
     setBusy(true)
+    metaTrack("InitiateCheckout", { content_name: plan })
     try {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
@@ -124,6 +126,9 @@ export function SubscribePlans({
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-brand-navy to-blue-50 flex items-center justify-center p-4">
+      {/* Checkout page is part of the signup funnel — ad-campaign tracking only
+          exists on these owner-facing pages, never on client-facing ones. */}
+      <MetaPixel />
       <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl p-6 md:p-8">
         <h1 className="text-2xl font-bold text-brand-navy mb-1">
           {lapsed ? "Reactivate your subscription" : "Start your 14-day free trial"}

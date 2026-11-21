@@ -46,7 +46,9 @@ export default async function SubscribePage({
     } catch (e) {
       console.error("Subscribe verify failed:", e)
     }
-    redirect("/onboarding/branding")
+    // Dedicated thank-you page: fires the ad-conversion events on a stable URL
+    // before carrying on into onboarding.
+    redirect("/subscribe/thanks")
   }
 
   const org = await db.organization.findUnique({
